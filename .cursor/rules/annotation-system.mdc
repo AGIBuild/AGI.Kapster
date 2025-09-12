@@ -1,0 +1,63 @@
+---
+description: Annotation system architecture and patterns
+globs: **/Overlays/*.cs,**/Services/AnnotationService.cs,**/Commands/*.cs
+---
+
+# Annotation System Architecture
+
+## Core Components
+- [AnnotationService](mdc:src/AGI.Captor.App/Services/AnnotationService.cs): Central annotation management
+- [NewAnnotationOverlay](mdc:src/AGI.Captor.App/Overlays/NewAnnotationOverlay.cs): Main drawing canvas
+- [NewAnnotationToolbar](mdc:src/AGI.Captor.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
+- [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Container window
+
+## Tool System
+- `AnnotationToolType` enum defines available tools
+- `CurrentTool` property controls active drawing mode
+- Tool changes trigger cursor updates and UI state changes
+- Each tool has specific creation and editing behaviors
+
+## Drawing Lifecycle
+1. **Tool Selection**: User selects tool from toolbar
+2. **Creation Start**: Pointer press begins new annotation
+3. **Creation Update**: Pointer move updates annotation geometry
+4. **Creation Complete**: Pointer release finalizes annotation
+5. **Selection/Editing**: Subsequent interactions for modification
+
+## Cursor Management Critical Pattern
+```csharp
+// In NewAnnotationOverlay.OnPointerMoved:
+if (CurrentTool != AnnotationToolType.None)
+{
+    // FORCE cross cursor for drawing tools
+    Cursor = new Cursor(StandardCursorType.Cross);
+}
+```
+
+## Instance Confusion Prevention
+- Always use direct references over FindControl<>()
+- Store control instances in private fields
+- Update references when creating new instances
+- Example pattern from [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs):
+  ```csharp
+  private NewAnnotationOverlay? _annotator;
+  // Use _annotator instead of FindControl<NewAnnotationOverlay>()
+  ```
+
+## Command Pattern
+- Implement ICommand for undoable operations
+- Store command history for undo/redo functionality
+- Each annotation operation should be a command
+- Commands handle both forward and reverse operations
+
+## Coordinate Systems
+- Screen coordinates for overlay positioning
+- Local coordinates for annotation geometry
+- Transform between coordinate systems as needed
+- Handle DPI scaling properly
+
+## Performance Considerations
+- Use canvas layers for different annotation types
+- Implement dirty region updating
+- Cache expensive calculations
+- Limit history depth to prevent memory issues

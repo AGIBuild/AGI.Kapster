@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+description: AGI.Captor project structure and navigation guide
+---
+
+# AGI.Captor Project Structure
+
+This is a .NET 9 cross-platform screenshot and annotation tool built with Avalonia UI.
+
+## Entry Points
+- Main application: [src/AGI.Captor.App/Program.cs](mdc:src/AGI.Captor.App/Program.cs)
+- Application startup: [src/AGI.Captor.App/App.axaml.cs](mdc:src/AGI.Captor.App/App.axaml.cs)
+
+## Core Architecture
+- **MVVM Pattern**: Using CommunityToolkit.Mvvm
+- **Dependency Injection**: Microsoft.Extensions.DependencyInjection
+- **Cross-platform UI**: Avalonia UI 11.x
+- **Graphics**: SkiaSharp for image processing
+- **Logging**: Serilog for structured logging
+
+## Key Directories
+- **Models/**: Data models and DTOs
+- **Services/**: Core business logic and platform abstractions
+- **ViewModels/**: MVVM view models
+- **Views/**: UI definitions (XAML)
+- **Overlays/**: Screenshot overlay windows and annotation canvas
+- **Commands/**: Command pattern for undo/redo functionality
+- **Rendering/**: Graphics rendering and annotation drawing
+
+## Critical Services
+- [ISettingsService](mdc:src/AGI.Captor.App/Services/ISettingsService.cs): Settings management (transient lifecycle)
+- [IHotkeyProvider](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyProvider.cs): Global hotkey registration
+- [IOverlayController](mdc:src/AGI.Captor.App/Services/IOverlayController.cs): Screenshot overlay management
+- [IAnnotationService](mdc:src/AGI.Captor.App/Services/AnnotationService.cs): Drawing tools and annotation logic
+- [IExportService](mdc:src/AGI.Captor.App/Services/ExportService.cs): Image encoding and file export
+
+## Main Windows
+- [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Screenshot capture overlay
+- [NewAnnotationOverlay](mdc:src/AGI.Captor.App/Overlays/NewAnnotationOverlay.cs): Drawing canvas
+- [NewAnnotationToolbar](mdc:src/AGI.Captor.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
+- [SettingsWindow](mdc:src/AGI.Captor.App/Views/SettingsWindow.axaml.cs): Application settings UI

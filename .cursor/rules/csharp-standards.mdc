@@ -1,0 +1,48 @@
+---
+globs: *.cs
+description: C# coding standards and patterns for AGI.Captor
+---
+
+# C# Coding Standards for AGI.Captor
+
+## Naming Conventions
+- **PascalCase**: Classes, methods, properties, enums, public fields
+- **camelCase**: Local variables, parameters, private fields (without underscore)
+- **_camelCase**: Private fields with underscore prefix
+- **UPPER_CASE**: Constants
+
+## Service Lifecycle Patterns
+- **ISettingsService**: Use transient instances, not singletons
+- Create new instances when needed: `new SettingsService()`
+- Settings are loaded in constructor, no need for LoadAsync()
+- No SettingsChanged events - reload service instance for fresh settings
+
+## Error Handling
+- Use structured logging with Serilog
+- Log levels: Debug, Information (avoid), Warning, Error
+- Prefer `Log.Debug()` over `Log.Information()` for development logs
+- Always include context in log messages
+
+## Async Patterns
+- Use `async/await` for I/O operations
+- Use `ConfigureAwait(false)` in library code
+- Prefer `Task.Run()` for CPU-bound work
+- Use `TaskCompletionSource` for event-driven async operations
+
+## MVVM Patterns
+- Use CommunityToolkit.Mvvm attributes: `[ObservableProperty]`, `[RelayCommand]`
+- ViewModels should not reference UI controls directly
+- Use weak event patterns for loosely coupled communication
+- Implement `INotifyPropertyChanged` through base classes
+
+## Dependency Injection
+- Register services in [Program.cs](mdc:src/AGI.Captor.App/Program.cs)
+- Use appropriate lifetimes: Singleton for stateless, Transient for stateful
+- Prefer constructor injection over service locator pattern
+- Use interfaces for testability and abstraction
+
+## Platform-Specific Code
+- Use conditional compilation: `#if WINDOWS`, `#if MACOS`
+- Check runtime: `RuntimeInformation.IsOSPlatform(OSPlatform.Windows)`
+- Implement platform-specific services behind interfaces
+- Keep platform code isolated in Services/ directories

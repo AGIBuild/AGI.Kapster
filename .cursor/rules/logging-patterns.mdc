@@ -1,0 +1,89 @@
+---
+description: Logging patterns and best practices using Serilog
+globs: *.cs
+---
+
+# Logging Patterns with Serilog
+
+## Log Levels Usage
+- **Debug**: Development debugging, verbose information
+- **Information**: Avoid in production - prefer Debug for development logs
+- **Warning**: Potential issues, recoverable errors
+- **Error**: Unrecoverable errors, exceptions
+- **Fatal**: Application terminating errors
+
+## Preferred Patterns
+```csharp
+// PREFER: Debug level for development logs
+Log.Debug("OnPointerMoved: Tool={Tool}, Position={Position}", CurrentTool, position);
+
+// AVOID: Information level for debug traces
+// Log.Information("OnPointerMoved: Tool={Tool}", CurrentTool); // Too verbose
+
+// GOOD: Error with exception context
+Log.Error(ex, "Failed to save screenshot to {FilePath}", filePath);
+
+// GOOD: Warning for recoverable issues
+Log.Warning("Hotkey registration failed, retrying: {HotkeyCombo}", hotkeyCombo);
+```
+
+## Structured Logging
+- Use message templates with parameters
+- Include relevant context variables
+- Use consistent parameter names across the codebase
+- Avoid string concatenation in log messages
+
+## Context Enrichment
+```csharp
+// Include operation context
+Log.Debug("Annotation created: Type={ToolType}, Bounds={Bounds}", 
+    toolType, annotationBounds);
+
+// Include user action context
+Log.Debug("Tool changed: {OldTool} -> {NewTool}", oldTool, newTool);
+
+// Include error context
+Log.Error(ex, "Export failed: Format={Format}, Path={Path}", 
+    exportFormat, filePath);
+```
+
+## Performance Considerations
+- Use Debug level to avoid runtime cost in production
+- Parameterized messages avoid string allocation
+- Consider using `Log.IsEnabled()` for expensive operations
+
+## Common Scenarios
+```csharp
+// Method entry/exit (sparingly)
+Log.Debug("Starting screenshot capture for screen {ScreenIndex}", screenIndex);
+
+// State changes
+Log.Debug("Cursor mode changed: {Mode}", cursorMode);
+
+// User interactions
+Log.Debug("Tool selected: {Tool}", selectedTool);
+
+// Error conditions
+Log.Error(ex, "Failed to register hotkey {Hotkey}", hotkeyString);
+
+// Performance metrics
+Log.Debug("Screenshot captured in {Duration}ms", stopwatch.ElapsedMilliseconds);
+```
+
+## Anti-patterns
+```csharp
+// DON'T: Excessive Information level
+Log.Information("Mouse moved"); // Too frequent
+
+// DON'T: String concatenation
+Log.Debug("Tool: " + toolName); // Use parameters instead
+
+// DON'T: Missing context
+Log.Error("Save failed"); // Include relevant details
+
+// DON'T: Logging in tight loops without conditions
+foreach(var item in items)
+{
+    Log.Debug("Processing item"); // Consider batching or sampling
+}
+```

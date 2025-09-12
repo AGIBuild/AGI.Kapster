@@ -1,0 +1,64 @@
+---
+description: Global hotkey system architecture and platform patterns
+globs: **/Hotkeys/*.cs,**/Services/*Hotkey*.cs
+---
+
+# Hotkey System Architecture
+
+## Core Interfaces
+- [IHotkeyProvider](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyProvider.cs): Platform-specific hotkey registration
+- [IHotkeyManager](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyManager.cs): High-level hotkey management
+- [IApplicationController](mdc:src/AGI.Captor.App/Services/IApplicationController.cs): Application lifecycle control
+
+## Platform Implementation
+- **Windows**: Uses Windows API (RegisterHotKey/UnregisterHotKey)
+- **macOS**: Platform-specific implementation (planned)
+- Factory pattern selects correct provider at runtime
+
+## Async Event Pattern
+```csharp
+// Use TaskCompletionSource for async hotkey waiting
+private TaskCompletionSource<bool>? _hotkeyPressedTcs;
+
+public async Task<bool> WaitForHotkeyAsync(CancellationToken cancellationToken)
+{
+    _hotkeyPressedTcs = new TaskCompletionSource<bool>();
+    // Register hotkey, wait for trigger
+    return await _hotkeyPressedTcs.Task;
+}
+```
+
+## Settings Integration
+- Hotkeys stored in [settings.json](mdc:settings.json)
+- Dynamic registration/unregistration when settings change
+- Validation of hotkey combinations
+- Conflict detection with system hotkeys
+
+## Error Handling
+- Graceful fallback when hotkey registration fails
+- User notification of conflicts
+- Retry mechanisms for transient failures
+- Platform-specific error codes handling
+
+## Thread Safety
+- Hotkey callbacks occur on different threads
+- Use Dispatcher.Invoke for UI thread operations
+- Synchronize access to shared state
+- Avoid blocking UI thread in callbacks
+
+## Memory Management
+- Unregister hotkeys on application exit
+- Dispose of platform resources properly
+- Weak references where appropriate
+- Clean up event subscriptions
+
+## Configuration Patterns
+```csharp
+// Hotkey configuration structure
+public class HotkeyConfig
+{
+    public ModifierKeys Modifiers { get; set; }
+    public Key Key { get; set; }
+    public string Action { get; set; }
+}
+```

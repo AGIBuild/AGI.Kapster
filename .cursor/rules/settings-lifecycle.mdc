@@ -1,0 +1,81 @@
+---
+description: Settings service lifecycle and transient instance patterns
+globs: **/Services/*Settings*.cs,**/Services/SettingsService.cs
+---
+
+# Settings Service Lifecycle Patterns
+
+## Transient Instance Model
+The project uses a **transient instance approach** for ISettingsService, not singleton pattern.
+
+## Key Principles
+1. **Constructor Loading**: Settings loaded synchronously in constructor
+2. **No Events**: No SettingsChanged events - create new instances for fresh data
+3. **No Async Loading**: No LoadAsync() method needed
+4. **Instance Per Use**: Create new SettingsService() when fresh settings needed
+
+## Implementation Pattern
+```csharp
+// CORRECT: Create fresh instance
+var settingsService = new SettingsService(); // Loads settings in constructor
+
+// INCORRECT: Don't use static/singleton instances
+// var settingsService = SettingsService.Instance; // AVOID
+```
+
+## Service Registration
+```csharp
+// In Program.cs - register as transient
+services.AddTransient<ISettingsService, SettingsService>();
+
+// Or create directly when needed
+var settings = new SettingsService();
+```
+
+## Constructor Pattern
+```csharp
+public SettingsService()
+{
+    LoadSettings(); // Synchronous loading
+}
+
+private void LoadSettings()
+{
+    // Load from file synchronously
+    // Set default values if file doesn't exist
+    // No events or async operations
+}
+```
+
+## Update Pattern
+```csharp
+public async Task UpdateSettingsAsync(AppSettings newSettings)
+{
+    Settings = newSettings;
+    await SaveAsync(); // Save to file
+    // No event firing - consumers create new instances
+}
+```
+
+## Consumer Pattern
+```csharp
+// In classes that need settings:
+public SomeService()
+{
+    var settingsService = new SettingsService(); // Fresh instance
+    var currentSettings = settingsService.Settings;
+    // Use settings...
+}
+```
+
+## Benefits
+- Always get latest settings without event subscriptions
+- Simpler state management
+- No memory leaks from event subscriptions
+- Clear ownership and lifecycle
+- Thread-safe by design (each thread gets own instance)
+
+## Files Following This Pattern
+- [SettingsService.cs](mdc:src/AGI.Captor.App/Services/SettingsService.cs): Core implementation
+- [ExportService.cs](mdc:src/AGI.Captor.App/Services/ExportService.cs): Uses `new SettingsService()`
+- [OverlayWindow.axaml.cs](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Creates own instance

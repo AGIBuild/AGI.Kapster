@@ -1,0 +1,123 @@
+---
+description: Common bugs and patterns to avoid based on project history
+alwaysApply: true
+---
+
+# Common Bugs and Prevention Patterns
+
+## Instance Confusion Pattern
+**Problem**: Using FindControl<>() can return wrong instances when controls are replaced dynamically.
+
+**Example Issue**: 
+```csharp
+// BAD: Can return wrong instance
+var annotator = this.FindControl<NewAnnotationOverlay>("Annotator");
+```
+
+**Solution**: Store direct references
+```csharp
+// GOOD: Use direct reference
+private NewAnnotationOverlay? _annotator;
+// Set in constructor after creating instance
+_annotator = new NewAnnotationOverlay(settingsService);
+```
+
+**Files Affected**: 
+- [OverlayWindow.axaml.cs](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs)
+- [NewAnnotationToolbar.axaml.cs](mdc:src/AGI.Captor.App/Overlays/NewAnnotationToolbar.axaml.cs)
+
+## Cursor State Issues
+**Problem**: Cursor gets stuck in wrong mode due to conflicting update logic.
+
+**Root Cause**: Multiple methods setting cursor simultaneously
+```csharp
+// PROBLEMATIC: Multiple cursor setting points
+UpdateCursor(); // Sets cursor
+this.Cursor = new Cursor(StandardCursorType.Cross); // Overrides
+```
+
+**Solution**: Centralized cursor logic
+```csharp
+// In OnPointerMoved - single source of truth
+if (CurrentTool != AnnotationToolType.None)
+{
+    Cursor = new Cursor(StandardCursorType.Cross); // Force for tools
+}
+```
+
+## Settings Service Lifecycle Issues
+**Problem**: Using singleton/static instances leads to stale settings.
+
+**Solution**: Always create fresh instances
+```csharp
+// GOOD: Fresh instance with latest settings
+var settingsService = new SettingsService();
+
+// BAD: Static/singleton instance
+// var settings = SettingsService.Instance;
+```
+
+## Event Handler Memory Leaks
+**Problem**: Event subscriptions not cleaned up properly.
+
+**Prevention**:
+```csharp
+// Subscribe
+_annotationService.ToolChanged += OnToolChanged;
+
+// Always unsubscribe in disposal
+public void Dispose()
+{
+    _annotationService.ToolChanged -= OnToolChanged;
+}
+```
+
+## BMP Export Format Issues
+**Problem**: SkiaSharp cannot encode BMP format properly.
+
+**Solution**: Use System.Drawing for BMP on Windows
+```csharp
+if (format == ExportFormat.Bmp)
+{
+    await SaveBitmapWithSystemDrawingAsync(bitmap, filePath);
+}
+```
+
+## Hotkey Registration Failures
+**Problem**: Global hotkey registration can fail silently.
+
+**Prevention**:
+```csharp
+try
+{
+    await _hotkeyProvider.RegisterAsync(hotkeyConfig);
+    Log.Debug("Hotkey registered: {Hotkey}", hotkeyConfig);
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "Hotkey registration failed: {Hotkey}", hotkeyConfig);
+    // Show user-friendly message
+}
+```
+
+## UI Thread Violations
+**Problem**: Updating UI from background threads.
+
+**Solution**: Use Dispatcher for UI updates
+```csharp
+Dispatcher.UIThread.InvokeAsync(() =>
+{
+    // UI update code here
+});
+```
+
+## Resource Disposal
+**Problem**: Graphics resources not disposed properly.
+
+**Pattern**: Always use `using` statements
+```csharp
+using var bitmap = new SKBitmap(width, height);
+using var canvas = new SKCanvas(bitmap);
+using var paint = new SKPaint();
+// Automatic disposal
+```
