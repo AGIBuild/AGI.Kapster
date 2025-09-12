@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AGI.Captor.App.Overlays"
+        x:Class="AGI.Captor.App.Overlays.OverlayWindow"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual">
+    <Grid Focusable="True">
+        <Path x:Name="MaskPath" Fill="#66000000" IsHitTestVisible="False"/>
+        <local:SelectionOverlay x:Name="Selector"/>
+        <local:NewAnnotationOverlay x:Name="Annotator"/>
+        <Canvas x:Name="UiCanvas">
+            <local:NewAnnotationToolbar x:Name="Toolbar"/>
+        </Canvas>
+    </Grid>
+</Window>
