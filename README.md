@@ -1,272 +1,274 @@
 # AGI.Captor 📸
 
-**现代化跨平台截图与标注工具**
+**Modern Cross-Platform Screenshot and Annotation Tool**
 
-一个基于 .NET 9 和 Avalonia UI 构建的高性能截图工具，支持智能区域选择、丰富的标注功能和灵活的导出选项。
+A high-performance screenshot tool built with .NET 9 and Avalonia UI, featuring intelligent region selection, rich annotation capabilities, and flexible export options.
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue)
 ![Framework](https://img.shields.io/badge/.NET-9.0-purple)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
-## ✨ 主要特性
+[中文文档](README_CN.md) | [Contributing](CONTRIBUTING.md)
 
-### 🎯 智能截图
-- **全局热键支持**：快速呼出截图界面（默认 `Alt+A`）
-- **自由区域选择**：拖拽创建任意大小的截图区域
-- **多屏幕支持**：跨多个显示器无缝工作
-- **高DPI适配**：完美支持不同缩放比例的显示器
+## ✨ Key Features
 
-### 🎨 丰富标注
-- **绘图工具**：箭头、矩形、椭圆、文字、手绘、表情符号
-- **样式自定义**：颜色、粗细、字体大小可调
-- **撤销重做**：支持多步操作历史记录
-- **图层管理**：标注元素可独立编辑和删除
+### 🎯 Smart Screenshot
+- **Global Hotkey Support**: Quick access to screenshot interface (default `Alt+A`)
+- **Free Region Selection**: Drag to create screenshots of any size
+- **Multi-Monitor Support**: Seamless operation across multiple displays
+- **High DPI Adaptation**: Perfect support for different scaling ratios
 
-### 💾 灵活导出
-- **多种格式**：PNG、JPEG、BMP、TIFF、GIF
-- **质量控制**：JPEG 质量和 PNG 压缩级别可调
-- **快速操作**：一键复制到剪贴板或保存到文件
-- **批量处理**：支持导出设置预设
+### 🎨 Rich Annotations
+- **Drawing Tools**: Arrow, rectangle, ellipse, text, freehand, emoji
+- **Style Customization**: Adjustable color, thickness, and font size
+- **Undo/Redo**: Multi-step operation history support
+- **Layer Management**: Independent editing and deletion of annotation elements
 
-### ⚙️ 个性化设置
-- **热键自定义**：可自定义所有快捷键
-- **开机启动**：可设置随系统启动
-- **托盘集成**：最小化到系统托盘
-- **主题支持**：现代化的用户界面
+### 💾 Flexible Export
+- **Multiple Formats**: PNG, JPEG, BMP, TIFF, GIF
+- **Quality Control**: Adjustable JPEG quality and PNG compression levels
+- **Quick Actions**: One-click copy to clipboard or save to file
+- **Batch Processing**: Export settings presets support
 
-## 🚀 快速开始
+### ⚙️ Personalization
+- **Custom Hotkeys**: Customizable shortcuts for all functions
+- **Auto-start**: Option to start with system boot
+- **Tray Integration**: Minimize to system tray
+- **Theme Support**: Modern user interface design
 
-### 系统要求
+## 🚀 Quick Start
 
-- **Windows**: Windows 10 1809 (17763) 或更高版本
-- **macOS**: macOS 10.15 (Catalina) 或更高版本
-- **.NET Runtime**: .NET 9.0 或更高版本
+### System Requirements
 
-### 安装
+- **Windows**: Windows 10 1809 (17763) or higher
+- **macOS**: macOS 10.15 (Catalina) or higher
+- **.NET Runtime**: .NET 9.0 or higher
+
+### Installation
 
 #### Windows
-1. 从 [Releases](../../releases) 下载最新的 `AGI.Captor-win-x64.zip`
-2. 解压到任意目录
-3. 运行 `AGI.Captor.App.exe`
+1. Download the latest `AGI.Captor-win-x64.zip` from [Releases](../../releases)
+2. Extract to any directory
+3. Run `AGI.Captor.App.exe`
 
 #### macOS
-1. 从 [Releases](../../releases) 下载最新的 `AGI.Captor-osx-x64.zip`
-2. 解压到应用程序文件夹
-3. 运行 `AGI.Captor.App`
+1. Download the latest `AGI.Captor-osx-x64.zip` from [Releases](../../releases)
+2. Extract to Applications folder
+3. Run `AGI.Captor.App`
 
-### 首次使用
+### First Use
 
-1. **启动应用**：程序将最小化到系统托盘
-2. **截图**：按下 `Alt+A`（默认）呼出截图界面
-3. **选择区域**：拖拽鼠标创建截图区域
-4. **添加标注**：使用工具栏的绘图工具进行标注
-5. **导出**：点击保存按钮或按 `Ctrl+S` 保存
+1. **Launch App**: The program will minimize to system tray
+2. **Take Screenshot**: Press `Alt+A` (default) to open screenshot interface
+3. **Select Region**: Drag mouse to create screenshot area
+4. **Add Annotations**: Use toolbar drawing tools for annotations
+5. **Export**: Click save button or press `Ctrl+S` to save
 
-## 📖 使用指南
+## 📖 User Guide
 
-### 基本操作
+### Basic Operations
 
-#### 截图流程
-1. **呼出界面**：`Alt+A`（可自定义）
-2. **创建选区**：
-   - 拖拽鼠标创建矩形选区
-   - 使用八个手柄调整选区大小
-   - 拖拽选区内部移动位置
-3. **添加标注**：选择工具栏中的绘图工具
-4. **完成截图**：
-   - `Ctrl+C`：复制到剪贴板
-   - `Ctrl+S`：保存到文件
-   - `Escape`：取消截图
+#### Screenshot Workflow
+1. **Open Interface**: `Alt+A` (customizable)
+2. **Create Selection**:
+   - Drag mouse to create rectangular selection
+   - Use eight handles to adjust selection size
+   - Drag inside selection to move position
+3. **Add Annotations**: Select drawing tools from toolbar
+4. **Complete Screenshot**:
+   - `Ctrl+C`: Copy to clipboard
+   - `Ctrl+S`: Save to file
+   - `Escape`: Cancel screenshot
 
-#### 标注工具
+#### Annotation Tools
 
-| 工具 | 快捷键 | 说明 |
-|------|--------|------|
-| 选择 | `S` | 选择和编辑标注元素 |
-| 箭头 | `A` | 绘制指向箭头 |
-| 矩形 | `R` | 绘制矩形框 |
-| 椭圆 | `E` | 绘制椭圆 |
-| 文字 | `T` | 添加文字标注 |
-| 手绘 | `F` | 自由绘制 |
-| 表情 | `M` | 插入表情符号 |
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Select | `S` | Select and edit annotation elements |
+| Arrow | `A` | Draw pointing arrows |
+| Rectangle | `R` | Draw rectangle frames |
+| Ellipse | `E` | Draw ellipses |
+| Text | `T` | Add text annotations |
+| Freehand | `F` | Free drawing |
+| Emoji | `M` | Insert emoji symbols |
 
-#### 编辑操作
+#### Edit Operations
 
-- **撤销**：`Ctrl+Z`
-- **重做**：`Ctrl+Y`
-- **删除选中**：`Delete`
-- **全选**：`Ctrl+A`
-- **取消选择**：`Ctrl+D`
+- **Undo**: `Ctrl+Z`
+- **Redo**: `Ctrl+Y`
+- **Delete Selected**: `Delete`
+- **Select All**: `Ctrl+A`
+- **Deselect**: `Ctrl+D`
 
-### 高级功能
+### Advanced Features
 
-#### 自定义热键
-1. 打开设置：`Alt+S`（默认）
-2. 进入"热键"选项卡
-3. 点击输入框并按下新的组合键
-4. 保存设置
+#### Custom Hotkeys
+1. Open Settings: `Alt+S` (default)
+2. Go to "Hotkeys" tab
+3. Click input box and press new key combination
+4. Save settings
 
-#### 导出设置
-1. 选择导出格式：PNG、JPEG、BMP、TIFF、GIF
-2. 调整质量参数：
-   - **JPEG质量**：0-100，建议90+
-   - **PNG压缩**：0-9，建议6-9
-3. 选择保存位置或复制到剪贴板
+#### Export Settings
+1. Choose export format: PNG, JPEG, BMP, TIFF, GIF
+2. Adjust quality parameters:
+   - **JPEG Quality**: 0-100, recommend 90+
+   - **PNG Compression**: 0-9, recommend 6-9
+3. Choose save location or copy to clipboard
 
-#### 样式自定义
-- **颜色**：从色板选择或输入十六进制值
-- **粗细**：1-20像素，支持滑块调节
-- **字体大小**：8-72pt，支持滑块调节
+#### Style Customization
+- **Color**: Select from palette or enter hex value
+- **Thickness**: 1-20 pixels, slider adjustable
+- **Font Size**: 8-72pt, slider adjustable
 
-## 🔧 设置说明
+## 🔧 Settings
 
-### 通用设置
-- **开机启动**：程序随系统启动
-- **最小化到托盘**：关闭窗口时最小化到系统托盘
-- **显示通知**：操作完成时显示系统通知
-- **默认保存格式**：选择首选的图片格式
+### General Settings
+- **Start with Windows**: Launch with system startup
+- **Minimize to Tray**: Minimize to system tray when closing window
+- **Show Notifications**: Display system notifications on completion
+- **Default Save Format**: Choose preferred image format
 
-### 热键设置
-- **区域截图**：呼出截图界面的热键
-- **打开设置**：快速打开设置窗口的热键
+### Hotkey Settings
+- **Region Screenshot**: Hotkey to open screenshot interface
+- **Open Settings**: Quick hotkey to open settings window
 
-### 默认样式
-- **文字**：默认字体大小和颜色
-- **图形**：默认线条粗细和颜色
-- **导出**：默认JPEG质量和PNG压缩级别
+### Default Styles
+- **Text**: Default font size and color
+- **Shapes**: Default line thickness and color
+- **Export**: Default JPEG quality and PNG compression levels
 
-### 高级设置
-- **性能**：硬件加速、内存限制等
-- **调试**：日志级别、诊断信息
-- **安全**：剪贴板安全、数据保护
+### Advanced Settings
+- **Performance**: Hardware acceleration, memory limits, etc.
+- **Debug**: Log levels, diagnostic information
+- **Security**: Clipboard security, data protection
 
-## 🗂️ 文件结构
+## 🗂️ File Structure
 
 ```
 AGI.Captor/
-├── AGI.Captor.App.exe          # 主程序
-├── settings.json               # 用户设置（自动创建）
-├── logs/                       # 日志文件
+├── AGI.Captor.App.exe          # Main executable
+├── settings.json               # User settings (auto-created)
+├── logs/                       # Log files
 │   └── app-YYYYMMDD.log
-└── runtimes/                   # 运行时依赖
-    ├── win-x64/               # Windows 平台库
-    └── osx-x64/               # macOS 平台库
+└── runtimes/                   # Runtime dependencies
+    ├── win-x64/               # Windows platform libraries
+    └── osx-x64/               # macOS platform libraries
 ```
 
-### 设置文件位置
+### Settings File Location
 
 - **Windows**: `%APPDATA%\AGI.Captor\settings.json`
 - **macOS**: `~/.config/AGI.Captor/settings.json`
 
-## 🐛 故障排除
+## 🐛 Troubleshooting
 
-### 常见问题
+### Common Issues
 
-#### 热键不响应
-1. 检查是否与其他应用冲突
-2. 以管理员身份运行（Windows）
-3. 授予辅助功能权限（macOS）
+#### Hotkeys Not Responding
+1. Check for conflicts with other applications
+2. Run as administrator (Windows)
+3. Grant accessibility permissions (macOS)
 
-#### 截图模糊或错位
-1. 检查显示器缩放设置
-2. 重启应用程序
-3. 更新显卡驱动
+#### Blurry or Misaligned Screenshots
+1. Check display scaling settings
+2. Restart the application
+3. Update graphics drivers
 
-#### 无法保存文件
-1. 检查目标文件夹权限
-2. 确保磁盘空间充足
-3. 检查文件名是否包含特殊字符
+#### Cannot Save Files
+1. Check target folder permissions
+2. Ensure sufficient disk space
+3. Check for special characters in filename
 
-#### 标注工具不工作
-1. 确保已选择正确的工具
-2. 检查是否在选区内操作
-3. 重新选择工具
+#### Annotation Tools Not Working
+1. Ensure correct tool is selected
+2. Check if operating within selection area
+3. Reselect the tool
 
-### 性能优化
+### Performance Optimization
 
-#### 大分辨率截图
-- 选择合适的压缩级别
-- 避免过多的标注元素
-- 及时清理历史记录
+#### High Resolution Screenshots
+- Choose appropriate compression levels
+- Avoid excessive annotation elements
+- Clear history records promptly
 
-#### 多屏环境
-- 确保主显示器设置正确
-- 使用相同的缩放比例
-- 避免混合不同DPI的显示器
+#### Multi-Monitor Environment
+- Ensure primary display is set correctly
+- Use consistent scaling ratios
+- Avoid mixing different DPI displays
 
-## 🔐 隐私与安全
+## 🔐 Privacy & Security
 
-- **数据本地化**：所有截图和设置均保存在本地
-- **无网络传输**：不会上传任何用户数据
-- **剪贴板安全**：支持安全剪贴板模式
-- **内存保护**：敏感数据及时清理
+- **Local Data**: All screenshots and settings stored locally
+- **No Network Transfer**: No user data uploaded
+- **Clipboard Security**: Secure clipboard mode support
+- **Memory Protection**: Sensitive data cleared promptly
 
-## 📋 系统要求详细
+## 📋 Detailed System Requirements
 
 ### Windows
-- **操作系统**：Windows 10 1809 (Build 17763) 或更高
-- **架构**：x64
-- **运行时**：.NET 9.0 Desktop Runtime
-- **内存**：至少 100MB 可用内存
-- **磁盘**：至少 50MB 可用空间
+- **OS**: Windows 10 1809 (Build 17763) or higher
+- **Architecture**: x64
+- **Runtime**: .NET 9.0 Desktop Runtime
+- **Memory**: At least 100MB available memory
+- **Disk**: At least 50MB available space
 
 ### macOS
-- **操作系统**：macOS 10.15 (Catalina) 或更高
-- **架构**：x64 (Intel) 或 ARM64 (Apple Silicon)
-- **运行时**：.NET 9.0 Runtime
-- **权限**：辅助功能、屏幕录制权限
-- **内存**：至少 100MB 可用内存
-- **磁盘**：至少 50MB 可用空间
+- **OS**: macOS 10.15 (Catalina) or higher
+- **Architecture**: x64 (Intel) or ARM64 (Apple Silicon)
+- **Runtime**: .NET 9.0 Runtime
+- **Permissions**: Accessibility, screen recording permissions
+- **Memory**: At least 100MB available memory
+- **Disk**: At least 50MB available space
 
-## 🆕 更新日志
+## 🆕 Changelog
 
-### v1.0.0 (当前开发版本)
-- ✅ 基础截图功能
-- ✅ 多种标注工具
-- ✅ 热键支持
-- ✅ 多格式导出
-- ✅ 设置持久化
-- ✅ 高DPI支持
-- 🚧 macOS 支持（开发中）
-- 🚧 自动更新（计划中）
+### v1.0.0 (Current Development Version)
+- ✅ Basic screenshot functionality
+- ✅ Multiple annotation tools
+- ✅ Hotkey support
+- ✅ Multi-format export
+- ✅ Settings persistence
+- ✅ High DPI support
+- 🚧 macOS support (in development)
+- 🚧 Auto-update (planned)
 
-## 🤝 贡献
+## 🤝 Contributing
 
-我们欢迎社区贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解如何参与开发。
+We welcome community contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to participate in development.
 
-### 开发环境
+### Development Environment
 - .NET 9.0 SDK
-- Visual Studio 2022 或 JetBrains Rider
-- Avalonia UI 扩展
+- Visual Studio 2022 or JetBrains Rider
+- Avalonia UI Extensions
 
-### 构建指令
+### Build Instructions
 ```bash
-# 克隆仓库
+# Clone repository
 git clone https://github.com/your-username/AGI.Captor.git
 cd AGI.Captor
 
-# 还原依赖
+# Restore dependencies
 dotnet restore
 
-# 构建
+# Build
 dotnet build
 
-# 运行
+# Run
 dotnet run --project src/AGI.Captor.App
 ```
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 [MIT 许可证](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
 
-## 🙏 致谢
+## 🙏 Acknowledgments
 
-- [Avalonia UI](https://avaloniaui.net/) - 跨平台UI框架
-- [SkiaSharp](https://github.com/mono/SkiaSharp) - 2D图形库
-- [Serilog](https://serilog.net/) - 结构化日志库
-- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) - MVVM工具包
+- [Avalonia UI](https://avaloniaui.net/) - Cross-platform UI framework
+- [SkiaSharp](https://github.com/mono/SkiaSharp) - 2D graphics library
+- [Serilog](https://serilog.net/) - Structured logging library
+- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) - MVVM toolkit
 
 ---
 
-**AGI.Captor** - 让截图标注更简单、更高效！ 🚀
+**AGI.Captor** - Making screenshot annotation simpler and more efficient! 🚀
