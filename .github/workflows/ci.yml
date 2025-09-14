@@ -1,0 +1,233 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  PROJECT_PATH: 'src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build
+      run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration Release
+      
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      continue-on-error: true  # Continue even if no tests exist yet
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build Windows x64
+      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/win-x64
+      
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: AGI.Captor-win-x64
+        path: ./dist/win-x64/
+        retention-days: 30
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build macOS x64
+      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/osx-x64
+      
+    - name: Build macOS ARM64
+      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/osx-arm64
+      
+    - name: Create macOS App Bundle (x64)
+      run: |
+        mkdir -p "./dist/AGI Captor-x64.app/Contents/MacOS"
+        mkdir -p "./dist/AGI Captor-x64.app/Contents/Resources"
+        
+        # Copy executable
+        cp ./dist/osx-x64/AGI.Captor.Desktop "./dist/AGI Captor-x64.app/Contents/MacOS/AGI Captor"
+        chmod +x "./dist/AGI Captor-x64.app/Contents/MacOS/AGI Captor"
+        
+        # Copy resources
+        cp ./src/AGI.Captor.Desktop/logo.ico "./dist/AGI Captor-x64.app/Contents/Resources/"
+        
+        # Create Info.plist
+        cat > "./dist/AGI Captor-x64.app/Contents/Info.plist" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>AGI Captor</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.agibuild.captor</string>
+            <key>CFBundleName</key>
+            <string>AGI Captor</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleSignature</key>
+            <string>AGIC</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.15</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSRequiresAquaSystemAppearance</key>
+            <false/>
+        </dict>
+        </plist>
+        EOF
+        
+    - name: Create macOS App Bundle (ARM64)
+      run: |
+        mkdir -p "./dist/AGI Captor-arm64.app/Contents/MacOS"
+        mkdir -p "./dist/AGI Captor-arm64.app/Contents/Resources"
+        
+        # Copy executable
+        cp ./dist/osx-arm64/AGI.Captor.Desktop "./dist/AGI Captor-arm64.app/Contents/MacOS/AGI Captor"
+        chmod +x "./dist/AGI Captor-arm64.app/Contents/MacOS/AGI Captor"
+        
+        # Copy resources
+        cp ./src/AGI.Captor.Desktop/logo.ico "./dist/AGI Captor-arm64.app/Contents/Resources/"
+        
+        # Create Info.plist
+        cat > "./dist/AGI Captor-arm64.app/Contents/Info.plist" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>AGI Captor</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.agibuild.captor</string>
+            <key>CFBundleName</key>
+            <string>AGI Captor</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleSignature</key>
+            <string>AGIC</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.15</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSRequiresAquaSystemAppearance</key>
+            <false/>
+        </dict>
+        </plist>
+        EOF
+        
+    - name: Create ZIP archives
+      run: |
+        cd dist
+        zip -r "AGI.Captor-osx-x64.zip" "AGI Captor-x64.app"
+        zip -r "AGI.Captor-osx-arm64.zip" "AGI Captor-arm64.app"
+        
+    - name: Upload macOS x64 artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: AGI.Captor-osx-x64
+        path: ./dist/AGI.Captor-osx-x64.zip
+        retention-days: 30
+        
+    - name: Upload macOS ARM64 artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: AGI.Captor-osx-arm64
+        path: ./dist/AGI.Captor-osx-arm64.zip
+        retention-days: 30
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos]
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: AGI.Captor-win-x64
+        path: ./artifacts/win-x64/
+        
+    - name: Download macOS x64 artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: AGI.Captor-osx-x64
+        path: ./artifacts/osx-x64/
+        
+    - name: Download macOS ARM64 artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: AGI.Captor-osx-arm64
+        path: ./artifacts/osx-arm64/
+        
+    - name: Create release archives
+      run: |
+        cd artifacts
+        zip -r "AGI.Captor-win-x64.zip" win-x64/
+        
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/AGI.Captor-win-x64.zip
+          artifacts/osx-x64/AGI.Captor-osx-x64.zip
+          artifacts/osx-arm64/AGI.Captor-osx-arm64.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
