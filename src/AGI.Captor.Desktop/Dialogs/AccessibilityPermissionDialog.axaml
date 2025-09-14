@@ -1,0 +1,111 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AGI.Captor.Desktop.Dialogs.AccessibilityPermissionDialog"
+        Title="辅助功能权限设置"
+        Width="500"
+        Height="400"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 标题 -->
+        <TextBlock Grid.Row="0" 
+                   Text="需要辅助功能权限" 
+                   FontSize="18" 
+                   FontWeight="Bold"
+                   Margin="0,0,0,20"/>
+        
+        <!-- 说明内容 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="15">
+                <TextBlock TextWrapping="Wrap" FontSize="14">
+                    AGI.Captor 需要辅助功能权限来监听全局热键。请按照以下步骤启用权限：
+                </TextBlock>
+                
+                <Border Background="#F5F5F5" Padding="15" CornerRadius="5">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="步骤 1: 打开系统设置" FontWeight="SemiBold"/>
+                        <TextBlock TextWrapping="Wrap">
+                            • 点击苹果菜单 → 系统设置（或系统偏好设置）
+                        </TextBlock>
+                        
+                        <TextBlock Text="步骤 2: 找到隐私与安全性" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                        <TextBlock TextWrapping="Wrap">
+                            • macOS Ventura+: 隐私与安全性 → 辅助功能
+                            • macOS Big Sur/Monterey: 安全性与隐私 → 隐私 → 辅助功能
+                        </TextBlock>
+                        
+                        <TextBlock Text="步骤 3: 添加应用程序" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                        <TextBlock TextWrapping="Wrap">
+                            • 点击锁图标并输入密码解锁
+                            • 点击 "+" 按钮添加应用程序
+                        </TextBlock>
+                        
+                        <TextBlock Text="步骤 4: 选择正确的应用" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Red">
+                            ⚠️ 重要：由于这是开发版本，请选择以下路径之一：
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" FontFamily="Consolas,Monaco,monospace" 
+                                   Background="#EEEEEE" Padding="5" FontSize="12">
+                            • /usr/local/share/dotnet/dotnet
+                            • /usr/bin/dotnet
+                            • 或者搜索 "dotnet" 并选择 .NET 运行时
+                        </TextBlock>
+                        
+                        <TextBlock Text="步骤 5: 启用权限" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                        <TextBlock TextWrapping="Wrap">
+                            • 确保添加的应用旁边的复选框已勾选
+                            • 重启 AGI.Captor 应用程序
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                
+                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray">
+                    注意：正式发布版本会显示为 "AGI.Captor.Desktop"，但开发版本需要添加 dotnet 运行时。
+                </TextBlock>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- 权限状态 -->
+        <Border Grid.Row="2" 
+                Background="#E3F2FD" 
+                Padding="10" 
+                CornerRadius="5" 
+                Margin="0,15,0,15">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock x:Name="PermissionStatusIcon" 
+                           Text="❌" 
+                           FontSize="16" 
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="PermissionStatusText" 
+                           Text="权限状态：未授予" 
+                           VerticalAlignment="Center"/>
+                <Button x:Name="RefreshButton" 
+                        Content="刷新状态" 
+                        Padding="8,4" 
+                        Click="RefreshPermissionStatus"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 按钮 -->
+        <StackPanel Grid.Row="3" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    Spacing="10">
+            <Button Content="打开系统设置" 
+                    Click="OpenSystemPreferences" 
+                    Padding="15,8"/>
+            <Button Content="稍后设置" 
+                    Click="CloseDialog" 
+                    Padding="15,8"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -225,13 +225,18 @@ AGI.Captor/
 
 ### v1.0.0 (Current Development Version)
 - ✅ Basic screenshot functionality
-- ✅ Multiple annotation tools
-- ✅ Hotkey support
-- ✅ Multi-format export
-- ✅ Settings persistence
-- ✅ High DPI support
-- 🚧 macOS support (in development)
-- 🚧 Auto-update (planned)
+- ✅ Multiple annotation tools (Arrow, Rectangle, Ellipse, Text, Freehand, Emoji)
+- ✅ Global hotkey support (Windows & macOS)
+- ✅ Multi-format export (PNG, JPEG, BMP, WebP with quality control)
+- ✅ Settings persistence and configuration management
+- ✅ High DPI support and multi-monitor compatibility
+- ✅ macOS platform support (hotkeys, screen capture, element detection)
+- ✅ System tray integration with About dialog
+- ✅ Clipboard functionality for all platforms
+- ✅ UI/UX optimizations (toolbar icons, arrow styles)
+- 🚧 CI/CD pipeline (in development)
+- 🚧 Unit testing coverage (in development)
+- 🚧 Auto-update system (planned)
 
 ## 🤝 Contributing
 
@@ -255,7 +260,7 @@ dotnet restore
 dotnet build
 
 # Run
-dotnet run --project src/AGI.Captor.App
+dotnet run --project src/AGI.Captor.Desktop
 ```
 
 ## 📄 License

@@ -225,13 +225,18 @@ AGI.Captor/
 
 ### v1.0.0 (当前开发版本)
 - ✅ 基础截图功能
-- ✅ 多种标注工具
-- ✅ 热键支持
-- ✅ 多格式导出
-- ✅ 设置持久化
-- ✅ 高DPI支持
-- 🚧 macOS 支持（开发中）
-- 🚧 自动更新（计划中）
+- ✅ 多种标注工具（箭头、矩形、椭圆、文字、手绘、表情符号）
+- ✅ 全局热键支持（Windows 和 macOS）
+- ✅ 多格式导出（PNG、JPEG、BMP、WebP，支持质量控制）
+- ✅ 设置持久化和配置管理
+- ✅ 高DPI支持和多屏幕兼容性
+- ✅ macOS 平台完整支持（热键、屏幕捕获、元素检测）
+- ✅ 系统托盘集成和 About 对话框
+- ✅ 全平台剪贴板功能
+- ✅ UI/UX 优化（工具栏图标、箭头样式）
+- 🚧 CI/CD 管道（开发中）
+- 🚧 单元测试覆盖率（开发中）
+- 🚧 自动更新系统（计划中）
 
 ## 🤝 贡献
 
@@ -255,7 +260,7 @@ dotnet restore
 dotnet build
 
 # 运行
-dotnet run --project src/AGI.Captor.App
+dotnet run --project src/AGI.Captor.Desktop
 ```
 
 ## 📄 许可证

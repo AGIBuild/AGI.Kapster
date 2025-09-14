@@ -1,0 +1,287 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Avalonia.Controls.Primitives"
+             x:Class="AGI.Captor.Desktop.Overlays.NewAnnotationToolbar">
+  
+
+  <!-- Compact adaptive-width toolbar -->
+  <Border Background="#E8000000" 
+          BorderBrush="#40FFFFFF" 
+          BorderThickness="1" 
+          CornerRadius="6"
+          Padding="6,6"
+          Height="56"
+          BoxShadow="0 2 12 0 #60000000">
+    
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      
+      <!-- Tool Selection with Icon Font -->
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <ToggleButton x:Name="SelectToolButton" 
+                     Content="🖱" 
+                     Tag="None"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Select Tool"
+                     IsChecked="True"/>
+        <ToggleButton x:Name="ArrowToolButton" 
+                     Content="↗" 
+                     Tag="Arrow"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Arrow Tool"/>
+        <ToggleButton x:Name="RectangleToolButton" 
+                     Content="▭" 
+                     Tag="Rectangle"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Rectangle Tool"/>
+        <ToggleButton x:Name="EllipseToolButton" 
+                     Content="○" 
+                     Tag="Ellipse"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Ellipse Tool"/>
+        <ToggleButton x:Name="TextToolButton" 
+                     Content="T" 
+                     Tag="Text"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     FontWeight="Bold"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Text Tool"/>
+        <ToggleButton x:Name="FreehandToolButton" 
+                     Content="✎"
+                     Tag="Freehand"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Freehand Tool"/>
+      </StackPanel>
+      
+      <!-- Separator -->
+      <Border Width="1" Height="32" Background="#40FFFFFF"/>
+      
+      <!-- Color Selection -->
+      <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">       
+        <!-- Current Color Display -->
+        <Border x:Name="CurrentColorDisplay" 
+               Width="24" Height="32" 
+               Background="Red"
+               CornerRadius="3"
+               BorderThickness="1"
+               BorderBrush="White"/>
+        <!-- Color Picker Button -->
+        <Button x:Name="ColorPickerButton" 
+               Content="▼" 
+               Width="18" Height="32"
+               Background="Transparent"
+               BorderBrush="#60FFFFFF"
+               BorderThickness="1"
+               Foreground="White"
+               CornerRadius="3"
+               FontSize="8"
+               Padding="0"
+               HorizontalContentAlignment="Center"
+               VerticalContentAlignment="Center"
+               Cursor="Hand"
+               ToolTip.Tip="Choose color"/>
+      </StackPanel>
+      
+      <!-- Emoji Selection Panel (always visible) -->
+      <StackPanel x:Name="EmojiPanel" 
+                 Orientation="Horizontal" 
+                 Spacing="2" 
+                 VerticalAlignment="Center">
+        
+        <!-- Current Emoji Display (acts as tool button) -->
+        <Button x:Name="CurrentEmojiDisplay" 
+               Width="32" Height="32" 
+               Background="#30FFFFFF"
+               CornerRadius="4"
+               BorderThickness="1"
+               BorderBrush="#60FFFFFF"
+               Padding="0,6,0,0" 
+               HorizontalContentAlignment="Center" 
+               VerticalContentAlignment="Center"
+               Margin="1"
+               ToolTip.Tip="Emoji Tool">
+          <TextBlock x:Name="CurrentEmojiText"
+                    Text="😀"
+                    FontSize="18"
+                    Padding="0"
+                    Margin="0"
+                    FontFamily="Segoe UI Emoji"
+                    TextAlignment="Center"
+                    VerticalAlignment="Center"
+                    LineHeight="30"/>
+        </Button>
+        
+        <!-- Emoji Picker Button -->
+        <Button x:Name="EmojiPickerButton" 
+               Content="▼" 
+               Width="18" Height="32"
+               Background="Transparent"
+               BorderBrush="#60FFFFFF"
+               BorderThickness="1"
+               Foreground="White"
+               CornerRadius="3"
+               FontSize="8"
+               Padding="0"
+               VerticalContentAlignment="Center"
+               HorizontalContentAlignment="Center" 
+               ToolTip.Tip="Select Emoji"/>
+      </StackPanel>
+      
+      <!-- Separator -->
+      <Border Width="1" Height="32" Background="#40FFFFFF"/>
+      
+      <!-- Stroke Width -->
+      <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+        <TextBlock Text="Size:" 
+                  VerticalAlignment="Center" 
+                  Foreground="White" 
+                  FontSize="11"
+                  MinWidth="28"/>
+        <Slider x:Name="WidthSlider" 
+               Minimum="1" 
+               Maximum="20" 
+               Value="4" 
+               Width="80"
+               Height="35"
+               VerticalAlignment="Center"
+               Foreground="White"
+               Background="#30FFFFFF"/>
+        <TextBlock x:Name="WidthValueText" 
+                  Text="4" 
+                  VerticalAlignment="Center" 
+                  Foreground="White" 
+                  FontSize="10"
+                  MinWidth="12"/>
+      </StackPanel>
+      
+      <!-- Font Size Panel (for text tool) -->
+      <StackPanel x:Name="FontSizePanel" 
+                 Orientation="Horizontal" 
+                 Spacing="2" 
+                 VerticalAlignment="Center"
+                 IsVisible="False">
+        
+        <!-- Separator -->
+        <Border Width="1" Height="24" Background="#40FFFFFF"/>
+        
+        <TextBlock Text="Font:" 
+                  VerticalAlignment="Center" 
+                  Foreground="White" 
+                  FontSize="11"
+                  MinWidth="32"/>
+        <Slider x:Name="FontSizeSlider" 
+               Minimum="8" 
+               Maximum="48" 
+               Value="18" 
+               Width="80"
+               Height="35"
+               VerticalAlignment="Center"
+               Foreground="White"
+               Background="#30FFFFFF"/>
+        <TextBlock x:Name="FontSizeValueText" 
+                  Text="18" 
+                  VerticalAlignment="Center" 
+                  Foreground="White" 
+                  FontSize="10"
+                  MinWidth="16"/>
+      </StackPanel>
+      
+      
+      <!-- Separator -->
+      <Border Width="1" Height="32" Background="#40FFFFFF"/>
+      
+      <!-- Action Buttons -->
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <Button x:Name="ClearButton" 
+               Content="🗑" 
+               Width="32" Height="32"
+               Background="Transparent"
+               BorderBrush="#60FFFFFF"
+               BorderThickness="1"
+               Foreground="White"
+               CornerRadius="3"
+               FontSize="12"
+               VerticalContentAlignment="Center"
+               HorizontalContentAlignment="Center"
+               ToolTip.Tip="Clear All"/>
+        <Button x:Name="DeleteButton" 
+               Content="X" 
+               Width="32" Height="32"
+               Background="Transparent"
+               BorderBrush="#60FFFFFF"
+               BorderThickness="1"
+               Foreground="White"
+               CornerRadius="3"
+               FontSize="12"
+               VerticalContentAlignment="Center"
+               HorizontalContentAlignment="Center"
+               ToolTip.Tip="Delete Selected"/>
+        
+        <!-- Separator -->
+        <Border Width="1" Height="32" Background="#40FFFFFF" Margin="2,0"/>
+        
+        <Button x:Name="ExportButton" 
+               Content="💾" 
+               Width="32" Height="32"
+               Background="Transparent"
+               BorderBrush="#60FFFFFF"
+               BorderThickness="1"
+               Foreground="White"
+               CornerRadius="3"
+               FontSize="12"
+               VerticalContentAlignment="Center"
+               HorizontalContentAlignment="Center"
+               ToolTip.Tip="Export Image"/>
+      </StackPanel>
+      
+    </StackPanel>
+    
+  </Border>
+  
+</UserControl>
