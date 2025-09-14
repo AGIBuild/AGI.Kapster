@@ -8,6 +8,7 @@ A high-performance screenshot tool built with .NET 9 and Avalonia UI, featuring 
 ![Framework](https://img.shields.io/badge/.NET-9.0-purple)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
+![CI/CD](https://github.com/AGIBuild/AGI.Captor/actions/workflows/ci.yml/badge.svg)
 
 [中文文档](README_CN.md) | [Contributing](CONTRIBUTING.md)
 
@@ -185,7 +186,7 @@ AGI.Captor/
 2. Check if operating within selection area
 3. Reselect the tool
 
-### Performance Optimization
+### Performance Optimizationgi t
 
 #### High Resolution Screenshots
 - Choose appropriate compression levels

@@ -8,6 +8,7 @@
 ![Framework](https://img.shields.io/badge/.NET-9.0-purple)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
+![CI/CD](https://github.com/AGIBuild/AGI.Captor/actions/workflows/ci.yml/badge.svg)
 
 [English](README.md) | [贡献指南](CONTRIBUTING.md)
 
