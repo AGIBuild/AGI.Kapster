@@ -208,11 +208,12 @@ public class HotkeyManager : IHotkeyManager
         try
         {
             var parts = combination.Split('+');
-            
+
             foreach (var part in parts)
             {
                 var trimmed = part.Trim();
-                switch (trimmed.ToLowerInvariant())
+                var lower = trimmed.ToLowerInvariant();
+                switch (lower)
                 {
                     case "ctrl":
                     case "control":
@@ -230,10 +231,12 @@ public class HotkeyManager : IHotkeyManager
                         modifiers |= HotkeyModifiers.Win;
                         break;
                     default:
-                        // Try to parse as key code
-                        if (trimmed.Length == 1)
+                        // Named keys
+                        keyCode = MapKeyNameToVk(lower);
+                        if (keyCode == 0 && trimmed.Length == 1)
                         {
-                            keyCode = char.ToUpperInvariant(trimmed[0]);
+                            // Single character (letter/digit)
+                            keyCode = (uint)char.ToUpperInvariant(trimmed[0]);
                         }
                         break;
                 }
@@ -246,6 +249,81 @@ public class HotkeyManager : IHotkeyManager
             Log.Error(ex, "Failed to parse hotkey combination: {Combination}", combination);
             return false;
         }
+    }
+
+    private static uint MapKeyNameToVk(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return 0;
+
+        // Function keys F1-F24
+        if (name.Length >= 2 && name[0] == 'f' && int.TryParse(name.AsSpan(1), out var fnum) && fnum >= 1 && fnum <= 24)
+            return (uint)(0x70 + (fnum - 1));
+
+        // Arrows
+        switch (name)
+        {
+            case "space": return 0x20;
+            case "enter": return 0x0D;
+            case "esc":
+            case "escape": return 0x1B;
+            case "tab": return 0x09;
+            case "backspace":
+            case "bksp": return 0x08;
+            case "delete":
+            case "del": return 0x2E;
+            case "insert":
+            case "ins": return 0x2D;
+            case "home": return 0x24;
+            case "end": return 0x23;
+            case "pageup":
+            case "pgup": return 0x21;
+            case "pagedown":
+            case "pgdn": return 0x22;
+            case "up": return 0x26;
+            case "down": return 0x28;
+            case "left": return 0x25;
+            case "right": return 0x27;
+
+            // Numpad digits and operations
+            case "numpad0": return 0x60;
+            case "numpad1": return 0x61;
+            case "numpad2": return 0x62;
+            case "numpad3": return 0x63;
+            case "numpad4": return 0x64;
+            case "numpad5": return 0x65;
+            case "numpad6": return 0x66;
+            case "numpad7": return 0x67;
+            case "numpad8": return 0x68;
+            case "numpad9": return 0x69;
+            case "numpad+":
+            case "add": return 0x6B;
+            case "numpad-":
+            case "sub":
+            case "subtract": return 0x6D;
+            case "numpad*":
+            case "mul":
+            case "multiply": return 0x6A;
+            case "numpad/":
+            case "div":
+            case "divide": return 0x6F;
+            case "numpad.":
+            case "decimal": return 0x6E;
+
+            // OEM symbols (US layout)
+            case "-": return 0xBD; // VK_OEM_MINUS
+            case "=": return 0xBB; // VK_OEM_PLUS
+            case "[": return 0xDB; // VK_OEM_4
+            case "]": return 0xDD; // VK_OEM_6
+            case "\\": return 0xDC; // VK_OEM_5
+            case ";": return 0xBA; // VK_OEM_1
+            case "'": return 0xDE; // VK_OEM_7
+            case ",": return 0xBC; // VK_OEM_COMMA
+            case ".": return 0xBE; // VK_OEM_PERIOD
+            case "/": return 0xBF; // VK_OEM_2
+            case "`": return 0xC0; // VK_OEM_3
+        }
+
+        return 0;
     }
 
     /// <summary>
