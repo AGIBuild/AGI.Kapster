@@ -18,9 +18,18 @@ public class AnnotationRenderer : IAnnotationRenderer
 {
     private readonly AnnotationRenderOptions _options;
     private readonly Dictionary<Guid, List<Control>> _renderCache = new();
-    
+
     // Geometry cache to avoid rebuilding complex figures repeatedly
-    private readonly Dictionary<Guid, (PathGeometry geometry, Rect bounds, long version)> _geometryCache = new();
+    private readonly Dictionary<Guid, (Geometry geometry, Rect bounds, long version)> _geometryCache = new();
+    private readonly Dictionary<Guid, (PathGeometry geometry, Rect bounds, long version)> _freehandCache = new();
+    
+    // Path instance pool to reduce allocations
+    private readonly Stack<Path> _pathPool = new();
+    private readonly SolidColorBrush _arrowShadowBrush = new SolidColorBrush(Colors.Black, 0.08);
+    
+    // Geometry pools for shapes with reusable local coordinates
+    private readonly Dictionary<(int w, int h), RectangleGeometry> _rectGeomPool = new();
+    private readonly Dictionary<(int w, int h), EllipseGeometry> _ellipseGeomPool = new();
 
     public AnnotationRenderer(AnnotationRenderOptions? options = null)
     {
@@ -104,7 +113,11 @@ public class AnnotationRenderer : IAnnotationRenderer
         foreach (var item in items)
         {
             // Use cached bounds when available for looser intersection test; fallback to item.Bounds
-            Rect itemBounds = item.Bounds;
+            Rect itemBounds = item switch
+            {
+                TextAnnotation ta => ta.GetTextRenderBounds(),
+                _ => item.Bounds
+            };
             if (_geometryCache.TryGetValue(item.Id, out var cached))
             {
                 if (!IsEmptyRect(cached.bounds))
@@ -121,12 +134,70 @@ public class AnnotationRenderer : IAnnotationRenderer
         }
     }
 
+    public void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, IReadOnlyList<Rect> dirtyRects)
+    {
+        if (dirtyRects == null || dirtyRects.Count == 0)
+        {
+            RenderAll(canvas, items);
+            return;
+        }
+        // Merge dirty rects into minimal list
+        var merged = MergeRects(dirtyRects);
+        foreach (var item in items)
+        {
+            Rect itemBounds = item is TextAnnotation t ? t.GetTextRenderBounds() : item.Bounds;
+            if (_geometryCache.TryGetValue(item.Id, out var cached) && !IsEmptyRect(cached.bounds))
+                itemBounds = cached.bounds;
+            bool intersects = false;
+            foreach (var dr in merged)
+            {
+                if (itemBounds.Intersects(dr)) { intersects = true; break; }
+            }
+            if (!intersects) continue;
+            Render(canvas, item);
+        }
+    }
+
+    private static List<Rect> MergeRects(IReadOnlyList<Rect> rects)
+    {
+        var list = rects.Where(r => r.Width > 0 && r.Height > 0).ToList();
+        if (list.Count <= 1) return list;
+        // Simple O(n^2) merge sufficient for small frame batches
+        bool merged;
+        do
+        {
+            merged = false;
+            for (int i = 0; i < list.Count && !merged; i++)
+            {
+                for (int j = i + 1; j < list.Count; j++)
+                {
+                    var a = list[i]; var b = list[j];
+                    if (a.Intersects(b) || Touching(a, b))
+                    {
+                        var u = new Rect(Math.Min(a.Left, b.Left), Math.Min(a.Top, b.Top),
+                                         Math.Max(a.Right, b.Right) - Math.Min(a.Left, b.Left),
+                                         Math.Max(a.Bottom, b.Bottom) - Math.Min(a.Top, b.Top));
+                        list.RemoveAt(j); list[i] = u; merged = true; break;
+                    }
+                }
+            }
+        } while (merged);
+        return list;
+    }
+
+    private static bool Touching(Rect a, Rect b)
+    {
+        return !(a.Right < b.Left || b.Right < a.Left || a.Bottom < b.Top || b.Bottom < a.Top);
+    }
+
     private static bool IsEmptyRect(Rect rect) => rect.Width <= 0 || rect.Height <= 0;
 
     public void Clear(Canvas canvas)
     {
         canvas.Children.Clear();
         _renderCache.Clear();
+        _geometryCache.Clear();
+        _freehandCache.Clear();
     }
 
     public void RemoveRender(Canvas canvas, IAnnotationItem item)
@@ -136,12 +207,22 @@ public class AnnotationRenderer : IAnnotationRenderer
             foreach (var control in controls)
             {
                 canvas.Children.Remove(control);
+                if (control is Path p)
+                {
+                    // Reset path before pooling
+                    p.Data = null;
+                    p.Stroke = null;
+                    p.Fill = null;
+                    p.StrokeThickness = 0;
+                    _pathPool.Push(p);
+                }
             }
             _renderCache.Remove(item.Id);
         }
         
         // Drop geometry cache for this item to force rebuild next time
         _geometryCache.Remove(item.Id);
+        _freehandCache.Remove(item.Id);
 
         // Additional safety check: remove any controls with matching name pattern
         // This helps prevent ghosting if the cache misses anything
@@ -172,17 +253,21 @@ public class AnnotationRenderer : IAnnotationRenderer
     private void RenderArrow(Canvas canvas, ArrowAnnotation arrow, List<Control> controls)
     {
         var arrowCanvas = new Canvas();
-
+        
         // Create shadow and body paths
-        var shadowPath = new Path { Fill = new SolidColorBrush(Colors.Black, 0.08), RenderTransform = new TranslateTransform(1.0, 1.0) };
-        var bodyPath = new Path { Stroke = null };
-
+        var shadowPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+        shadowPath.Fill = _arrowShadowBrush;
+        shadowPath.Stroke = null;
+        shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
+        var bodyPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+        bodyPath.Stroke = null;
+        
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
-
+        
         // Build or reuse geometry
         var version = ComputeArrowVersion(arrow);
-        PathGeometry geom;
+        Geometry geom;
         Rect bounds;
         if (_geometryCache.TryGetValue(arrow.Id, out var cached) && cached.version == version && cached.geometry is not null)
         {
@@ -197,7 +282,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         bodyPath.Data = geom;
         shadowPath.Data = geom;
         ApplyArrowFillAndShadow(bodyPath, shadowPath, arrow);
-
+        
         canvas.Children.Add(arrowCanvas);
         controls.Add(arrowCanvas);
     }
@@ -207,23 +292,30 @@ public class AnnotationRenderer : IAnnotationRenderer
     /// </summary>
     private void RenderRectangle(Canvas canvas, RectangleAnnotation rectangle, List<Control> controls)
     {
-        var rect = new Rectangle
+        // Simple cache key via version
+        var version = ComputeRectVersion(rectangle);
+        if (!_geometryCache.TryGetValue(rectangle.Id, out var cached) || cached.version != version)
         {
-            Width = rectangle.Width,
-            Height = rectangle.Height,
-            Stroke = CreateBrush(rectangle.Style.StrokeColor),
-            StrokeThickness = rectangle.Style.StrokeWidth,
-            Fill = rectangle.Style.FillMode != FillMode.None 
-                ? CreateBrush(rectangle.Style.FillColor) 
-                : Brushes.Transparent,
-            Opacity = rectangle.Style.Opacity
-        };
+            var key = ((int)Math.Round(rectangle.Width), (int)Math.Round(rectangle.Height));
+            if (!_rectGeomPool.TryGetValue(key, out var rg))
+            {
+                rg = new RectangleGeometry(new Rect(0, 0, key.Item1, key.Item2));
+                _rectGeomPool[key] = rg;
+            }
+            _geometryCache[rectangle.Id] = (rg, rectangle.Bounds, version);
+            cached = (rg, rectangle.Bounds, version);
+        }
 
-        Canvas.SetLeft(rect, rectangle.Rectangle.X);
-        Canvas.SetTop(rect, rectangle.Rectangle.Y);
-
-        canvas.Children.Add(rect);
-        controls.Add(rect);
+        var path = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+        path.Data = cached.geometry;
+        path.Stroke = CreateBrush(rectangle.Style.StrokeColor);
+        path.StrokeThickness = rectangle.Style.StrokeWidth;
+        path.Fill = rectangle.Style.FillMode != FillMode.None ? CreateBrush(rectangle.Style.FillColor) : Brushes.Transparent;
+        path.Opacity = rectangle.Style.Opacity;
+        Canvas.SetLeft(path, rectangle.Rectangle.X);
+        Canvas.SetTop(path, rectangle.Rectangle.Y);
+        canvas.Children.Add(path);
+        controls.Add(path);
     }
 
     /// <summary>
@@ -231,23 +323,57 @@ public class AnnotationRenderer : IAnnotationRenderer
     /// </summary>
     private void RenderEllipse(Canvas canvas, EllipseAnnotation ellipse, List<Control> controls)
     {
-        var ellipseShape = new Ellipse
+        var version = ComputeEllipseVersion(ellipse);
+        if (!_geometryCache.TryGetValue(ellipse.Id, out var cached) || cached.version != version)
         {
-            Width = ellipse.BoundingRect.Width,
-            Height = ellipse.BoundingRect.Height,
-            Stroke = CreateBrush(ellipse.Style.StrokeColor),
-            StrokeThickness = ellipse.Style.StrokeWidth,
-            Fill = ellipse.Style.FillMode != FillMode.None 
-                ? CreateBrush(ellipse.Style.FillColor) 
-                : Brushes.Transparent,
-            Opacity = ellipse.Style.Opacity
-        };
+            var key = ((int)Math.Round(ellipse.BoundingRect.Width), (int)Math.Round(ellipse.BoundingRect.Height));
+            if (!_ellipseGeomPool.TryGetValue(key, out var eg))
+            {
+                eg = new EllipseGeometry(new Rect(0, 0, key.Item1, key.Item2));
+                _ellipseGeomPool[key] = eg;
+            }
+            _geometryCache[ellipse.Id] = (eg, ellipse.Bounds, version);
+            cached = (eg, ellipse.Bounds, version);
+        }
 
-        Canvas.SetLeft(ellipseShape, ellipse.BoundingRect.X);
-        Canvas.SetTop(ellipseShape, ellipse.BoundingRect.Y);
+        var path = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+        path.Data = cached.geometry;
+        path.Stroke = CreateBrush(ellipse.Style.StrokeColor);
+        path.StrokeThickness = ellipse.Style.StrokeWidth;
+        path.Fill = ellipse.Style.FillMode != FillMode.None ? CreateBrush(ellipse.Style.FillColor) : Brushes.Transparent;
+        path.Opacity = ellipse.Style.Opacity;
+        Canvas.SetLeft(path, ellipse.BoundingRect.X);
+        Canvas.SetTop(path, ellipse.BoundingRect.Y);
+        canvas.Children.Add(path);
+        controls.Add(path);
+    }
 
-        canvas.Children.Add(ellipseShape);
-        controls.Add(ellipseShape);
+    private static long ComputeRectVersion(RectangleAnnotation r)
+    {
+        unchecked
+        {
+            long v = 1469598103934665603L;
+            void Mix(double d) { var b = BitConverter.DoubleToInt64Bits(d); v ^= b; v *= 1099511628211L; }
+            void MixColor(Color c) { v ^= ((long)c.A << 24) | ((long)c.R << 16) | ((long)c.G << 8) | c.B; v *= 1099511628211L; }
+            var rect = r.Rectangle;
+            Mix(rect.X); Mix(rect.Y); Mix(rect.Width); Mix(rect.Height);
+            Mix(r.Style.StrokeWidth); Mix(r.Style.Opacity); MixColor(r.Style.StrokeColor); MixColor(r.Style.FillColor);
+            return v;
+        }
+    }
+
+    private static long ComputeEllipseVersion(EllipseAnnotation e)
+    {
+        unchecked
+        {
+            long v = 1469598103934665603L;
+            void Mix(double d) { var b = BitConverter.DoubleToInt64Bits(d); v ^= b; v *= 1099511628211L; }
+            void MixColor(Color c) { v ^= ((long)c.A << 24) | ((long)c.R << 16) | ((long)c.G << 8) | c.B; v *= 1099511628211L; }
+            var rect = e.BoundingRect;
+            Mix(rect.X); Mix(rect.Y); Mix(rect.Width); Mix(rect.Height);
+            Mix(e.Style.StrokeWidth); Mix(e.Style.Opacity); MixColor(e.Style.StrokeColor); MixColor(e.Style.FillColor);
+            return v;
+        }
     }
 
     /// <summary>
@@ -838,38 +964,35 @@ public class AnnotationRenderer : IAnnotationRenderer
         
         if (points.Count < 2) return;
 
-        // Create path geometry from points
+        // Cache key and version
+        long version = ComputeFreehandVersion(freehand);
+        if (!_freehandCache.TryGetValue(freehand.Id, out var cached) || cached.version != version)
+        {
+            // Rebuild
         var pathGeometry = new PathGeometry();
         var pathFigure = new PathFigure { StartPoint = points[0], IsClosed = false };
-        
         if (points.Count == 2)
         {
-            // Simple line for two points
             pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
         }
         else
         {
-            // Create smooth curves using quadratic bezier segments
             for (int i = 1; i < points.Count; i++)
             {
                 if (i == 1)
                 {
-                    // First segment - line to second point
                     pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
                 }
                 else if (i == points.Count - 1)
                 {
-                    // Last segment - line to final point
                     pathFigure.Segments!.Add(new LineSegment { Point = points[i] });
                 }
                 else
                 {
-                    // Middle segments - quadratic bezier for smoothness
                     var controlPoint = points[i - 1];
                     var endPoint = new Point(
                         (points[i - 1].X + points[i].X) / 2,
                         (points[i - 1].Y + points[i].Y) / 2);
-                    
                     pathFigure.Segments!.Add(new QuadraticBezierSegment 
                     { 
                         Point1 = controlPoint, 
@@ -878,21 +1001,36 @@ public class AnnotationRenderer : IAnnotationRenderer
                 }
             }
         }
-        
         pathGeometry.Figures!.Add(pathFigure);
+            var bounds = pathGeometry.Bounds.Inflate(freehand.Style.StrokeWidth / 2);
+            _freehandCache[freehand.Id] = (pathGeometry, bounds, version);
+            cached = (pathGeometry, bounds, version);
+        }
 
         // Create path control
-        var path = new Path
-        {
-            Data = pathGeometry,
-            Stroke = CreateBrush(freehand.Style.StrokeColor),
-            StrokeThickness = freehand.Style.StrokeWidth,
-            Opacity = freehand.Style.Opacity,
-            StrokeLineCap = PenLineCap.Round
-        };
+        var path = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+        path.Data = cached.geometry;
+        path.Stroke = CreateBrush(freehand.Style.StrokeColor);
+        path.StrokeThickness = freehand.Style.StrokeWidth;
+        path.Opacity = freehand.Style.Opacity;
+        path.StrokeLineCap = PenLineCap.Round;
 
         canvas.Children.Add(path);
         controls.Add(path);
+    }
+
+    private static long ComputeFreehandVersion(FreehandAnnotation freehand)
+    {
+        unchecked
+        {
+            long v = 1469598103934665603L;
+            void Mix(double d) { var b = BitConverter.DoubleToInt64Bits(d); v ^= b; v *= 1099511628211L; }
+            void MixColor(Color c) { v ^= ((long)c.A << 24) | ((long)c.R << 16) | ((long)c.G << 8) | c.B; v *= 1099511628211L; }
+            foreach (var p in freehand.Points)
+            { Mix(p.X); Mix(p.Y); }
+            Mix(freehand.Style.StrokeWidth); Mix(freehand.Style.Opacity); MixColor(freehand.Style.StrokeColor);
+            return v;
+        }
     }
 
     /// <summary>
@@ -942,8 +1080,14 @@ public class AnnotationRenderer : IAnnotationRenderer
     /// <summary>
     /// 创建画刷
     /// </summary>
+    // Simple brush pool to reduce allocations
+    private readonly Dictionary<uint, SolidColorBrush> _brushPool = new();
     private IBrush CreateBrush(Color color)
     {
-        return new SolidColorBrush(color);
+        uint key = ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
+        if (_brushPool.TryGetValue(key, out var b)) return b;
+        var brush = new SolidColorBrush(color);
+        _brushPool[key] = brush;
+        return brush;
     }
 }

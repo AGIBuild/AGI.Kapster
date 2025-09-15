@@ -5,6 +5,7 @@ using AGI.Captor.Desktop.Rendering;
 using Avalonia;
 using Avalonia.Media;
 using System;
+using System.Collections.Generic;
 
 namespace AGI.Captor.Desktop.Services;
 
@@ -16,6 +17,7 @@ public class AnnotationService : IAnnotationService
     private AnnotationToolType _currentTool = AnnotationToolType.None;
     private IAnnotationStyle _currentStyle;
     private readonly ISettingsService? _settingsService;
+    private readonly Dictionary<Guid, Point> _creationAnchors = new();
 
     public AnnotationManager Manager { get; } = new();
 
@@ -76,16 +78,41 @@ public class AnnotationService : IAnnotationService
 
     public IAnnotationItem? StartCreate(Point startPoint)
     {
-        return CurrentTool switch
+        IAnnotationItem? item = null;
+        if (CurrentTool == AnnotationToolType.Rectangle)
         {
-            AnnotationToolType.Rectangle => CreateRectangle(startPoint),
-            AnnotationToolType.Ellipse => CreateEllipse(startPoint),
-            AnnotationToolType.Arrow => CreateArrow(startPoint),
-            AnnotationToolType.Text => CreateText(startPoint),
-            AnnotationToolType.Freehand => CreateFreehand(),
-            AnnotationToolType.Emoji => CreateEmoji(startPoint),
-            _ => null
-        };
+            item = CreateRectangle(startPoint);
+        }
+        else if (CurrentTool == AnnotationToolType.Ellipse)
+        {
+            item = CreateEllipse(startPoint);
+        }
+        else if (CurrentTool == AnnotationToolType.Arrow)
+        {
+            item = CreateArrow(startPoint);
+        }
+        else if (CurrentTool == AnnotationToolType.Text)
+        {
+            item = CreateText(startPoint);
+        }
+        else if (CurrentTool == AnnotationToolType.Freehand)
+        {
+            item = CreateFreehand();
+        }
+        else if (CurrentTool == AnnotationToolType.Emoji)
+        {
+            item = CreateEmoji(startPoint);
+        }
+
+        if (item != null)
+        {
+            // Record immutable creation anchor for shapes
+            if (item is RectangleAnnotation || item is EllipseAnnotation || item is ArrowAnnotation)
+            {
+                _creationAnchors[item.Id] = startPoint;
+            }
+        }
+        return item;
     }
 
     public void UpdateCreate(Point currentPoint, IAnnotationItem item)
@@ -139,6 +166,7 @@ public class AnnotationService : IAnnotationService
         // Add to manager
         item.State = AnnotationState.Normal;
         Manager.AddItem(item);
+        _creationAnchors.Remove(item.Id);
         return true;
     }
 
@@ -146,6 +174,7 @@ public class AnnotationService : IAnnotationService
     {
         // Nothing special needed for cancellation
         // The item will simply not be added to the manager
+        _creationAnchors.Remove(item.Id);
     }
 
     public IAnnotationItem? HitTest(Point point)
@@ -177,8 +206,8 @@ public class AnnotationService : IAnnotationService
     /// </summary>
     private void UpdateRectangle(RectangleAnnotation rect, Point currentPoint)
     {
-        // Get the original start point from the current rectangle
-        var startPoint = rect.TopLeft;
+        // Use immutable creation anchor to support all drag directions
+        var startPoint = _creationAnchors.TryGetValue(rect.Id, out var sp) ? sp : rect.TopLeft;
         
         // Create new rectangle from start point to current point
         var left = Math.Min(startPoint.X, currentPoint.X);
@@ -208,8 +237,8 @@ public class AnnotationService : IAnnotationService
     /// </summary>
     private void UpdateEllipse(EllipseAnnotation ellipse, Point currentPoint)
     {
-        // Similar to rectangle, create bounding rect from start to current
-        var startPoint = ellipse.BoundingRect.TopLeft;
+        // Use immutable creation anchor to support all drag directions
+        var startPoint = _creationAnchors.TryGetValue(ellipse.Id, out var sp) ? sp : ellipse.BoundingRect.TopLeft;
         
         var left = Math.Min(startPoint.X, currentPoint.X);
         var top = Math.Min(startPoint.Y, currentPoint.Y);

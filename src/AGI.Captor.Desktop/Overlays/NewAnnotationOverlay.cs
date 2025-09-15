@@ -73,8 +73,6 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             _selectionRect = value;
             UpdateHitTestVisibility();
-            // Update cursor when selection changes
-            UpdateCursor();
         }
     }
 
@@ -113,8 +111,6 @@ public sealed class NewAnnotationOverlay : Canvas
         _annotationService.Manager.SelectionChanged += OnSelectionChanged;
         _annotationService.ToolChanged += OnToolChanged;
         _annotationService.StyleChanged += OnStyleChanged;
-        
-        UpdateCursor();
         
         // Enable keyboard focus for shortcuts
         Focusable = true;
@@ -216,7 +212,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             base.OnPointerPressed(e);
             
-            var point = e.GetPosition(this);
+            var point = e.GetCurrentPoint(this).Position;
             var properties = e.GetCurrentPoint(this).Properties;
             var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
             var pointInSelection = hasSelection && _selectionRect.Contains(point);
@@ -254,8 +250,6 @@ public sealed class NewAnnotationOverlay : Canvas
                     // Clear selection state before confirming to prevent further drawing
                     _selectionRect = new Rect();
                     IsHitTestVisible = false;
-                    UpdateCursor();
-                    
                     ConfirmRequested?.Invoke(currentSelection);
                     e.Handled = true;
                     return;
@@ -304,6 +298,11 @@ public sealed class NewAnnotationOverlay : Canvas
                 {
                     // Creation mode - for creating new annotations
                     HandleCreationPress(point);
+                    // Ensure we receive all move events accurately during creation
+                    if (_isCreating && _creatingItem != null)
+                    {
+                        e.Pointer.Capture(this);
+                    }
                 }
                 
                 e.Handled = true;
@@ -320,7 +319,7 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         base.OnPointerMoved(e);
         
-        var point = e.GetPosition(this);
+        var point = e.GetCurrentPoint(this).Position;
         
         // Handle drag and resize operations first
         if (_isDragging)
@@ -376,8 +375,18 @@ public sealed class NewAnnotationOverlay : Canvas
         
         if (_isCreating && _creatingItem != null)
         {
+            var oldBounds = _creatingItem.Bounds;
             _annotationService.UpdateCreate(point, _creatingItem);
-            RefreshRender();
+            var newBounds = _creatingItem.Bounds;
+            var dirty = Union(oldBounds, newBounds).Inflate(DirtyPadding);
+            // Ensure creating item participates in rendering during drag
+            var itemsWithCreating = new System.Collections.Generic.List<IAnnotationItem>(_annotationService.Manager.Items)
+            {
+                _creatingItem
+            };
+            _renderer.RenderChanged(this, itemsWithCreating, dirty);
+            // Force immediate UI update to reduce visual latency
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Render);
         }
     }
 
@@ -464,6 +473,9 @@ public sealed class NewAnnotationOverlay : Canvas
         
         // End any ongoing transformation
         EndTransformation();
+        // Ensure capture released
+        e.Pointer.Capture(null);
+        e.Pointer.Capture(null);
         
         if (_isCreating && _creatingItem != null)
         {
@@ -928,6 +940,20 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     private const double DirtyPadding = 3.0; // compensate AA/shadow
+    private System.Collections.Generic.List<Rect> _frameDirtyRects = new System.Collections.Generic.List<Rect>(8);
+
+    private void FlushFrameDirtyIfNeeded()
+    {
+        if (_frameDirtyRects == null || _frameDirtyRects.Count == 0) return;
+        // Defer to UI thread low priority to coalesce same-frame updates
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_frameDirtyRects == null || _frameDirtyRects.Count == 0) return;
+            var batch = _frameDirtyRects.ToArray();
+            _frameDirtyRects.Clear();
+            _renderer.RenderChanged(this, _annotationService.Manager.Items, batch);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
 
     /// <summary>
     /// Calculate new bounds based on resize handle and delta
@@ -1045,7 +1071,6 @@ public sealed class NewAnnotationOverlay : Canvas
             _isDragging = false;
             _isResizing = false;
             _activeResizeHandle = ResizeHandle.None;
-            UpdateCursor();
         }
     }
 
@@ -1148,18 +1173,18 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         try
         {
-            UpdateCursor();
-            
             // Force cursor update when tool changes
             Log.Information("OnToolChanged: {OldTool} -> {NewTool}, forcing cursor update", e.OldTool, e.NewTool);
             
-            // Simple force: if we have a drawing tool and selection, always set cross cursor
+            // If we are in drawing mode and have a valid screenshot selection,
+            // immediately clear any annotation selection (resize anchors) and set cross cursor
             var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
-            
             if (hasSelection && CurrentTool != AnnotationToolType.None)
             {
+                _annotationService.Manager.ClearSelection();
+                IsHitTestVisible = true;
                 Cursor = new Cursor(StandardCursorType.Cross);
-                Log.Information("OnToolChanged: FORCED Cross cursor for tool {Tool}", CurrentTool);
+                Log.Information("OnToolChanged: cleared annotation selection and set Cross cursor for {Tool}", CurrentTool);
             }
             else if (hasSelection && CurrentTool == AnnotationToolType.None)
             {
@@ -1175,6 +1200,8 @@ public sealed class NewAnnotationOverlay : Canvas
                 _isCreating = false;
                 RefreshRender();
             }
+            
+            // (moved) selection clearing handled above when entering drawing mode
             
             // Note: ESC key handling is done at OverlayWindow level
         }

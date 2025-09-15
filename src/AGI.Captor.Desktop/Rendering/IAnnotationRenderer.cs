@@ -32,6 +32,14 @@ public interface IAnnotationRenderer
     /// <param name="items">All items on the canvas (used to find affected ones)</param>
     /// <param name="dirtyRect">Dirty rectangle in canvas coordinates</param>
     void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, Rect dirtyRect);
+
+    /// <summary>
+    /// Batch render multiple dirty rectangles merged in one frame
+    /// </summary>
+    /// <param name="canvas">Target canvas</param>
+    /// <param name="items">All items</param>
+    /// <param name="dirtyRects">Dirty rectangles in the same frame</param>
+    void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, IReadOnlyList<Rect> dirtyRects);
     
     /// <summary>
     /// 清除Canvas上的所有渲染内容

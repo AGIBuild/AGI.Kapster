@@ -94,7 +94,10 @@
 		<Style Selector="CheckBox">
 			<Setter Property="FontSize" Value="11"/>
 			<Setter Property="Margin" Value="0,2"/>
-			<Setter Property="Foreground" Value="#F0FFFFFF"/>
+		</Style>
+		
+		<Style Selector="CheckBox ContentPresenter">
+			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
 		
 		<Style Selector="TextBlock">
@@ -108,7 +111,7 @@
 			<Setter Property="BorderBrush" Value="#6044AACC"/>
 			<Setter Property="CornerRadius" Value="5"/>
 			<Setter Property="Padding" Value="8,6"/>
-			<Setter Property="Foreground" Value="DarkBlue"/>
+			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontSize" Value="11"/>
 		</Style>
 		
@@ -125,45 +128,14 @@
 		</Style>
 		
 		<Style Selector="ComboBox">
-			<Setter Property="Background" Value="#B0001122"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="#6044AACC"/>
-			<Setter Property="CornerRadius" Value="5"/>
-			<Setter Property="Padding" Value="8,6"/>
-			<Setter Property="Foreground" Value="#FFFFFF"/>
-			<Setter Property="FontSize" Value="11"/>
-		</Style>
-		
-		<Style Selector="ComboBox /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="Foreground" Value="#FFFFFF"/>
-		</Style>
-		
-		<Style Selector="ComboBox /template/ Border#PART_BorderElement">
 			<Setter Property="Background" Value="#50336699"/>
-		</Style>
-		
-		<Style Selector="ComboBox:pointerover /template/ Border#PART_BorderElement">
-			<Setter Property="Background" Value="#7044AACC"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
 		
 		<Style Selector="ComboBoxItem">
-			<Setter Property="Background" Value="#50336699"/>
-			<Setter Property="Foreground" Value="#FFFFFF"/>
-			<Setter Property="Padding" Value="8,6"/>
-			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Background" Value="#40224466"/>
 		</Style>
-		
-		<Style Selector="ComboBoxItem:pointerover">
-			<Setter Property="Background" Value="#7044AACC"/>
-			<Setter Property="Foreground" Value="#FFFFFF"/>
-		</Style>
-		
-		<Style Selector="ComboBoxItem:selected">
-			<Setter Property="Background" Value="#9055BBDD"/>
-			<Setter Property="Foreground" Value="#FFFFFF"/>
-		</Style>
-		
 		
 		<Style Selector="Button">
 			<Setter Property="Background" Value="#50336699"/>
@@ -193,7 +165,7 @@
 		
 		<Style Selector="Button.primary">
 			<Setter Property="Background" Value="#FF4477BB"/>
-			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Foreground" Value="#FFFFFF"/>
 			<Setter Property="BorderBrush" Value="#FF336699"/>
 		</Style>
 		

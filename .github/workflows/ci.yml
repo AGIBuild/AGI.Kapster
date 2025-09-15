@@ -20,6 +20,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      DOTNET_ENVIRONMENT: Production
     
     steps:
     - name: Checkout code
@@ -44,6 +46,8 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     needs: test
+    env:
+      DOTNET_ENVIRONMENT: Production
     
     steps:
     - name: Checkout code
@@ -71,6 +75,8 @@ jobs:
     name: Build macOS
     runs-on: macos-latest
     needs: test
+    env:
+      DOTNET_ENVIRONMENT: Production
     
     steps:
     - name: Checkout code

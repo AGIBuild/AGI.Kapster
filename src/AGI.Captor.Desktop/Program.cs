@@ -25,35 +25,37 @@ class Program
     {
         // Check for command line arguments
         var isMinimizedStart = args.Any(arg => arg == "--minimized" || arg == "-m");
-        
-        // Determine environment based on build configuration
-        #if DEBUG
-        var environment = "dev";
-        #else
-        var environment = "prod";
-        System.Console.WriteLine("PROD env");
-        #endif
-        
-        // Initialize logging early with configuration
-        var configuration = InitializeLogging(environment);
-        
+
         if (isMinimizedStart)
         {
             Log.Debug("Application started in minimized mode from command line");
         }
         
-        Log.Information("Starting AGI.Captor in {Environment} environment", environment);
-        
-        RunApp(args, isMinimizedStart, environment, configuration);
+        RunApp(args, isMinimizedStart);
     }
     
-    private static void RunApp(string[] args, bool startMinimized, string environment, IConfiguration configuration)
+    private static void RunApp(string[] args, bool startMinimized )
     {
         var builder = Host.CreateApplicationBuilder(args);
+        // Determine environment (default Development for local run; CI/CD sets to Production)
+        var environment = builder.Environment.EnvironmentName ?? "Development";
+        Log.Information("Starting AGI.Captor in {Environment} environment", environment);
+
+        builder.Configuration
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables();
         
-        // Replace with our pre-loaded configuration
-        builder.Configuration.Sources.Clear();
-        builder.Configuration.AddConfiguration(configuration);
+        // Ensure logs directory exists for file sink
+        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(logsDir);
+        
+        // Configure Serilog strictly from configuration
+        Log.Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.WithProperty("Environment", environment)
+            .CreateLogger();
         
         // Register startup arguments
         var startupArgs = new AGI.Captor.Desktop.Models.AppStartupArgs
@@ -104,30 +106,7 @@ class Program
     }
     
     
-    private static IConfiguration InitializeLogging(string environment)
-    {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environment.ToLowerInvariant()}.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables()
-            .Build();
-
-        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
-        Directory.CreateDirectory(logsDir);
-
-        Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(configuration)
-            .Enrich.WithProperty("Environment", environment)
-            .WriteTo.File(Path.Combine(logsDir, "app-.log"), 
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 7)
-            .CreateLogger();
-
-        Log.Information("Logging initialized for {Environment} environment. Logs at {LogsDir}", environment, logsDir);
-        
-        return configuration;
-    }
+    // Removed InitializeLogging; Serilog is configured in RunApp strictly from configuration files
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
