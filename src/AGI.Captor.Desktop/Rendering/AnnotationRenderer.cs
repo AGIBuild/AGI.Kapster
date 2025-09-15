@@ -406,7 +406,8 @@ public class AnnotationRenderer : IAnnotationRenderer
         }
 
         // Generate smooth curved shaft using quadratic bezier sampling
-        int steps = Math.Max(16, (int)(len / 8));
+        // Increase sampling density to smooth edges and reduce stair-stepping
+        int steps = Math.Max(24, (int)(len / 4));
         var leftPoints = new List<Point>(steps + 1);
         var rightPoints = new List<Point>(steps + 1);
         
@@ -527,17 +528,12 @@ public class AnnotationRenderer : IAnnotationRenderer
         bodyPath.Data = geom;
         shadowPath.Data = geom;
 
-        // Enhanced gradient for streamlined effect - 0% to 75% transparency from tail to arrow head base
+        // Gradient re-tuned to reduce banding and jagged transparency edges
         var baseColor = arrow.Style.StrokeColor;
-        var transparent = Color.FromArgb(0, baseColor.R, baseColor.G, baseColor.B);                    // 100% transparent (0% opacity)
-        var veryLight = Color.FromArgb((byte)(baseColor.A * 0.15), baseColor.R, baseColor.G, baseColor.B);  // 85% transparent (15% opacity)
-        var light = Color.FromArgb((byte)(baseColor.A * 0.35), baseColor.R, baseColor.G, baseColor.B);      // 65% transparent (35% opacity)
-        var medium = Color.FromArgb((byte)(baseColor.A * 0.55), baseColor.R, baseColor.G, baseColor.B);     // 45% transparent (55% opacity)
-        var semiOpaque = Color.FromArgb((byte)(baseColor.A * 0.75), baseColor.R, baseColor.G, baseColor.B); // 25% transparent (75% opacity)
-        var darker = Color.FromArgb(baseColor.A, 
-            (byte)Math.Max(0, baseColor.R * 0.9), 
-            (byte)Math.Max(0, baseColor.G * 0.9), 
-            (byte)Math.Max(0, baseColor.B * 0.9));
+        var tailSoft = Color.FromArgb((byte)(baseColor.A * 0.12), baseColor.R, baseColor.G, baseColor.B);   // 12%
+        var tailMid  = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);   // 28%
+        var shaftMid = Color.FromArgb((byte)(baseColor.A * 0.48), baseColor.R, baseColor.G, baseColor.B);   // 48%
+        var shaftEnd = Color.FromArgb((byte)(baseColor.A * 0.72), baseColor.R, baseColor.G, baseColor.B);   // 72%
             
         // Calculate arrow head base position for gradient endpoint
         var arrowHeadBase = new Point(b.X - ux * headLen, b.Y - uy * headLen);
@@ -548,20 +544,24 @@ public class AnnotationRenderer : IAnnotationRenderer
             EndPoint = new RelativePoint(arrowHeadBase, RelativeUnit.Absolute), // End at arrow head base, not tip
             GradientStops = new GradientStops
             {
-                new GradientStop(transparent, 0),        // 100% transparent at tail (0% opacity)
-                new GradientStop(veryLight, 0.2),        // 85% transparent (15% opacity)
-                new GradientStop(light, 0.4),            // 65% transparent (35% opacity)
-                new GradientStop(medium, 0.6),           // 45% transparent (55% opacity)
-                new GradientStop(semiOpaque, 0.8),       // 25% transparent (75% opacity) at shaft end
-                new GradientStop(semiOpaque, 1)          // Keep 75% opacity at arrow head base
+                // Avoid fully transparent start to reduce visible banding on AA edges
+                new GradientStop(tailSoft, 0.00),  // 12%
+                new GradientStop(tailMid,  0.20),  // 28%
+                new GradientStop(shaftMid, 0.45),  // 48%
+                new GradientStop(shaftEnd, 0.80),  // 72%
+                new GradientStop(shaftEnd, 1.00)   // maintain opacity near head base
             }
         };
-        bodyPath.Stroke = null;
+        // Add a subtle outline to visually smooth jagged edges
+        bodyPath.Stroke = new SolidColorBrush(Color.FromArgb((byte)(baseColor.A * 0.85), baseColor.R, baseColor.G, baseColor.B));
+        bodyPath.StrokeThickness = Math.Max(1.0, arrow.Style.StrokeWidth * 0.075);
+        bodyPath.StrokeLineJoin = PenLineJoin.Round;
+        bodyPath.StrokeLineCap = PenLineCap.Round;
 
         // Softer shadow
-        shadowPath.Fill = new SolidColorBrush(Colors.Black, 0.12);
+        shadowPath.Fill = new SolidColorBrush(Colors.Black, 0.08);
         shadowPath.Stroke = null;
-        shadowPath.RenderTransform = new TranslateTransform(1.5, 1.5);
+        shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
     }
 
     /// <summary>
