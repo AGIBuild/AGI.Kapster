@@ -3,6 +3,8 @@ using Serilog;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using AGI.Captor.Desktop.Services.Serialization;
 using System.Threading.Tasks;
 
 namespace AGI.Captor.Desktop.Services;
@@ -15,11 +17,7 @@ public class SettingsService : ISettingsService
     private readonly string _settingsFilePath;
     private AppSettings _settings;
     
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
+    private static readonly JsonSerializerOptions JsonOptions = AppJsonContext.Default.Options;
     
     public AppSettings Settings => _settings;
     
@@ -47,7 +45,7 @@ public class SettingsService : ISettingsService
             if (File.Exists(_settingsFilePath))
             {
                 var json = File.ReadAllText(_settingsFilePath);
-                var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
+                var loadedSettings = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppSettings);
                 
                 if (loadedSettings != null)
                 {
@@ -79,7 +77,7 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            var json = JsonSerializer.Serialize(_settings, JsonOptions);
+            var json = JsonSerializer.Serialize(_settings, AppJsonContext.Default.AppSettings);
             
             await File.WriteAllTextAsync(_settingsFilePath, json);
             
