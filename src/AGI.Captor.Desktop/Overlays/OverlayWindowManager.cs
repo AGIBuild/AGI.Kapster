@@ -30,22 +30,47 @@ public sealed class OverlayWindowManager : IOverlayController
 
 	public void ShowAll()
 	{
+		// Prevent opening more overlays if already active
+		if (IsActive)
+		{
+			Log.Debug("Overlay already active - ShowAll ignored");
+			return;
+		}
 		if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime life && life.MainWindow is not null)
 		{
 			Log.Information("Overlay ShowAll (no-arg) using MainWindow");
 			ShowAll(life.MainWindow);
 			return;
 		}
-		Log.Information("Overlay ShowAll (no-arg) no MainWindow, using single maximized window");
-		var single = new OverlayWindow(_elementDetector);
-		single.WindowState = WindowState.Maximized;
-		single.Show();
-		_windows.Add(single);
+		// No MainWindow (tray mode). Create a temporary anchor TopLevel to enumerate screens.
+		Log.Information("Overlay ShowAll (no-arg) no MainWindow, using temporary anchor for multi-screen");
+		var anchor = new Window
+		{
+			ShowInTaskbar = false,
+			SystemDecorations = SystemDecorations.None,
+			Opacity = 0.01,
+			WindowStartupLocation = WindowStartupLocation.Manual,
+			Position = new PixelPoint(0, 0)
+		};
+		anchor.Show();
+		try
+		{
+			ShowAll(anchor);
+		}
+		finally
+		{
+			anchor.Close();
+		}
 	}
 
 	public void ShowAll(TopLevel anchor)
 	{
-		CloseAll();
+		// Prevent reentry if overlays are already active
+		if (IsActive)
+		{
+			Log.Debug("Overlay already active for anchor - ShowAll ignored");
+			return;
+		}
 		Log.Information("Overlay ShowAll for anchor size {W}x{H}", anchor?.Bounds.Width, anchor?.Bounds.Height);
 		var screens = anchor?.Screens;
 		if (screens is null || screens.All.Count == 0)
@@ -63,9 +88,16 @@ public sealed class OverlayWindowManager : IOverlayController
 			{
 				Position = new PixelPoint(s.Bounds.Position.X, s.Bounds.Position.Y)
 			};
+			// Ensure overlay looks borderless and stays on top
+			wdw.SystemDecorations = SystemDecorations.None;
+			wdw.ShowInTaskbar = false;
+			wdw.Topmost = true;
+			wdw.WindowStartupLocation = WindowStartupLocation.Manual;
+
+			// Important: show first on the target position, then switch to FullScreen
+			wdw.Show();
 			wdw.WindowState = WindowState.FullScreen;
 			wdw.Closed += OnAnyWindowClosed;
-			wdw.Show();
 			_windows.Add(wdw);
 		}
 	}

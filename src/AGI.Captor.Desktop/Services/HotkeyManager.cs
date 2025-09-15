@@ -8,7 +8,7 @@ using Serilog;
 namespace AGI.Captor.Desktop.Services;
 
 /// <summary>
-/// 热键管理器 - 使用策略模式管理不同平台的热键
+/// Hotkey manager - strategy-based provider per platform
 /// </summary>
 public class HotkeyManager : IHotkeyManager
 {
@@ -24,8 +24,8 @@ public class HotkeyManager : IHotkeyManager
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _overlayController = overlayController ?? throw new ArgumentNullException(nameof(overlayController));
         
-        // 延迟创建热键提供者，避免构造函数中的复杂操作
-        _hotkeyProvider = null!; // 将在InitializeAsync中创建
+        // Defer provider creation to InitializeAsync
+        _hotkeyProvider = null!; // Will be created in InitializeAsync
         
         Log.Debug("HotkeyManager constructor completed");
     }
@@ -55,7 +55,7 @@ public class HotkeyManager : IHotkeyManager
         {
             Log.Debug("Initializing hotkey manager...");
             
-            // 创建热键提供者
+            // Create hotkey provider
             _hotkeyProvider = CreateHotkeyProvider();
             Log.Debug("Hotkey provider created: {Type}", _hotkeyProvider.GetType().Name);
 
@@ -65,16 +65,16 @@ public class HotkeyManager : IHotkeyManager
                 return;
             }
 
-            // 延迟权限检查，给macOS时间处理.app包权限
+            // Delay permission check (macOS accessibility)
             await Task.Delay(500);
             
-            // 重新检查权限（macOS .app包权限可能需要时间生效）
+            // Re-check permissions (macOS .app accessibility may need time)
             if (!_hotkeyProvider.HasPermissions)
             {
                 Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
                 Log.Warning("Retrying permission check in 2 seconds...");
                 
-                // 再次延迟检查
+                // Delay and retry
                 await Task.Delay(2000);
                 
                 if (!_hotkeyProvider.HasPermissions)
@@ -83,7 +83,7 @@ public class HotkeyManager : IHotkeyManager
                     return;
                 }
                 
-                Log.Information("Permissions granted after retry!");
+                Log.Information("Permissions granted after retry");
             }
             
             await ReloadHotkeysAsync();
@@ -128,9 +128,14 @@ public class HotkeyManager : IHotkeyManager
             var success = _hotkeyProvider.RegisterHotkey("capture_region", modifiers, keyCode, () =>
             {
                 Log.Debug("Capture region hotkey triggered");
+                // Prevent reentry if an overlay session is already active
+                if (_overlayController.IsActive)
+                {
+                    Log.Debug("Capture hotkey ignored - overlay is already active");
+                    return;
+                }
                 _overlayController.ShowAll();
                 
-                // 当截图开始时，注册ESC热键
                 RegisterEscapeHotkey();
             });
 
