@@ -198,6 +198,51 @@ public class TransformAnnotationCommand : CommandBase
 }
 
 /// <summary>
+/// Command to set both endpoints of an arrow (supports undo)
+/// </summary>
+public class SetArrowEndpointsCommand : CommandBase
+{
+    private readonly IAnnotationRenderer _renderer;
+    private readonly AnnotationManager _manager;
+    private readonly ArrowAnnotation _arrow;
+    private readonly Avalonia.Point _oldStart;
+    private readonly Avalonia.Point _oldEnd;
+    private readonly Avalonia.Point _newStart;
+    private readonly Avalonia.Point _newEnd;
+    private readonly Canvas _canvas;
+
+    public SetArrowEndpointsCommand(IAnnotationRenderer renderer, AnnotationManager manager, ArrowAnnotation arrow,
+        Avalonia.Point oldStart, Avalonia.Point oldEnd, Avalonia.Point newStart, Avalonia.Point newEnd, Canvas canvas)
+        : base($"Set arrow endpoints")
+    {
+        _renderer = renderer;
+        _manager = manager;
+        _arrow = arrow;
+        _oldStart = oldStart;
+        _oldEnd = oldEnd;
+        _newStart = newStart;
+        _newEnd = newEnd;
+        _canvas = canvas;
+    }
+
+    public override void Execute()
+    {
+        _arrow.StartPoint = _newStart;
+        _arrow.EndPoint = _newEnd;
+        _renderer.RenderAll(_canvas, _manager.Items);
+        Log.Debug("Arrow endpoints set: {Id} Start={Start} End={End}", _arrow.Id, _newStart, _newEnd);
+    }
+
+    public override void Undo()
+    {
+        _arrow.StartPoint = _oldStart;
+        _arrow.EndPoint = _oldEnd;
+        _renderer.RenderAll(_canvas, _manager.Items);
+        Log.Debug("Arrow endpoints reverted: {Id} Start={Start} End={End}", _arrow.Id, _oldStart, _oldEnd);
+    }
+}
+
+/// <summary>
 /// Composite command to execute multiple commands as one unit
 /// </summary>
 public class CompositeCommand : CommandBase

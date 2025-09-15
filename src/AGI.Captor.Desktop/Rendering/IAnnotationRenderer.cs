@@ -1,4 +1,5 @@
 using AGI.Captor.Desktop.Models;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using System.Collections.Generic;
@@ -23,6 +24,14 @@ public interface IAnnotationRenderer
     /// <param name="canvas">目标Canvas</param>
     /// <param name="items">要渲染的标注项集合</param>
     void RenderAll(Canvas canvas, IEnumerable<IAnnotationItem> items);
+    
+    /// <summary>
+    /// Incremental render: only re-render items intersecting the dirty rectangle
+    /// </summary>
+    /// <param name="canvas">Target canvas</param>
+    /// <param name="items">All items on the canvas (used to find affected ones)</param>
+    /// <param name="dirtyRect">Dirty rectangle in canvas coordinates</param>
+    void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, Rect dirtyRect);
     
     /// <summary>
     /// 清除Canvas上的所有渲染内容

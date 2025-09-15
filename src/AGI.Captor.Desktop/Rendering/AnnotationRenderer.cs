@@ -18,6 +18,9 @@ public class AnnotationRenderer : IAnnotationRenderer
 {
     private readonly AnnotationRenderOptions _options;
     private readonly Dictionary<Guid, List<Control>> _renderCache = new();
+    
+    // Geometry cache to avoid rebuilding complex figures repeatedly
+    private readonly Dictionary<Guid, (PathGeometry geometry, Rect bounds, long version)> _geometryCache = new();
 
     public AnnotationRenderer(AnnotationRenderOptions? options = null)
     {
@@ -88,6 +91,37 @@ public class AnnotationRenderer : IAnnotationRenderer
             Render(canvas, item);
         }
     }
+    
+    public void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, Rect dirtyRect)
+    {
+        if (IsEmptyRect(dirtyRect))
+        {
+            // Fallback to full render if dirty rect is not provided
+            RenderAll(canvas, items);
+            return;
+        }
+        
+        foreach (var item in items)
+        {
+            // Use cached bounds when available for looser intersection test; fallback to item.Bounds
+            Rect itemBounds = item.Bounds;
+            if (_geometryCache.TryGetValue(item.Id, out var cached))
+            {
+                if (!IsEmptyRect(cached.bounds))
+                {
+                    itemBounds = cached.bounds;
+                }
+            }
+            
+            if (!itemBounds.Intersects(dirtyRect))
+                continue;
+            
+            // Re-render this item only
+            Render(canvas, item);
+        }
+    }
+
+    private static bool IsEmptyRect(Rect rect) => rect.Width <= 0 || rect.Height <= 0;
 
     public void Clear(Canvas canvas)
     {
@@ -105,6 +139,9 @@ public class AnnotationRenderer : IAnnotationRenderer
             }
             _renderCache.Remove(item.Id);
         }
+        
+        // Drop geometry cache for this item to force rebuild next time
+        _geometryCache.Remove(item.Id);
 
         // Additional safety check: remove any controls with matching name pattern
         // This helps prevent ghosting if the cache misses anything
@@ -134,28 +171,33 @@ public class AnnotationRenderer : IAnnotationRenderer
     /// </summary>
     private void RenderArrow(Canvas canvas, ArrowAnnotation arrow, List<Control> controls)
     {
-        // Create arrow path similar to the current implementation
         var arrowCanvas = new Canvas();
-        
-        // Create shadow path
-        var shadowPath = new Path
-        {
-            Fill = new SolidColorBrush(Colors.Black, 0.15),
-            RenderTransform = new TranslateTransform(1.5, 1.5)
-        };
-        
-        // Create main body path
-        var bodyPath = new Path
-        {
-            Stroke = null
-        };
-        
+
+        // Create shadow and body paths
+        var shadowPath = new Path { Fill = new SolidColorBrush(Colors.Black, 0.08), RenderTransform = new TranslateTransform(1.0, 1.0) };
+        var bodyPath = new Path { Stroke = null };
+
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
-        
-        // Use the arrow update logic from AnnotationOverlay
-        UpdateArrowGeometry(bodyPath, shadowPath, arrow);
-        
+
+        // Build or reuse geometry
+        var version = ComputeArrowVersion(arrow);
+        PathGeometry geom;
+        Rect bounds;
+        if (_geometryCache.TryGetValue(arrow.Id, out var cached) && cached.version == version && cached.geometry is not null)
+        {
+            geom = cached.geometry;
+            bounds = cached.bounds;
+        }
+        else
+        {
+            geom = BuildArrowGeometry(arrow, out bounds);
+            _geometryCache[arrow.Id] = (geom, bounds, version);
+        }
+        bodyPath.Data = geom;
+        shadowPath.Data = geom;
+        ApplyArrowFillAndShadow(bodyPath, shadowPath, arrow);
+
         canvas.Children.Add(arrowCanvas);
         controls.Add(arrowCanvas);
     }
@@ -552,13 +594,233 @@ public class AnnotationRenderer : IAnnotationRenderer
                 new GradientStop(shaftEnd, 1.00)   // maintain opacity near head base
             }
         };
-        // Add a subtle outline to visually smooth jagged edges
-        bodyPath.Stroke = new SolidColorBrush(Color.FromArgb((byte)(baseColor.A * 0.85), baseColor.R, baseColor.G, baseColor.B));
-        bodyPath.StrokeThickness = Math.Max(1.0, arrow.Style.StrokeWidth * 0.075);
-        bodyPath.StrokeLineJoin = PenLineJoin.Round;
-        bodyPath.StrokeLineCap = PenLineCap.Round;
+        // No stroke outline per requirement
+        bodyPath.Stroke = null;
 
         // Softer shadow
+        shadowPath.Fill = new SolidColorBrush(Colors.Black, 0.08);
+        shadowPath.Stroke = null;
+        shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
+    }
+
+    // Build arrow geometry only (no fill/stroke assignment). Returns geometry and bounds.
+    private PathGeometry BuildArrowGeometry(ArrowAnnotation arrow, out Rect bounds)
+    {
+        var a = arrow.StartPoint;
+        var b = arrow.EndPoint;
+
+        var dx = b.X - a.X; var dy = b.Y - a.Y;
+        var len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+        if (len < 5)
+        {
+            bounds = new Rect();
+            return new PathGeometry();
+        }
+
+        var ux = dx / len; var uy = dy / len;
+        var px = -uy; var py = ux;
+
+        var headLen = Math.Min(len * 0.2, Math.Max(10, arrow.Style.StrokeWidth * 4.5));
+        var headWidth = Math.Max(14, arrow.Style.StrokeWidth * 7.0);
+        var tailWidth = Math.Max(arrow.Style.StrokeWidth * 3.5, 12.0);
+        var baseWidth = Math.Max(arrow.Style.StrokeWidth * 0.8, 2.5);
+
+        const double CurveIntensityFactor = 0.12;
+        const double MaxCurveAmount = 25;
+        const double StraightAngleThreshold = 15;
+
+        var midPoint = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+        var angle = Math.Atan2(Math.Abs(dy), Math.Abs(dx)) * 180 / Math.PI;
+        var isHorizontal = angle < StraightAngleThreshold;
+        var isVertical = angle > (90 - StraightAngleThreshold);
+
+        Point curveControl;
+        if (isHorizontal || isVertical)
+        {
+            curveControl = midPoint;
+        }
+        else
+        {
+            var curveAmount = Math.Min(len * CurveIntensityFactor, MaxCurveAmount);
+            double curveOffsetX = 0, curveOffsetY = 0;
+
+            if (dx > 0 && dy < 0)
+            {
+                curveOffsetX = -curveAmount; curveOffsetY = -curveAmount;
+            }
+            else if (dx > 0 && dy > 0)
+            {
+                curveOffsetX = -curveAmount; curveOffsetY = curveAmount;
+            }
+            else if (dx < 0 && dy < 0)
+            {
+                curveOffsetX = curveAmount; curveOffsetY = -curveAmount;
+            }
+            else if (dx < 0 && dy > 0)
+            {
+                curveOffsetX = curveAmount; curveOffsetY = curveAmount;
+            }
+
+            curveControl = new Point(midPoint.X + curveOffsetX, midPoint.Y + curveOffsetY);
+        }
+
+        // Sample centerline and width profile
+        int steps = Math.Max(24, (int)(len / 4));
+        var leftPoints = new List<Point>(steps + 1);
+        var rightPoints = new List<Point>(steps + 1);
+
+        var headBase = new Point(b.X - ux * headLen, b.Y - uy * headLen);
+
+        for (int i = 0; i <= steps; i++)
+        {
+            double t = (double)i / steps;
+            double omt = 1 - t;
+
+            var centerX = omt * omt * a.X + 2 * omt * t * curveControl.X + t * t * headBase.X;
+            var centerY = omt * omt * a.Y + 2 * omt * t * curveControl.Y + t * t * headBase.Y;
+
+            var tangentX = 2 * omt * (curveControl.X - a.X) + 2 * t * (headBase.X - curveControl.X);
+            var tangentY = 2 * omt * (curveControl.Y - a.Y) + 2 * t * (headBase.Y - curveControl.Y);
+            var tangentLen = Math.Max(1e-6, Math.Sqrt(tangentX * tangentX + tangentY * tangentY));
+            var normalX = -tangentY / tangentLen;
+            var normalY = tangentX / tangentLen;
+
+            var easedT = t * t * (3 - 2 * t);
+            var width = tailWidth + (baseWidth - tailWidth) * easedT;
+            var halfWidth = width / 2;
+
+            leftPoints.Add(new Point(centerX + normalX * halfWidth, centerY + normalY * halfWidth));
+            rightPoints.Add(new Point(centerX - normalX * halfWidth, centerY - normalY * halfWidth));
+        }
+
+        var headLeft = new Point(headBase.X + px * headWidth / 2, headBase.Y + py * headWidth / 2);
+        var headRight = new Point(headBase.X - px * headWidth / 2, headBase.Y - py * headWidth / 2);
+
+        var fig = new PathFigure { StartPoint = leftPoints[0], IsClosed = true };
+        var segs = new PathSegments();
+
+        // Swallow tail notch
+        var tailNotchDepth = tailWidth * 0.5;
+        var tailCenter = new Point((leftPoints[0].X + rightPoints[0].X) / 2, (leftPoints[0].Y + rightPoints[0].Y) / 2);
+        var tailNotchPoint = new Point(tailCenter.X + ux * tailNotchDepth, tailCenter.Y + uy * tailNotchDepth);
+        segs.Add(new LineSegment { Point = tailNotchPoint });
+        segs.Add(new LineSegment { Point = rightPoints[0] });
+
+        // Right edge
+        for (int i = 1; i < rightPoints.Count; i++)
+        {
+            if (i == 1 || i == rightPoints.Count - 1)
+                segs.Add(new LineSegment { Point = rightPoints[i] });
+            else
+            {
+                var prev = rightPoints[i - 1];
+                var curr = rightPoints[i];
+                var ctrl = new Point((prev.X + curr.X) / 2, (prev.Y + curr.Y) / 2);
+                segs.Add(new QuadraticBezierSegment { Point1 = ctrl, Point2 = curr });
+            }
+        }
+
+        // Head connections
+        segs.Add(new QuadraticBezierSegment
+        {
+            Point1 = new Point((rightPoints.Last().X + headRight.X) / 2, (rightPoints.Last().Y + headRight.Y) / 2),
+            Point2 = headRight
+        });
+
+        var rightCurveCtrl = new Point(
+            headRight.X + (b.X - headRight.X) * 0.3 + px * headWidth * 0.1,
+            headRight.Y + (b.Y - headRight.Y) * 0.3 + py * headWidth * 0.1
+        );
+        segs.Add(new QuadraticBezierSegment { Point1 = rightCurveCtrl, Point2 = b });
+
+        var leftCurveCtrl = new Point(
+            headLeft.X + (b.X - headLeft.X) * 0.3 - px * headWidth * 0.1,
+            headLeft.Y + (b.Y - headLeft.Y) * 0.3 - py * headWidth * 0.1
+        );
+        segs.Add(new QuadraticBezierSegment { Point1 = leftCurveCtrl, Point2 = headLeft });
+
+        segs.Add(new QuadraticBezierSegment
+        {
+            Point1 = new Point((headLeft.X + leftPoints.Last().X) / 2, (headLeft.Y + leftPoints.Last().Y) / 2),
+            Point2 = leftPoints.Last()
+        });
+
+        // Left edge reverse
+        for (int i = leftPoints.Count - 2; i >= 0; i--)
+        {
+            if (i == 0 || i == leftPoints.Count - 2)
+                segs.Add(new LineSegment { Point = leftPoints[i] });
+            else
+            {
+                var prev = leftPoints[i + 1];
+                var curr = leftPoints[i];
+                var ctrl = new Point((prev.X + curr.X) / 2, (prev.Y + curr.Y) / 2);
+                segs.Add(new QuadraticBezierSegment { Point1 = ctrl, Point2 = curr });
+            }
+        }
+
+        fig.Segments = segs;
+        var geom = new PathGeometry { Figures = new PathFigures { fig } };
+        bounds = geom.Bounds;
+        return geom;
+    }
+    
+    private static long ComputeArrowVersion(ArrowAnnotation arrow)
+    {
+        // Combine key properties into a simple version hash surrogate
+        unchecked
+        {
+            long v = 1469598103934665603L; // FNV offset basis
+            void Mix(double d)
+            {
+                var bits = BitConverter.DoubleToInt64Bits(d);
+                v ^= bits;
+                v *= 1099511628211L;
+            }
+            void MixColor(Color c)
+            {
+                v ^= ((long)c.A << 24) | ((long)c.R << 16) | ((long)c.G << 8) | c.B;
+                v *= 1099511628211L;
+            }
+            Mix(arrow.StartPoint.X); Mix(arrow.StartPoint.Y);
+            Mix(arrow.EndPoint.X);   Mix(arrow.EndPoint.Y);
+            Mix(arrow.Style.StrokeWidth);
+            Mix(arrow.Style.Opacity);
+            MixColor(arrow.Style.StrokeColor);
+            return v;
+        }
+    }
+
+    private void ApplyArrowFillAndShadow(Path bodyPath, Path shadowPath, ArrowAnnotation arrow)
+    {
+        var a = arrow.StartPoint;
+        var b = arrow.EndPoint;
+        var dx = b.X - a.X; var dy = b.Y - a.Y;
+        var len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+        var ux = dx / len; var uy = dy / len;
+        var headLen = Math.Min(len * 0.2, Math.Max(10, arrow.Style.StrokeWidth * 4.5));
+        var arrowHeadBase = new Point(b.X - ux * headLen, b.Y - uy * headLen);
+
+        var baseColor = arrow.Style.StrokeColor;
+        var tailSoft = Color.FromArgb((byte)(baseColor.A * 0.12), baseColor.R, baseColor.G, baseColor.B);
+        var tailMid  = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);
+        var shaftMid = Color.FromArgb((byte)(baseColor.A * 0.48), baseColor.R, baseColor.G, baseColor.B);
+        var shaftEnd = Color.FromArgb((byte)(baseColor.A * 0.72), baseColor.R, baseColor.G, baseColor.B);
+
+        bodyPath.Fill = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(a, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(arrowHeadBase, RelativeUnit.Absolute),
+            GradientStops = new GradientStops
+            {
+                new GradientStop(tailSoft, 0.00),
+                new GradientStop(tailMid,  0.20),
+                new GradientStop(shaftMid, 0.45),
+                new GradientStop(shaftEnd, 0.80),
+                new GradientStop(shaftEnd, 1.00)
+            }
+        };
+        bodyPath.Stroke = null;
         shadowPath.Fill = new SolidColorBrush(Colors.Black, 0.08);
         shadowPath.Stroke = null;
         shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);

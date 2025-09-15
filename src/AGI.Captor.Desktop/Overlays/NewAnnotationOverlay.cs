@@ -128,6 +128,32 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             switch (e.Key)
             {
+                case Key.Left:
+                case Key.Right:
+                case Key.Up:
+                case Key.Down:
+                    if (_annotationService.Manager.HasSelection)
+                    {
+                        var delta = e.Key switch
+                        {
+                            Key.Left => new Vector(-1, 0),
+                            Key.Right => new Vector(1, 0),
+                            Key.Up => new Vector(0, -1),
+                            Key.Down => new Vector(0, 1),
+                            _ => new Vector(0, 0)
+                        };
+                        var selected = _annotationService.Manager.SelectedItems;
+                        var prevUnion = ComputeUnionBounds(selected.Select(i => i.Bounds));
+                        foreach (var item in selected)
+                        {
+                            item.Move(delta);
+                        }
+                        var newUnion = ComputeUnionBounds(selected.Select(i => i.Bounds));
+                        var dirty = Union(prevUnion, newUnion).Inflate(DirtyPadding);
+                        _renderer.RenderChanged(this, _annotationService.Manager.Items, dirty);
+                        e.Handled = true;
+                    }
+                    break;
                 case Key.Delete:
                     if (_annotationService.Manager.HasSelection)
                     {
@@ -366,6 +392,34 @@ public sealed class NewAnnotationOverlay : Canvas
         // End drag or resize operations
         if (_isDragging || _isResizing)
         {
+            // Commit resize/drag to command stack for undo
+            if (_isResizing)
+            {
+                var selectedItems = _annotationService.Manager.SelectedItems;
+                if (selectedItems.Count == 1)
+                {
+                    var item = selectedItems[0];
+                    if (item is ArrowAnnotation)
+                    {
+                        var (s, ept) = GetCurrentEndpoints(item);
+                        if (_resizeStartSnapshot.item is ArrowAnnotation && s.HasValue && ept.HasValue
+                            && _resizeStartSnapshot.start.HasValue && _resizeStartSnapshot.end.HasValue)
+                        {
+                            var cmd = new SetArrowEndpointsCommand(
+                                _renderer,
+                                _annotationService.Manager,
+                                (ArrowAnnotation)item,
+                                _resizeStartSnapshot.start.Value,
+                                _resizeStartSnapshot.end.Value,
+                                s.Value,
+                                ept.Value,
+                                this);
+                            _commandManager.ExecuteCommand(cmd);
+                        }
+                    }
+                }
+            }
+
             EndTransformation();
             e.Handled = true;
             return;
@@ -659,6 +713,17 @@ public sealed class NewAnnotationOverlay : Canvas
         _activeResizeHandle = handle;
         _dragStartPoint = point;
         _dragStartBounds = selectedItems[0].Bounds;
+        // Snapshot start state for undo
+        _resizeStartSnapshot = CreateSnapshot(selectedItems[0]);
+        // Arrow endpoint lock-in
+        if (selectedItems[0] is ArrowAnnotation arrow)
+        {
+            var handleCenter = GetHandleCenter(_dragStartBounds, handle);
+            var distStart = Math.Sqrt(Math.Pow(handleCenter.X - arrow.StartPoint.X, 2) + Math.Pow(handleCenter.Y - arrow.StartPoint.Y, 2));
+            var distEnd = Math.Sqrt(Math.Pow(handleCenter.X - arrow.EndPoint.X, 2) + Math.Pow(handleCenter.Y - arrow.EndPoint.Y, 2));
+            _resizeMoveStart = distStart <= distEnd;
+            _resizeFixedEndpoint = _resizeMoveStart ? arrow.EndPoint : arrow.StartPoint;
+        }
         UpdateCursorForResize(handle);
     }
 
@@ -692,16 +757,26 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         if (!_isDragging) return;
 
-        var delta = currentPoint - _dragStartPoint;
         var selectedItems = _annotationService.Manager.SelectedItems;
+        if (selectedItems.Count == 0) return;
 
+        // Compute union of previous bounds
+        var prevUnion = ComputeUnionBounds(selectedItems.Select(i => i.Bounds));
+
+        // Apply movement
+        var delta = currentPoint - _dragStartPoint;
         foreach (var item in selectedItems)
         {
             item.Move(delta);
         }
 
+        // Compute union of new bounds
+        var newUnion = ComputeUnionBounds(selectedItems.Select(i => i.Bounds));
         _dragStartPoint = currentPoint;
-        RefreshRender();
+
+        // Dirty rect = union(prev, new) with padding (shadow/AA)
+        var dirty = Union(prevUnion, newUnion).Inflate(DirtyPadding);
+        _renderer.RenderChanged(this, _annotationService.Manager.Items, dirty);
     }
 
     /// <summary>
@@ -715,13 +790,144 @@ public sealed class NewAnnotationOverlay : Canvas
         if (selectedItems.Count != 1) return;
 
         var item = selectedItems[0];
+        var prevBounds = item.Bounds;
         var delta = currentPoint - _dragStartPoint;
-        var newBounds = CalculateNewBounds(_dragStartBounds, _activeResizeHandle, delta);
 
-        // Apply transformation based on annotation type
-        ApplyTransformation(item, _dragStartBounds, newBounds);
-        RefreshRender();
+        var newBounds = CalculateNewBounds(_dragStartBounds, _activeResizeHandle, delta);
+        if (item is ArrowAnnotation arrowItem)
+        {
+            ApplyArrowResizeFollowHandle(arrowItem, newBounds, _activeResizeHandle);
+        }
+        else
+        {
+            // Apply transformation based on item type
+            ApplyTransformation(item, _dragStartBounds, newBounds);
+        }
+
+        var dirty = Union(prevBounds, item.Bounds).Inflate(DirtyPadding);
+        _renderer.RenderChanged(this, _annotationService.Manager.Items, dirty);
     }
+
+    private (IAnnotationItem item, Point? start, Point? end) CreateSnapshot(IAnnotationItem item)
+    {
+        return item is ArrowAnnotation a
+            ? (item, a.StartPoint, a.EndPoint)
+            : (item, null, null);
+    }
+
+    private (Point? start, Point? end) GetCurrentEndpoints(IAnnotationItem item)
+    {
+        if (item is ArrowAnnotation a)
+            return (a.StartPoint, a.EndPoint);
+        return (null, null);
+    }
+
+    private (IAnnotationItem item, Point? start, Point? end) _resizeStartSnapshot;
+
+    private void ApplyArrowResizeFollowHandle(ArrowAnnotation arrow, Rect newBounds, ResizeHandle handle)
+    {
+        if (arrow.IsLocked) return;
+        // Follow the dragged handle directly; keep the opposite endpoint fixed for the whole gesture
+        var target = GetHandleCenter(newBounds, handle);
+        var guard = (_selectionRect.Width > 0 && _selectionRect.Height > 0) ? _selectionRect : newBounds;
+        target = ClampPoint(target, guard);
+
+        const double minLen = 2.0;
+        if (_resizeMoveStart)
+        {
+            var newStart = target;
+            if (Vector.Distance(newStart, _resizeFixedEndpoint) < minLen)
+            {
+                var dir = _resizeFixedEndpoint - newStart;
+                var len = Math.Max(1e-6, Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y));
+                var ux = dir.X / len; var uy = dir.Y / len;
+                newStart = new Point(_resizeFixedEndpoint.X - ux * minLen, _resizeFixedEndpoint.Y - uy * minLen);
+            }
+            arrow.StartPoint = newStart;
+            arrow.EndPoint = _resizeFixedEndpoint;
+        }
+        else
+        {
+            var newEnd = target;
+            if (Vector.Distance(_resizeFixedEndpoint, newEnd) < minLen)
+            {
+                var dir = newEnd - _resizeFixedEndpoint;
+                var len = Math.Max(1e-6, Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y));
+                var ux = dir.X / len; var uy = dir.Y / len;
+                newEnd = new Point(_resizeFixedEndpoint.X + ux * minLen, _resizeFixedEndpoint.Y + uy * minLen);
+            }
+            arrow.StartPoint = _resizeFixedEndpoint;
+            arrow.EndPoint = newEnd;
+        }
+    }
+
+    private static Point ClampPoint(Point p, Rect rect)
+    {
+        var x = Math.Max(rect.Left, Math.Min(rect.Right, p.X));
+        var y = Math.Max(rect.Top, Math.Min(rect.Bottom, p.Y));
+        return new Point(x, y);
+    }
+
+    private static ResizeHandle GetOppositeHandle(ResizeHandle handle)
+    {
+        return handle switch
+        {
+            ResizeHandle.TopLeft => ResizeHandle.BottomRight,
+            ResizeHandle.TopCenter => ResizeHandle.BottomCenter,
+            ResizeHandle.TopRight => ResizeHandle.BottomRight,
+            ResizeHandle.MiddleRight => ResizeHandle.MiddleLeft,
+            ResizeHandle.BottomRight => ResizeHandle.TopLeft,
+            ResizeHandle.BottomCenter => ResizeHandle.TopCenter,
+            ResizeHandle.BottomLeft => ResizeHandle.TopRight,
+            ResizeHandle.MiddleLeft => ResizeHandle.MiddleRight,
+            _ => ResizeHandle.BottomRight
+        };
+    }
+    
+    // Arrow resize state
+    private bool _resizeMoveStart;
+    private Point _resizeFixedEndpoint;
+
+    private static Point GetHandleCenter(Rect bounds, ResizeHandle handle)
+    {
+        return handle switch
+        {
+            ResizeHandle.TopLeft => new Point(bounds.Left, bounds.Top),
+            ResizeHandle.TopCenter => new Point(bounds.Center.X, bounds.Top),
+            ResizeHandle.TopRight => new Point(bounds.Right, bounds.Top),
+            ResizeHandle.MiddleRight => new Point(bounds.Right, bounds.Center.Y),
+            ResizeHandle.BottomRight => new Point(bounds.Right, bounds.Bottom),
+            ResizeHandle.BottomCenter => new Point(bounds.Center.X, bounds.Bottom),
+            ResizeHandle.BottomLeft => new Point(bounds.Left, bounds.Bottom),
+            ResizeHandle.MiddleLeft => new Point(bounds.Left, bounds.Center.Y),
+            _ => bounds.Center
+        };
+    }
+
+    private static Rect ComputeUnionBounds(IEnumerable<Rect> rects)
+    {
+        var enumerated = rects.ToList();
+        if (enumerated.Count == 0) return new Rect();
+        var union = enumerated[0];
+        for (int i = 1; i < enumerated.Count; i++)
+        {
+            union = Union(union, enumerated[i]);
+        }
+        return union;
+    }
+
+    private static Rect Union(Rect a, Rect b)
+    {
+        if (a.Width <= 0 || a.Height <= 0) return b;
+        if (b.Width <= 0 || b.Height <= 0) return a;
+        var left = Math.Min(a.Left, b.Left);
+        var top = Math.Min(a.Top, b.Top);
+        var right = Math.Max(a.Right, b.Right);
+        var bottom = Math.Max(a.Bottom, b.Bottom);
+        return new Rect(left, top, right - left, bottom - top);
+    }
+
+    private const double DirtyPadding = 3.0; // compensate AA/shadow
 
     /// <summary>
     /// Calculate new bounds based on resize handle and delta
