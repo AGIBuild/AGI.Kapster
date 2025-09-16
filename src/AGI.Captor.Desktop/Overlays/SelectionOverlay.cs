@@ -20,12 +20,12 @@ public sealed class SelectionOverlay : Canvas
     private HandleKind _activeHandle = HandleKind.None;
     private readonly Border _rectBorder;
     private bool _pendingCreate;
-    private const double DragThreshold = 2.0;
+    private const double DragThreshold = 0.5; // 从2.0降低到0.5像素，提高响应速度
     
     // Performance optimization: throttle rendering
     private DateTime _lastRenderTime = DateTime.MinValue;
     private Rect _lastRenderedRect = new Rect();
-    private const double MinRenderInterval = 16.0; // ~60 FPS (milliseconds)
+    private const double MinRenderInterval = 8.0; // ~120 FPS (milliseconds)
 
     private const double HandleSize = 8;
     private const double HandleHit = 10;
