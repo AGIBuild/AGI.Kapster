@@ -17,8 +17,8 @@
     <CFBundleName>AGI Captor</CFBundleName>
     <CFBundleDisplayName>AGI Captor</CFBundleDisplayName>
     <CFBundleIdentifier>com.agi.captor</CFBundleIdentifier>
-    <CFBundleVersion>1.0.0</CFBundleVersion>
-    <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
+    <CFBundleVersion>1.1.0</CFBundleVersion>
+    <CFBundleShortVersionString>1.1.0</CFBundleShortVersionString>
     <CFBundlePackageType>APPL</CFBundlePackageType>
     <CFBundleSignature>????</CFBundleSignature>
     <CFBundleExecutable>AGI.Captor.Desktop</CFBundleExecutable>
