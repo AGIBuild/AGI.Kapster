@@ -84,20 +84,12 @@ public class MacOverlayWindow : IOverlayWindow
             CreateWindow();
         }
         
-        // On macOS, we can use the existing window's screens property
-        // without creating a temporary anchor window
-        if (_primaryWindow != null && _primaryWindow.Screens != null)
-        {
-            // Position window on the target screen
-            _window!.Position = new PixelPoint(screen.Bounds.Position.X, screen.Bounds.Position.Y);
-            _window.WindowStartupLocation = WindowStartupLocation.Manual;
-            _window.WindowState = WindowState.FullScreen;
-        }
-        else
-        {
-            // Fallback: just maximize if we can't get screens
-            _window!.WindowState = WindowState.Maximized;
-        }
+        // Position window directly on the target screen using screen bounds
+        _window!.Position = new PixelPoint(screen.Bounds.Position.X, screen.Bounds.Position.Y);
+        _window.WindowStartupLocation = WindowStartupLocation.Manual;
+        _window.Width = screen.Bounds.Width;
+        _window.Height = screen.Bounds.Height;
+        _window.WindowState = WindowState.Normal; // Use Normal state instead of FullScreen for better multi-screen support
         
         Log.Debug("macOS overlay window set to fullscreen on screen at {X},{Y}", 
             screen.Bounds.Position.X, screen.Bounds.Position.Y);
