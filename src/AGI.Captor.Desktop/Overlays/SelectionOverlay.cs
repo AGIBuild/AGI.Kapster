@@ -226,7 +226,7 @@ public sealed class SelectionOverlay : Canvas
 
     private void UpdateVisuals()
     {
-        // 直接更新视觉元素，无节流
+        // Directly update visual elements without throttling
         if (SelectionRect.Width > 0 && SelectionRect.Height > 0)
         {
             _rectBorder.Width = SelectionRect.Width;

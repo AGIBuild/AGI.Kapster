@@ -315,7 +315,7 @@ public class HotkeyManager : IHotkeyManager
             Log.Debug("ESC hotkey triggered, closing all overlays");
             _overlayController.CloseAll();
             
-            // 关闭遮罩层后，注销ESC热键
+            // Unregister ESC hotkey after closing overlays
             UnregisterEscapeHotkey();
         });
 
@@ -331,7 +331,7 @@ public class HotkeyManager : IHotkeyManager
     }
 
     /// <summary>
-    /// 注销ESC热键
+    /// Unregister ESC hotkey
     /// </summary>
     public void UnregisterEscapeHotkey()
     {
@@ -354,7 +354,7 @@ public class HotkeyManager : IHotkeyManager
 }
 
 /// <summary>
-/// 不支持平台的热键提供者
+/// Hotkey provider for unsupported platforms
 /// </summary>
 internal class UnsupportedHotkeyProvider : IHotkeyProvider
 {

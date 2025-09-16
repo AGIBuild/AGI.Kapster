@@ -10,7 +10,7 @@ using System.Collections.Generic;
 namespace AGI.Captor.Desktop.Services;
 
 /// <summary>
-/// 标注服务实现
+/// Annotation service implementation
 /// </summary>
 public class AnnotationService : IAnnotationService
 {
@@ -188,7 +188,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建矩形标注
+    /// Create rectangle annotation
     /// </summary>
     private RectangleAnnotation CreateRectangle(Point startPoint)
     {
@@ -202,7 +202,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 更新矩形标注
+    /// Update rectangle annotation
     /// </summary>
     private void UpdateRectangle(RectangleAnnotation rect, Point currentPoint)
     {
@@ -219,7 +219,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建椭圆标注
+    /// Create ellipse annotation
     /// </summary>
     private EllipseAnnotation CreateEllipse(Point startPoint)
     {
@@ -233,7 +233,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 更新椭圆标注
+    /// Update ellipse annotation
     /// </summary>
     private void UpdateEllipse(EllipseAnnotation ellipse, Point currentPoint)
     {
@@ -249,7 +249,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建箭头标注
+    /// Create arrow annotation
     /// </summary>
     private ArrowAnnotation CreateArrow(Point startPoint)
     {
@@ -263,7 +263,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 更新箭头标注
+    /// Update arrow annotation
     /// </summary>
     private void UpdateArrow(ArrowAnnotation arrow, Point currentPoint)
     {
@@ -271,7 +271,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建文本标注
+    /// Create text annotation
     /// </summary>
     private TextAnnotation CreateText(Point startPoint)
     {
@@ -287,7 +287,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建自由画笔标注
+    /// Create freehand annotation
     /// </summary>
     private FreehandAnnotation CreateFreehand()
     {
@@ -301,7 +301,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 更新自由画笔标注
+    /// Update freehand annotation
     /// </summary>
     private void UpdateFreehand(FreehandAnnotation freehand, Point currentPoint)
     {
@@ -309,7 +309,7 @@ public class AnnotationService : IAnnotationService
     }
 
     /// <summary>
-    /// 创建Emoji标注
+    /// Create Emoji annotation
     /// </summary>
     private EmojiAnnotation CreateEmoji(Point startPoint)
     {

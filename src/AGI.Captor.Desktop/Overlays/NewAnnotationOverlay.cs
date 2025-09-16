@@ -1257,7 +1257,7 @@ public sealed class NewAnnotationOverlay : Canvas
 
 
     /// <summary>
-    /// 清除所有标注
+    /// Clear all annotations
     /// </summary>
     public void Clear()
     {
@@ -1276,7 +1276,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 删除选中的标注
+    /// Delete selected annotations
     /// </summary>
     public void DeleteSelected()
     {
@@ -1304,7 +1304,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 获取标注服务（用于外部访问）
+    /// Get annotation service (for external access)
     /// </summary>
     public IAnnotationService GetAnnotationService() => _annotationService;
 
@@ -1319,13 +1319,13 @@ public sealed class NewAnnotationOverlay : Canvas
     #region Text Editing
 
     /// <summary>
-    /// 开始编辑文本标注
+    /// Start editing text annotation
     /// </summary>
     private void StartTextEditing(TextAnnotation textItem)
     {
         try
         {
-            // 如果已经在编辑其他文本，先结束编辑
+            // If already editing other text, end editing first
             EndTextEditing();
 
             _editingTextItem = textItem;
@@ -1341,12 +1341,12 @@ public sealed class NewAnnotationOverlay : Canvas
             // This prevents ghosting during text editing
             RefreshRender();
 
-            // 获取文本选中状态的边界大小（与选中状态显示一致）
-            var bounds = textItem.Bounds; // 这会返回选中状态的编辑边界
+            // Get text selection state boundary size (consistent with selection state display)
+            var bounds = textItem.Bounds; // This returns the editing boundary of the selection state
             var actualWidth = bounds.Width;
             var actualHeight = bounds.Height;
             
-            // 创建文本编辑框 - 精确匹配TextBlock的渲染位置和尺寸
+            // Create text editing box - precisely match TextBlock rendering position and size
             _editingTextBox = new TextBox
             {
                 Text = textItem.Text,
@@ -1355,13 +1355,13 @@ public sealed class NewAnnotationOverlay : Canvas
                 FontWeight = (Avalonia.Media.FontWeight)textItem.Style.FontWeight,
                 FontStyle = (Avalonia.Media.FontStyle)textItem.Style.FontStyle,
                 Foreground = new SolidColorBrush(textItem.Style.StrokeColor),
-                Background = new SolidColorBrush(Colors.White, 0.9), // 半透明背景便于编辑
+                Background = new SolidColorBrush(Colors.White, 0.9), // Semi-transparent background for easy editing
                 BorderBrush = new SolidColorBrush(textItem.Style.StrokeColor),
                 BorderThickness = new Avalonia.Thickness(1),
                 // CRITICAL: Remove padding and margin to match TextBlock rendering exactly
                 Padding = new Avalonia.Thickness(0),
                 Margin = new Avalonia.Thickness(0),
-                // 使用文本的实际尺寸，而不是选区尺寸
+                // Use actual text size, not selection size
                 Width = actualWidth,
                 Height = actualHeight,
                 MinWidth = 100,
@@ -1373,20 +1373,20 @@ public sealed class NewAnnotationOverlay : Canvas
                 VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Top
             };
 
-            // 设置位置 - 考虑边框偏移量以精确对齐
-            // TextBox有1px边框，需要向左上角偏移1px以对齐TextBlock
+            // Set position - consider border offset for precise alignment
+            // TextBox has 1px border, need to offset 1px to top-left to align with TextBlock
             Canvas.SetLeft(_editingTextBox, textItem.Position.X - 1);
             Canvas.SetTop(_editingTextBox, textItem.Position.Y - 1);
 
-            // 添加到画布
+            // Add to canvas
             Children.Add(_editingTextBox);
 
-            // 处理编辑完成事件
+            // Handle editing completion events
             _editingTextBox.LostFocus += OnTextEditingLostFocus;
             _editingTextBox.KeyDown += OnTextEditingKeyDown;
             _editingTextBox.TextChanged += OnTextEditingTextChanged;
 
-            // 聚焦并选中所有文本
+            // Focus and select all text
             _editingTextBox.Focus();
             _editingTextBox.SelectAll();
             
@@ -1396,7 +1396,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             Log.Error(ex, "Failed to start text editing for annotation {Id}", textItem.Id);
             
-            // 清理状态
+            // Clean up state
             _editingTextBox = null;
             _editingTextItem = null;
             textItem.EndEditing();
@@ -1404,7 +1404,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 文本编辑框内容变化事件 - 实现自动扩展
+    /// Text editing box content change event - implement auto-expansion
     /// </summary>
     private void OnTextEditingTextChanged(object? sender, TextChangedEventArgs e)
     {
@@ -1412,7 +1412,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             if (_editingTextBox == null || _editingTextItem == null) return;
 
-            // 测量文本尺寸
+            // Measure text size
             var formattedText = new Avalonia.Media.FormattedText(
                 _editingTextBox.Text ?? "",
                 System.Globalization.CultureInfo.CurrentCulture,
@@ -1423,11 +1423,11 @@ public sealed class NewAnnotationOverlay : Canvas
                 _editingTextItem.Style.FontSize,
                 Brushes.Black);
 
-            // 计算新的尺寸（添加一些编辑空间）
+            // Calculate new size (add some editing space)
             var newWidth = Math.Max(formattedText.Width + 20, 100);
             var newHeight = Math.Max(formattedText.Height + 8, _editingTextItem.Style.FontSize + 8);
 
-            // 更新编辑框尺寸
+            // Update editing box size
             _editingTextBox.Width = newWidth;
             _editingTextBox.Height = newHeight;
 
@@ -1441,7 +1441,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 结束文本编辑
+    /// End text editing
     /// </summary>
     private void EndTextEditing()
     {
@@ -1449,11 +1449,11 @@ public sealed class NewAnnotationOverlay : Canvas
 
         try
         {
-            // 更新文本内容
+            // Update text content
             var finalText = _editingTextBox.Text ?? string.Empty;
             _editingTextItem.Text = finalText;
             
-            // 移除编辑框
+            // Remove editing box
             Children.Remove(_editingTextBox);
             _editingTextBox.LostFocus -= OnTextEditingLostFocus;
             _editingTextBox.KeyDown -= OnTextEditingKeyDown;
@@ -1498,7 +1498,7 @@ public sealed class NewAnnotationOverlay : Canvas
         }
         finally
         {
-            // 确保清理状态
+            // Ensure state cleanup
             _editingTextBox = null;
             _editingTextItem = null;
 
@@ -1515,7 +1515,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 文本编辑框失去焦点事件
+    /// Text editing box lost focus event
     /// </summary>
     private void OnTextEditingLostFocus(object? sender, EventArgs e)
     {
@@ -1530,7 +1530,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// 文本编辑框按键事件
+    /// Text editing box key press event
     /// </summary>
     private void OnTextEditingKeyDown(object? sender, KeyEventArgs e)
     {
@@ -1538,7 +1538,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             if (e.Key == Key.Escape)
             {
-                // ESC键取消编辑，恢复原文本
+                // ESC key cancels editing, restore original text
                 if (_editingTextItem != null && _editingTextBox != null)
                 {
                     _editingTextBox.Text = _editingTextItem.Text;
@@ -1548,7 +1548,7 @@ public sealed class NewAnnotationOverlay : Canvas
             }
             else if (e.Key == Key.Enter && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
-                // Enter键结束编辑（Shift+Enter换行）
+                // Enter key ends editing (Shift+Enter for new line)
                 EndTextEditing();
                 e.Handled = true;
             }
