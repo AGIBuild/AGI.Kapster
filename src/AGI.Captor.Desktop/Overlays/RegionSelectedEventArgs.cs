@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using AGI.Captor.Desktop.Services;
 
 namespace AGI.Captor.Desktop.Overlays;
@@ -29,12 +30,19 @@ public class RegionSelectedEventArgs : EventArgs
     /// </summary>
     public bool IsEditableSelection { get; }
     
-    public RegionSelectedEventArgs(Rect region, bool isFullScreen = false, DetectedElement? detectedElement = null, bool isEditableSelection = false)
+    /// <summary>
+    /// Gets the composite image with annotations (for platforms that need manual composition like macOS)
+    /// </summary>
+    public Bitmap? CompositeImage { get; }
+    
+    public RegionSelectedEventArgs(Rect region, bool isFullScreen = false, DetectedElement? detectedElement = null, 
+        bool isEditableSelection = false, Bitmap? compositeImage = null)
     {
         Region = region;
         IsFullScreen = isFullScreen;
         DetectedElement = detectedElement;
         IsEditableSelection = isEditableSelection;
+        CompositeImage = compositeImage;
     }
 }
 

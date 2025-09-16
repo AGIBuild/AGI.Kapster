@@ -153,6 +153,18 @@ public class MacOverlayWindow : IOverlayWindow
             return;
         }
         
+        // Pass composite image (if available) through CaptureTarget
+        // This is used for macOS to include annotations in the screenshot
+        object? captureTarget = null;
+        if (e.CompositeImage != null)
+        {
+            captureTarget = e.CompositeImage;
+        }
+        else if (e.DetectedElement != null)
+        {
+            captureTarget = ElementInfoAdapter.FromDetectedElement(e.DetectedElement);
+        }
+        
         RegionSelected?.Invoke(this, new CaptureRegionEventArgs(
             new PixelRect(
                 (int)e.Region.X,
@@ -160,7 +172,7 @@ public class MacOverlayWindow : IOverlayWindow
                 (int)e.Region.Width,
                 (int)e.Region.Height),
             e.IsFullScreen ? CaptureMode.FullScreen : CaptureMode.Region,
-            e.DetectedElement != null ? ElementInfoAdapter.FromDetectedElement(e.DetectedElement) : null));
+            captureTarget));
     }
     
     private void OnCancelled(object? sender, OverlayCancelledEventArgs e)

@@ -148,6 +148,22 @@ public class ExportService : IExportService
     }
 
     /// <summary>
+    /// Create composite image with annotations for macOS clipboard support
+    /// </summary>
+    public async Task<Bitmap?> CreateCompositeImageWithAnnotationsAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect)
+    {
+        try
+        {
+            return await CreateCompositeImageAsync(screenshot, annotations, selectionRect);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to create composite image with annotations");
+            return null;
+        }
+    }
+    
+    /// <summary>
     /// Create composite image with annotations rendered on top of screenshot
     /// Must be called on UI thread due to Canvas and RenderTargetBitmap operations
     /// </summary>

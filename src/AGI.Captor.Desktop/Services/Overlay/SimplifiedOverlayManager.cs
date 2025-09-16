@@ -159,12 +159,26 @@ public class SimplifiedOverlayManager : IOverlayController
             
             if (_captureStrategy != null && _clipboardStrategy != null)
             {
-                // Capture the region
-                var bitmap = await _captureStrategy.CaptureRegionAsync(e.Region);
-                if (bitmap != null)
+                SkiaSharp.SKBitmap? bitmapToClipboard = null;
+                
+                // Check if we have a composite image from OverlayWindow (macOS with annotations)
+                // The composite image is passed through CaptureTarget property
+                if (e.CaptureTarget is Avalonia.Media.Imaging.Bitmap compositeImage)
+                {
+                    Log.Debug("Using composite image with annotations from OverlayWindow");
+                    bitmapToClipboard = BitmapConverter.ConvertToSKBitmap(compositeImage);
+                }
+                
+                // If no composite image, capture normally
+                if (bitmapToClipboard == null)
+                {
+                    bitmapToClipboard = await _captureStrategy.CaptureRegionAsync(e.Region);
+                }
+                
+                if (bitmapToClipboard != null)
                 {
                     // Copy to clipboard
-                    var success = await _clipboardStrategy.SetImageAsync(bitmap);
+                    var success = await _clipboardStrategy.SetImageAsync(bitmapToClipboard);
                     Log.Information("Screenshot copied to clipboard: {Success}", success);
                 }
                 else

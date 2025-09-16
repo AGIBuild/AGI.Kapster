@@ -142,10 +142,34 @@ public partial class OverlayWindow : Window
 				UpdateToolbarPosition(r);
 			};
 
-			selector.ConfirmRequested += r =>
+			selector.ConfirmRequested += async r =>
 			{
+				Bitmap? compositeImage = null;
+				
+				var annotations = _annotator?.GetAnnotationService()?.Manager?.Items;
+				if (annotations != null && annotations.Any())
+				{
+					try
+					{
+						Log.Debug("Creating composite image with {Count} annotations from selector (unified)", annotations.Count());
+						// Capture the base screenshot first
+						var screenshot = await CaptureRegionAsync(r);
+						if (screenshot != null)
+						{
+							// Create composite image with annotations
+							var exportService = new Services.ExportService();
+							compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
+							Log.Debug("Composite image created successfully from selector (unified)");
+						}
+					}
+					catch (Exception ex)
+					{
+						Log.Warning(ex, "Failed to create composite image from selector, will use base screenshot (unified)");
+					}
+				}
+				
 				// Raise region selected event - SimplifiedOverlayManager will handle closing all windows
-				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
+				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, compositeImage));
 			};
 		}
 
@@ -162,11 +186,34 @@ public partial class OverlayWindow : Window
 			// Subscribe to export events
 			existingAnnotator.ExportRequested += HandleExportRequest;
 			
-			// Handle double-click confirm (same as old version)
-			existingAnnotator.ConfirmRequested += r =>
+			// Handle double-click confirm (unified cross-platform logic)
+			existingAnnotator.ConfirmRequested += async r =>
 			{
-				// Raise region selected event
-				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
+				Bitmap? compositeImage = null;
+				var annotations = existingAnnotator.GetAnnotationService()?.Manager?.Items;
+				if (annotations != null && annotations.Any())
+				{
+					try
+					{
+						Log.Debug("Creating composite image with {Count} annotations (unified)", annotations.Count());
+						// Capture the base screenshot first
+						var screenshot = await CaptureRegionAsync(r);
+						if (screenshot != null)
+						{
+							// Create composite image with annotations
+							var exportService = new Services.ExportService();
+							compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
+							Log.Debug("Composite image created successfully (unified)");
+						}
+					}
+					catch (Exception ex)
+					{
+						Log.Warning(ex, "Failed to create composite image, will use base screenshot (unified)");
+					}
+				}
+				
+				// Raise region selected event with composite image (if created)
+				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, compositeImage));
 				
 				var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
 				{
