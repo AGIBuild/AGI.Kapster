@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Services.Overlay.Platforms;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Overlays;
 using AGI.Captor.Desktop.Views;
@@ -78,22 +80,38 @@ class Program
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
         builder.Services.AddTransient<SettingsWindow>();
         
-        // Element detector (platform-specific)
-        if (OperatingSystem.IsWindows())
-        {
-            builder.Services.AddSingleton<IElementDetector, WindowsElementDetector>();
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            // TODO: Add MacElementDetector when implementing T-0202
-            builder.Services.AddSingleton<IElementDetector, WindowsElementDetector>(); // Placeholder
-        }
+        // Element detector is now created by platform factory
+        // Removed direct registration - handled by IPlatformOverlayFactory
 
-        builder.Services.AddSingleton<IOverlayController>(provider =>
+        // Register platform-specific services
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var elementDetector = provider.GetService<IElementDetector>();
-            return new OverlayWindowManager(elementDetector);
-        });
+            builder.Services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
+            builder.Services.AddTransient<IElementDetector, WindowsElementDetector>();
+            builder.Services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
+            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
+            builder.Services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            builder.Services.AddTransient<IOverlayWindow, MacOverlayWindow>();
+            builder.Services.AddTransient<IElementDetector, NullElementDetector>();
+            builder.Services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
+            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>(); // Reuse Windows renderer
+            builder.Services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
+        }
+        else
+        {
+            // Default to Windows implementations for other platforms
+            builder.Services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
+            builder.Services.AddTransient<IElementDetector, WindowsElementDetector>();
+            builder.Services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
+            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
+            builder.Services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
+        }
+        
+        // Register the overlay manager
+        builder.Services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
 
         var host = builder.Build();
 

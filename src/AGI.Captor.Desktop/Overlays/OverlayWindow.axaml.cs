@@ -16,12 +16,14 @@ using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Dialogs;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
+using SkiaSharp;
 
 namespace AGI.Captor.Desktop.Overlays;
 
 public partial class OverlayWindow : Window
 {
 	private readonly IElementDetector? _elementDetector;
+	private readonly IScreenCaptureStrategy? _screenCaptureStrategy;
 	private ElementHighlightOverlay? _elementHighlight;
 	private bool _isElementPickerMode = false; // Default to free selection mode
 	private bool _hasEditableSelection = false; // Track if there's an editable selection
@@ -32,10 +34,22 @@ public partial class OverlayWindow : Window
 	private DateTime _lastDetectionTime = DateTime.MinValue;
 	private const double MinMovementThreshold = 8.0; // pixels
 	private static readonly TimeSpan MinDetectionInterval = TimeSpan.FromMilliseconds(30); // ~33 FPS max
+	
+	// Public events for external consumers
+	public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+	public event EventHandler<OverlayCancelledEventArgs>? Cancelled;
+	
+	// Property to check element detection support
+	public bool ElementDetectionEnabled 
+	{
+		get => _isElementPickerMode;
+		set => SetElementPickerMode(value);
+	}
 
-	public OverlayWindow(IElementDetector? elementDetector = null)
+	public OverlayWindow(IElementDetector? elementDetector = null, IScreenCaptureStrategy? screenCaptureStrategy = null)
 	{
 		_elementDetector = elementDetector;
+		_screenCaptureStrategy = screenCaptureStrategy;
 		InitializeComponent();
 		
 		// Create settings service instance for this overlay session
@@ -104,6 +118,9 @@ public partial class OverlayWindow : Window
 				// Keep selection for annotation; don't capture yet
 				_hasEditableSelection = true; // Mark that we have an editable selection
 				Log.Information("Selection finished: {X},{Y} {W}x{H} - editable selection created", r.X, r.Y, r.Width, r.Height);
+				
+				// Raise public event with isEditableSelection = true
+				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
 			};
 
 			// Create a hole in mask over selection using Path (even-odd)
@@ -125,25 +142,10 @@ public partial class OverlayWindow : Window
 				UpdateToolbarPosition(r);
 			};
 
-			selector.ConfirmRequested += async r =>
+			selector.ConfirmRequested += r =>
 			{
-				try
-				{
-					var success = await CopyRegionToClipboardAsync(r);
-					Log.Information("CopyRegionToClipboard result={Success}", success);
-				}
-				catch (Exception ex)
-				{
-					Log.Error(ex, "Capture failed");
-				}
-				finally
-				{
-					var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-					{
-						await System.Threading.Tasks.Task.Delay(50);
-						Close();
-					});
-				}
+				// Raise region selected event - SimplifiedOverlayManager will handle closing all windows
+				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
 			};
 		}
 
@@ -161,38 +163,29 @@ public partial class OverlayWindow : Window
 			existingAnnotator.ExportRequested += HandleExportRequest;
 			
 			// Handle double-click confirm (same as old version)
-			existingAnnotator.ConfirmRequested += async r =>
+			existingAnnotator.ConfirmRequested += r =>
 			{
-				try
+				// Raise region selected event
+				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
+				
+				var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
 				{
-					var success = await CopyRegionToClipboardAsync(r);
-					Log.Information("CopyRegionToClipboard result={Success}", success);
-				}
-				catch (Exception ex)
-				{
-					Log.Error(ex, "Capture failed");
-				}
-				finally
-				{
-					var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+					await System.Threading.Tasks.Task.Delay(50);
+					
+					// Close all overlay windows, not just this one
+					var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
+					if (overlayController != null)
 					{
-						await System.Threading.Tasks.Task.Delay(50);
-						
-						// Close all overlay windows, not just this one
-						var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-						if (overlayController != null)
-						{
-							overlayController.CloseAll();
-							Log.Information("All overlay windows closed after double-click save");
-						}
-						else
-						{
-							// Fallback: close just this window
-							Close();
-							Log.Warning("Could not get overlay controller, closing only current window");
-						}
-					});
-				}
+						overlayController.CloseAll();
+						Log.Information("All overlay windows closed after double-click save");
+					}
+					else
+					{
+						// Fallback: close just this window
+						Close();
+						Log.Warning("Could not get overlay controller, closing only current window");
+					}
+				});
 			};
 		}
 
@@ -269,7 +262,7 @@ public partial class OverlayWindow : Window
 		if (e.Key == Key.Escape)
 		{
 			Serilog.Log.Information("ESC key pressed - exiting screenshot mode");
-			Close();
+			Cancelled?.Invoke(this, new OverlayCancelledEventArgs("User pressed ESC"));
 			e.Handled = true;
 		}
 		
@@ -318,34 +311,25 @@ public partial class OverlayWindow : Window
 				var r = selector.SelectionRect;
 				if (r.Width > 0)
 				{
+					// Raise region selected event
+					RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
+					
 					var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
 					{
-						try
+						await System.Threading.Tasks.Task.Delay(50);
+						
+						// Close all overlay windows, not just this one
+						var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
+						if (overlayController != null)
 						{
-							var success = await CopyRegionToClipboardAsync(r);
-							Log.Information("CopyRegionToClipboard result={Success}", success);
+							overlayController.CloseAll();
+							Log.Information("All overlay windows closed after Enter key save");
 						}
-						catch (Exception ex)
+						else
 						{
-							Log.Error(ex, "Capture failed");
-						}
-						finally
-						{
-							await System.Threading.Tasks.Task.Delay(50);
-							
-							// Close all overlay windows, not just this one
-							var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-							if (overlayController != null)
-							{
-								overlayController.CloseAll();
-								Log.Information("All overlay windows closed after Enter key save");
-							}
-							else
-							{
-								// Fallback: close just this window
-								Close();
-								Log.Warning("Could not get overlay controller, closing only current window");
-							}
+							// Fallback: close just this window
+							Close();
+							Log.Warning("Could not get overlay controller, closing only current window");
 						}
 					});
 				}
@@ -431,6 +415,31 @@ public partial class OverlayWindow : Window
 		
 		Log.Information("Element picker mode: {Active}", _isElementPickerMode);
 	}
+	
+	private void SetElementPickerMode(bool enabled)
+	{
+		if (_isElementPickerMode != enabled)
+		{
+			_isElementPickerMode = enabled;
+			
+			// Update element highlight state
+			if (_elementHighlight != null)
+			{
+				_elementHighlight.IsActive = _isElementPickerMode;
+			}
+			
+			// Hide/show selection overlay based on mode
+			var selector = this.FindControl<SelectionOverlay>("Selector");
+			if (selector != null)
+			{
+				selector.IsHitTestVisible = !_isElementPickerMode;
+				selector.IsVisible = !_isElementPickerMode;
+			}
+			
+			// Set appropriate cursor
+			this.Cursor = _isElementPickerMode ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Cross);
+		}
+	}
 
 	private void OnElementSelected(DetectedElement element)
 	{
@@ -472,6 +481,9 @@ public partial class OverlayWindow : Window
 		
 		// Reset cursor to normal selection mode (let overlay handle cursor)
 		// this.Cursor = new Cursor(StandardCursorType.Cross);
+		
+		// Raise public event with isEditableSelection = true
+		RegionSelected?.Invoke(this, new RegionSelectedEventArgs(selectionRect, false, element, true));
 		
 		Log.Information("Switched to selection mode with element bounds - editable selection created");
 		}
@@ -554,36 +566,8 @@ public partial class OverlayWindow : Window
 		// Note: When not in element picker mode, let SelectionOverlay handle the event for custom drag selection
 	}
 
-#region Cross-platform screenshot capture and clipboard
-    /// <summary>
-    /// Cross-platform clipboard copy method
-    /// </summary>
-    private async Task<bool> CopyRegionToClipboardAsync(Avalonia.Rect rect)
-    {
-        try
-        {
-            if (OperatingSystem.IsWindows())
-            {
-                // Use Windows-specific clipboard method for better compatibility
-                return CopyRegionToClipboardWindows(rect);
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                // Use macOS-specific clipboard method
-                return await CopyRegionToClipboardMacOSAsync(rect);
-            }
-            else
-            {
-                // Fallback to Avalonia clipboard for other platforms
-                return await CopyRegionToClipboardAvaloniaAsync(rect);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to copy region to clipboard");
-            return false;
-        }
-    }
+// Clipboard functionality has been moved to platform-specific strategies
+// See IClipboardStrategy and its implementations
 
     /// <summary>
     /// Avalonia clipboard fallback method
@@ -642,331 +626,31 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// macOS-specific clipboard copy using native commands
-    /// </summary>
-    private async Task<bool> CopyRegionToClipboardMacOSAsync(Avalonia.Rect rect)
-    {
-        try
-        {
-            // Convert to screen coordinates
-            var p1 = this.PointToScreen(new Point(rect.X, rect.Y));
-            var p2 = this.PointToScreen(new Point(rect.Right, rect.Bottom));
-            int x = Math.Min(p1.X, p2.X);
-            int y = Math.Min(p1.Y, p2.Y);
-            int w = Math.Max(1, Math.Abs(p2.X - p1.X));
-            int h = Math.Max(1, Math.Abs(p2.Y - p1.Y));
-
-            // Use screencapture with clipboard option
-            var process = new System.Diagnostics.Process
-            {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "screencapture",
-                    Arguments = $"-R {x},{y},{w},{h} -c",  // -c flag copies to clipboard
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                }
-            };
-
-            process.Start();
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
-            {
-                Log.Information("Successfully copied region to clipboard using screencapture -c");
-                return true;
-            }
-            else
-            {
-                var stderr = await process.StandardError.ReadToEndAsync();
-                Log.Error("screencapture clipboard command failed with exit code: {ExitCode}, Error: {Error}", 
-                    process.ExitCode, stderr);
-                
-                // Fallback to file-based approach
-                return await CopyRegionToClipboardMacOSFileAsync(rect);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to copy region to clipboard using screencapture");
-            
-            // Fallback to file-based approach
-            return await CopyRegionToClipboardMacOSFileAsync(rect);
-        }
-    }
-
-    /// <summary>
-    /// macOS clipboard fallback using temporary file and pbcopy
-    /// </summary>
-    private async Task<bool> CopyRegionToClipboardMacOSFileAsync(Avalonia.Rect rect)
-    {
-        try
-        {
-            var bitmap = await CaptureRegionAsync(rect);
-            if (bitmap == null)
-            {
-                Log.Warning("Failed to capture region for clipboard");
-                return false;
-            }
-
-            // Save to temporary file
-            var tempFile = System.IO.Path.GetTempFileName() + ".png";
-            
-            try
-            {
-                bitmap.Save(tempFile);
-                
-                // Use osascript to copy image to clipboard
-                var osascriptCommand = $"set the clipboard to (read file POSIX file \"{tempFile}\" as «class PNGf»)";
-                
-                var process = new System.Diagnostics.Process
-                {
-                    StartInfo = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "osascript",
-                        Arguments = $"-e '{osascriptCommand}'",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    }
-                };
-
-                process.Start();
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0)
-                {
-                    Log.Information("Successfully copied region to clipboard using osascript");
-                    return true;
-                }
-                else
-                {
-                    var stderr = await process.StandardError.ReadToEndAsync();
-                    Log.Error("osascript clipboard command failed with exit code: {ExitCode}, Error: {Error}", 
-                        process.ExitCode, stderr);
-                    return false;
-                }
-            }
-            finally
-            {
-                try { System.IO.File.Delete(tempFile); } catch { }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to copy region to clipboard using osascript");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Cross-platform screenshot capture method
+    /// Cross-platform screenshot capture method using strategy pattern
     /// </summary>
     private async Task<Bitmap?> CaptureRegionAsync(Avalonia.Rect rect)
     {
-        if (OperatingSystem.IsWindows())
+        if (_screenCaptureStrategy == null)
         {
-            return CaptureRegionWindows(rect);
+            Log.Error("No screen capture strategy available");
+            return null;
         }
-        else if (OperatingSystem.IsMacOS())
-        {
-            return await CaptureRegionMacOSAsync(rect);
-        }
-        else
-        {
-            throw new PlatformNotSupportedException("Screenshot capture is not supported on this platform");
-        }
-    }
-
-    /// <summary>
-    /// macOS screenshot capture using screencapture command
-    /// </summary>
-    private async Task<Bitmap?> CaptureRegionMacOSAsync(Avalonia.Rect rect)
-    {
+        
         try
         {
-            // Convert to screen coordinates
-            var p1 = this.PointToScreen(new Point(rect.X, rect.Y));
-            var p2 = this.PointToScreen(new Point(rect.Right, rect.Bottom));
-            int x = Math.Min(p1.X, p2.X);
-            int y = Math.Min(p1.Y, p2.Y);
-            int w = Math.Max(1, Math.Abs(p2.X - p1.X));
-            int h = Math.Max(1, Math.Abs(p2.Y - p1.Y));
-
-            // Create temporary file for screenshot
-            var tempFile = System.IO.Path.GetTempFileName() + ".png";
-            
-            // Use screencapture command to capture region
-            var process = new System.Diagnostics.Process
-            {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "screencapture",
-                    Arguments = $"-R {x},{y},{w},{h} \"{tempFile}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                }
-            };
-
-            process.Start();
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0 && System.IO.File.Exists(tempFile))
-            {
-                try
-                {
-                    using var fileStream = System.IO.File.OpenRead(tempFile);
-                    var bitmap = new Bitmap(fileStream);
-                    return bitmap;
-                }
-                finally
-                {
-                    try { System.IO.File.Delete(tempFile); } catch { }
-                }
-            }
-            else
-            {
-                Log.Error("screencapture command failed with exit code: {ExitCode}", process.ExitCode);
-                return null;
-            }
+            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
+            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to capture screenshot on macOS");
+            Log.Error(ex, "Failed to capture region");
             return null;
         }
     }
 
-#region Windows GDI capture
-    private Bitmap? CaptureRegionWindows(Avalonia.Rect rect)
-    {
-        // Convert both corners to screen pixels to handle DPI/multi-screen correctly
-        var p1 = this.PointToScreen(new Point(rect.X, rect.Y));
-        var p2 = this.PointToScreen(new Point(rect.Right, rect.Bottom));
-        int x = Math.Min(p1.X, p2.X);
-        int y = Math.Min(p1.Y, p2.Y);
-        int w = Math.Max(1, Math.Abs(p2.X - p1.X));
-        int h = Math.Max(1, Math.Abs(p2.Y - p1.Y));
 
-        IntPtr hScreenDC = GetDC(IntPtr.Zero);
-        IntPtr hMemDC = CreateCompatibleDC(hScreenDC);
-        IntPtr hBitmap = CreateCompatibleBitmap(hScreenDC, w, h);
-        IntPtr hOld = SelectObject(hMemDC, hBitmap);
-        _ = BitBlt(hMemDC, 0, 0, w, h, hScreenDC, x, y, SRCCOPY);
-        _ = SelectObject(hMemDC, hOld);
-        _ = DeleteDC(hMemDC);
-        _ = ReleaseDC(IntPtr.Zero, hScreenDC);
 
-        if (hBitmap == IntPtr.Zero)
-            return null;
 
-        try
-        {
-            using var stream = new System.IO.MemoryStream();
-            if (OperatingSystem.IsWindowsVersionAtLeast(6, 1))
-            {
-                using (var bmp = System.Drawing.Image.FromHbitmap(hBitmap))
-                {
-                    bmp.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-                }
-                stream.Position = 0;
-                return new Bitmap(stream);
-            }
-            else
-            {
-                throw new PlatformNotSupportedException("This operation requires Windows 6.1 or later");
-            }
-        }
-        finally
-        {
-            _ = DeleteObject(hBitmap);
-        }
-    }
-
-    private bool CopyRegionToClipboardWindows(Avalonia.Rect rect)
-    {
-        // Convert to screen pixel coordinates using both corners (DPI-safe)
-        var p1 = this.PointToScreen(new Point(rect.X, rect.Y));
-        var p2 = this.PointToScreen(new Point(rect.Right, rect.Bottom));
-        int x = Math.Min(p1.X, p2.X);
-        int y = Math.Min(p1.Y, p2.Y);
-        int w = Math.Max(1, Math.Abs(p2.X - p1.X));
-        int h = Math.Max(1, Math.Abs(p2.Y - p1.Y));
-
-        IntPtr hScreenDC = GetDC(IntPtr.Zero);
-        if (hScreenDC == IntPtr.Zero) return false;
-        IntPtr hMemDC = CreateCompatibleDC(hScreenDC);
-        if (hMemDC == IntPtr.Zero) { ReleaseDC(IntPtr.Zero, hScreenDC); return false; }
-        IntPtr hBitmap = CreateCompatibleBitmap(hScreenDC, w, h);
-        if (hBitmap == IntPtr.Zero) { DeleteDC(hMemDC); ReleaseDC(IntPtr.Zero, hScreenDC); return false; }
-        IntPtr hOld = SelectObject(hMemDC, hBitmap);
-        bool blt = BitBlt(hMemDC, 0, 0, w, h, hScreenDC, x, y, SRCCOPY);
-        _ = SelectObject(hMemDC, hOld);
-        _ = DeleteDC(hMemDC);
-        _ = ReleaseDC(IntPtr.Zero, hScreenDC);
-        if (!blt)
-        {
-            DeleteObject(hBitmap);
-            return false;
-        }
-
-        bool result = false;
-        // Robust clipboard open with small retries, as other apps may temporarily lock
-        for (int i = 0; i < 10 && !result; i++)
-        {
-            if (OpenClipboard(IntPtr.Zero))
-            {
-                try
-                {
-                    EmptyClipboard();
-                    IntPtr set = SetClipboardData(CF_BITMAP, hBitmap);
-                    result = set != IntPtr.Zero;
-                    if (result)
-                    {
-                        hBitmap = IntPtr.Zero; // Clipboard takes ownership
-                    }
-                }
-                finally
-                {
-                    CloseClipboard();
-                }
-            }
-            if (!result)
-            {
-                System.Threading.Thread.Sleep(25);
-            }
-        }
-
-        if (hBitmap != IntPtr.Zero)
-        {
-            DeleteObject(hBitmap);
-        }
-
-        return result;
-    }
-
-    private const int SRCCOPY = 0x00CC0020;
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern bool BitBlt(IntPtr hdc, int x, int y, int cx, int cy, IntPtr hdcSrc, int x1, int y1, int rop);
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int cx, int cy);
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern bool DeleteDC(IntPtr hdc);
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern bool DeleteObject(IntPtr hObject);
-    [DllImport("gdi32.dll", SetLastError = true)] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
-    [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr GetDC(IntPtr hWnd);
-    [DllImport("user32.dll", SetLastError = true)] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-    [DllImport("user32.dll", SetLastError = true)] private static extern bool OpenClipboard(IntPtr hWndNewOwner);
-    [DllImport("user32.dll", SetLastError = true)] private static extern bool CloseClipboard();
-    [DllImport("user32.dll", SetLastError = true)] private static extern bool EmptyClipboard();
-    [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
-    private const uint CF_BITMAP = 2;
-#endregion
-
-#endregion
 
 #region Export Functionality
 
@@ -1076,8 +760,19 @@ public partial class OverlayWindow : Window
                 Log.Information("Successfully exported annotated screenshot to {FilePath} with settings: {Format}, Quality: {Quality}", 
                     file.Path.LocalPath, settings.Format, settings.Quality);
                 
-                    // Close overlay window immediately
-                    Close();
+                    // Close all overlay windows, not just this one
+                    var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
+                    if (overlayController != null)
+                    {
+                        overlayController.CloseAll();
+                        Log.Information("All overlay windows closed after export");
+                    }
+                    else
+                    {
+                        // Fallback: close just this window
+                        Close();
+                        Log.Warning("Could not get overlay controller, closing only current window");
+                    }
                 }
                 finally
                 {
