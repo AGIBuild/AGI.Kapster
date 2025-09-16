@@ -61,8 +61,8 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
             {
                 try
                 {
-                                    var data = System.IO.File.ReadAllBytes(tempFile);
-                return SKBitmap.Decode(data);
+                    var data = System.IO.File.ReadAllBytes(tempFile);
+                    return SKBitmap.Decode(data);
                 }
                 finally
                 {
@@ -120,3 +120,5 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
         }
     }
 }
+
+

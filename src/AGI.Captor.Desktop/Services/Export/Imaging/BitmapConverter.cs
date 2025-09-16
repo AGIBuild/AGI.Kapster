@@ -38,3 +38,5 @@ public static class BitmapConverter
         return SKBitmap.Decode(stream);
     }
 }
+
+

@@ -49,3 +49,5 @@ public interface IElementDetector
     /// </summary>
     bool IsWindowMode { get; }
 }
+
+

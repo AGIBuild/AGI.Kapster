@@ -371,3 +371,5 @@ public class WindowsClipboardStrategy : IClipboardStrategy
     
     #endregion
 }
+
+

@@ -1,22 +1,25 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Serilog;
-using Avalonia.Media.Imaging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.IO;
-using Avalonia.Media;
+using System.Threading.Tasks;
+
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
+
+using Serilog;
+using SkiaSharp;
+
+using AGI.Captor.Desktop.Dialogs;
+using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Overlay;
-using AGI.Captor.Desktop.Models;
-using AGI.Captor.Desktop.Dialogs;
-using System.Threading.Tasks;
-using Avalonia.Platform.Storage;
-using SkiaSharp;
 
 namespace AGI.Captor.Desktop.Overlays;
 

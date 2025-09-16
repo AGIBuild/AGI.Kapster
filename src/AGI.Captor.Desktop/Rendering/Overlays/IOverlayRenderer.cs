@@ -65,3 +65,5 @@ public class OverlayTheme
     public SKTypeface TextTypeface { get; set; } = SKTypeface.Default;
     public float TextSize { get; set; } = 14f;
 }
+
+

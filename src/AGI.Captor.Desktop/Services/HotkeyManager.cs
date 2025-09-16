@@ -1,9 +1,11 @@
 using System;
 using System.Threading.Tasks;
+
+using Serilog;
+
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Views;
-using Serilog;
 
 namespace AGI.Captor.Desktop.Services;
 

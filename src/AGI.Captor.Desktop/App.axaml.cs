@@ -1,16 +1,20 @@
 using System;
 using System.Threading.Tasks;
+
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using AGI.Captor.Desktop.Services.Hotkeys;
-using AGI.Captor.Desktop.Overlays;
-using AGI.Captor.Desktop.Services.Overlay;
-using AGI.Captor.Desktop.Services;
-using AGI.Captor.Desktop.Views;
+
 using Serilog;
+
+using AGI.Captor.Desktop.Overlays;
+using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Hotkeys;
+using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Views;
 
 namespace AGI.Captor.Desktop;
 

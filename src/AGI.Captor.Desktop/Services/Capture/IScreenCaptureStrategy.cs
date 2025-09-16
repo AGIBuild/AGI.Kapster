@@ -85,3 +85,5 @@ public interface IElementInfo
     /// </summary>
     object? PlatformData { get; }
 }
+
+

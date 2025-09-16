@@ -43,3 +43,5 @@ public interface IClipboardStrategy
     /// </summary>
     bool SupportsImages { get; }
 }
+
+

@@ -37,3 +37,5 @@ public class ElementInfoAdapter : IElementInfo
         return new ElementInfoAdapter(detectedElement);
     }
 }
+
+

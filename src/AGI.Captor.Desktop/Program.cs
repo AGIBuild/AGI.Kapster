@@ -13,6 +13,7 @@ using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Overlays;
+using AGI.Captor.Desktop.Services.ElementDetection;
 using AGI.Captor.Desktop.Views;
 
 namespace AGI.Captor.Desktop;

@@ -2,7 +2,7 @@ using System;
 using Avalonia;
 using Serilog;
 
-namespace AGI.Captor.Desktop.Services.Overlay.Platforms;
+namespace AGI.Captor.Desktop.Services.ElementDetection;
 
 /// <summary>
 /// Null implementation of IElementDetector for platforms that don't support element detection

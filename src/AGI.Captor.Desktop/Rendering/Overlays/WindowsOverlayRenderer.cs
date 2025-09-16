@@ -364,3 +364,5 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         canvas.DrawText(label, x, y, paint);
     }
 }
+
+
