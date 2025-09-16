@@ -1,13 +1,23 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AGI.Captor.Desktop.Dialogs.AccessibilityPermissionDialog"
-        Title="辅助功能权限设置"
+        Title="Accessibility Permission Settings"
         Width="500"
         Height="400"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
         ShowInTaskbar="True">
     
+    <Window.Styles>
+        <Style Selector="Window">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="10"/>
+        </Style>
+    </Window.Styles>
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,7 +28,7 @@
         
         <!-- 标题 -->
         <TextBlock Grid.Row="0" 
-                   Text="需要辅助功能权限" 
+                   Text="Accessibility Permission Required" 
                    FontSize="18" 
                    FontWeight="Bold"
                    Margin="0,0,0,20"/>
@@ -27,56 +37,57 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="15">
                 <TextBlock TextWrapping="Wrap" FontSize="14">
-                    AGI.Captor 需要辅助功能权限来监听全局热键。请按照以下步骤启用权限：
+                    AGI.Captor requires accessibility permission to monitor global hotkeys. Please follow these steps to enable permissions:
                 </TextBlock>
                 
-                <Border Background="#F5F5F5" Padding="15" CornerRadius="5">
+                <Border Background="#2D2D2D" Padding="15" CornerRadius="5">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="步骤 1: 打开系统设置" FontWeight="SemiBold"/>
-                        <TextBlock TextWrapping="Wrap">
-                            • 点击苹果菜单 → 系统设置（或系统偏好设置）
+                        <TextBlock Text="Step 1: Open System Settings" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Click Apple menu → System Settings (or System Preferences)
                         </TextBlock>
                         
-                        <TextBlock Text="步骤 2: 找到隐私与安全性" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                        <TextBlock TextWrapping="Wrap">
-                            • macOS Ventura+: 隐私与安全性 → 辅助功能
-                            • macOS Big Sur/Monterey: 安全性与隐私 → 隐私 → 辅助功能
+                        <TextBlock Text="Step 2: Find Privacy &amp;amp; Security" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • macOS Ventura+: Privacy &amp;amp; Security → Accessibility
+                            • macOS Big Sur/Monterey: Security &amp;amp; Privacy → Privacy → Accessibility
                         </TextBlock>
                         
-                        <TextBlock Text="步骤 3: 添加应用程序" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                        <TextBlock TextWrapping="Wrap">
-                            • 点击锁图标并输入密码解锁
-                            • 点击 "+" 按钮添加应用程序
+                        <TextBlock Text="Step 3: Add Application" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Click the lock icon and enter password to unlock
+                            • Click "+" button to add application
                         </TextBlock>
                         
-                        <TextBlock Text="步骤 4: 选择正确的应用" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Red">
-                            ⚠️ 重要：由于这是开发版本，请选择以下路径之一：
+                        <TextBlock Text="Step 4: Select Correct Application" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • The current application path is:
                         </TextBlock>
-                        <TextBlock TextWrapping="Wrap" FontFamily="Consolas,Monaco,monospace" 
-                                   Background="#EEEEEE" Padding="5" FontSize="12">
-                            • /usr/local/share/dotnet/dotnet
-                            • /usr/bin/dotnet
-                            • 或者搜索 "dotnet" 并选择 .NET 运行时
-                        </TextBlock>
+                        <TextBlock x:Name="CurrentAppPathText" 
+                                   TextWrapping="Wrap" 
+                                   FontFamily="Consolas,Monaco,monospace" 
+                                   Background="#3D3D3D" 
+                                   Padding="5" 
+                                   FontSize="12" 
+                                   Foreground="Gray"/>
                         
-                        <TextBlock Text="步骤 5: 启用权限" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                        <TextBlock TextWrapping="Wrap">
-                            • 确保添加的应用旁边的复选框已勾选
-                            • 重启 AGI.Captor 应用程序
+                        <TextBlock Text="Step 5: Enable Permissions" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Ensure the checkbox next to the added app is checked
+                            • Restart AGI.Captor application
                         </TextBlock>
                     </StackPanel>
                 </Border>
                 
                 <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray">
-                    注意：正式发布版本会显示为 "AGI.Captor.Desktop"，但开发版本需要添加 dotnet 运行时。
+                    Note: The release version will show as "AGI.Captor.Desktop", but the development version requires adding the dotnet runtime.
                 </TextBlock>
             </StackPanel>
         </ScrollViewer>
         
         <!-- 权限状态 -->
         <Border Grid.Row="2" 
-                Background="#E3F2FD" 
+                Background="#3D3D3D" 
                 Padding="10" 
                 CornerRadius="5" 
                 Margin="0,15,0,15">
@@ -84,14 +95,20 @@
                 <TextBlock x:Name="PermissionStatusIcon" 
                            Text="❌" 
                            FontSize="16" 
-                           VerticalAlignment="Center"/>
+                           VerticalAlignment="Center"
+                           Foreground="Gray"/>
                 <TextBlock x:Name="PermissionStatusText" 
-                           Text="权限状态：未授予" 
-                           VerticalAlignment="Center"/>
+                           Text="Permission Status: Not Granted" 
+                           VerticalAlignment="Center"
+                           Foreground="Gray"/>
                 <Button x:Name="RefreshButton" 
-                        Content="刷新状态" 
+                        Content="Refresh Status" 
                         Padding="8,4" 
-                        Click="RefreshPermissionStatus"/>
+                        Click="RefreshPermissionStatus"
+                        Background="#555555"
+                        Foreground="White"
+                        BorderBrush="Transparent"
+                        CornerRadius="5"/>
             </StackPanel>
         </Border>
         
@@ -100,12 +117,20 @@
                     Orientation="Horizontal" 
                     HorizontalAlignment="Right" 
                     Spacing="10">
-            <Button Content="打开系统设置" 
+            <Button Content="Open System Settings" 
                     Click="OpenSystemPreferences" 
-                    Padding="15,8"/>
-            <Button Content="稍后设置" 
+                    Padding="15,8"
+                    Background="#555555"
+                    Foreground="White"
+                    BorderBrush="Transparent"
+                    CornerRadius="5"/>
+            <Button Content="Set Later" 
                     Click="CloseDialog" 
-                    Padding="15,8"/>
+                    Padding="15,8"
+                    Background="#555555"
+                    Foreground="White"
+                    BorderBrush="Transparent"
+                    CornerRadius="5"/>
         </StackPanel>
     </Grid>
 </Window>

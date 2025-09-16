@@ -712,16 +712,12 @@ public partial class SettingsWindow : Window
                 statusIcon.Text = "[✓]";
                 statusText.Text = "macOS Accessibility Permission: Granted";
                 statusText.Foreground = Brushes.Green;
-                permissionPanel.Background = Brushes.LightGreen;
-                permissionPanel.BorderBrush = Brushes.Green;
             }
             else
             {
                 statusIcon.Text = "[!]";
                 statusText.Text = "macOS Accessibility Permission: Not Granted";
                 statusText.Foreground = Brushes.DarkOrange;
-                permissionPanel.Background = new SolidColorBrush(Color.FromRgb(255, 243, 224)); // #FFF3E0
-                permissionPanel.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // #FF9800
             }
             
             Log.Debug("Updated macOS permission status: {HasPermission}", hasPermission);

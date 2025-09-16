@@ -56,7 +56,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="logo.ico" />
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -70,6 +69,10 @@
 
   <ItemGroup>
     <Folder Include="Properties\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="logo.ico" />
   </ItemGroup>
 
 </Project>

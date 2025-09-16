@@ -18,6 +18,27 @@ public partial class AccessibilityPermissionDialog : Window
     {
         InitializeComponent();
         
+        // Display current application path
+        try
+        {
+            var appPath = Process.GetCurrentProcess().MainModule?.FileName;
+            if (!string.IsNullOrEmpty(appPath))
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    var pathText = this.FindControl<TextBlock>("CurrentAppPathText");
+                    if (pathText != null)
+                    {
+                        pathText.Text = $"• {appPath}";
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to get application path");
+        }
+        
         // 创建定时器定期检查权限状态
         _statusTimer = new DispatcherTimer
         {
@@ -51,20 +72,14 @@ public partial class AccessibilityPermissionDialog : Window
                 if (hasPermission)
                 {
                     statusIcon.Text = "✅";
-                    statusText.Text = "权限状态：已授予";
+                    statusText.Text = "Permission Status: Granted";
                     statusText.Foreground = Avalonia.Media.Brushes.Green;
                     
-                    // 权限已授予，可以关闭对话框
-                    Dispatcher.UIThread.Post(async () =>
-                    {
-                        await Task.Delay(1000); // 显示成功状态1秒
-                        Close(true); // 返回true表示权限已授予
-                    });
                 }
                 else
                 {
                     statusIcon.Text = "❌";
-                    statusText.Text = "权限状态：未授予";
+                    statusText.Text = "Permission Status: Not Granted";
                     statusText.Foreground = Avalonia.Media.Brushes.Red;
                 }
             }
@@ -146,28 +161,14 @@ public partial class AccessibilityPermissionDialog : Window
     /// <returns>true表示权限已授予，false表示用户选择稍后设置</returns>
     public static async Task<bool> ShowAsync(Window? parent = null)
     {
+        if (parent == null)
+        {
+            throw new ArgumentNullException(nameof(parent), "Parent window must be provided for a modal dialog.");
+        }
+
         var dialog = new AccessibilityPermissionDialog();
         
-        if (parent != null)
-        {
-            return await dialog.ShowDialog<bool>(parent);
-        }
-        else
-        {
-            dialog.Show();
-            
-            // 创建TaskCompletionSource来等待对话框关闭
-            var tcs = new TaskCompletionSource<bool>();
-            
-            dialog.Closed += (_, _) =>
-            {
-                // 检查最终权限状态
-                var hasPermission = MacHotkeyProvider.HasAccessibilityPermissions;
-                tcs.SetResult(hasPermission);
-            };
-            
-            return await tcs.Task;
-        }
+        return await dialog.ShowDialog<bool>(parent);
     }
 }
 
