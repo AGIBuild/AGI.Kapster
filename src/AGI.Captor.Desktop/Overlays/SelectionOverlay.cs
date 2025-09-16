@@ -22,11 +22,6 @@ public sealed class SelectionOverlay : Canvas
     private bool _pendingCreate;
     private const double DragThreshold = 0.5; // 从2.0降低到0.5像素，提高响应速度
     
-    // Performance optimization: throttle rendering
-    private DateTime _lastRenderTime = DateTime.MinValue;
-    private Rect _lastRenderedRect = new Rect();
-    private const double MinRenderInterval = 8.0; // ~120 FPS (milliseconds)
-
     private const double HandleSize = 8;
     private const double HandleHit = 10;
 
@@ -35,7 +30,7 @@ public sealed class SelectionOverlay : Canvas
     public Rect SelectionRect
     {
         get => _selectionRect;
-        private set { _selectionRect = value; InvalidateVisual(); }
+        private set { _selectionRect = value; }
     }
 
     public event Action<Rect>? SelectionFinished;
@@ -231,30 +226,7 @@ public sealed class SelectionOverlay : Canvas
 
     private void UpdateVisuals()
     {
-        UpdateVisualsThrottled(false);
-    }
-    
-    private void UpdateVisualsThrottled(bool force = false)
-    {
-        var now = DateTime.UtcNow;
-        var timeSinceLastRender = (now - _lastRenderTime).TotalMilliseconds;
-        
-        // Check if we should skip this update for performance
-        if (!force && timeSinceLastRender < MinRenderInterval)
-        {
-            // Check if the rect actually changed significantly
-            var rectChanged = Math.Abs(_selectionRect.X - _lastRenderedRect.X) > 1 ||
-                            Math.Abs(_selectionRect.Y - _lastRenderedRect.Y) > 1 ||
-                            Math.Abs(_selectionRect.Width - _lastRenderedRect.Width) > 1 ||
-                            Math.Abs(_selectionRect.Height - _lastRenderedRect.Height) > 1;
-            
-            if (!rectChanged)
-                return;
-        }
-        
-        _lastRenderTime = now;
-        _lastRenderedRect = _selectionRect;
-        
+        // 直接更新视觉元素，无节流
         if (SelectionRect.Width > 0 && SelectionRect.Height > 0)
         {
             _rectBorder.Width = SelectionRect.Width;
@@ -306,7 +278,7 @@ public sealed class SelectionOverlay : Canvas
     public void SetSelection(Rect rect)
     {
         SelectionRect = rect;
-        UpdateVisualsThrottled(true); // Force update for programmatic changes
+        UpdateVisuals(); // Force update for programmatic changes
         
         // Set global selection state
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
