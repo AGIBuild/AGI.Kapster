@@ -10,8 +10,11 @@
 - `src/AGI.Captor.Desktop/Program.cs` - DI registration (lines 86-111)
 
 ### Platform Implementations
-- Windows: `Services/Overlay/Platforms/Windows*.cs`
-- macOS: `Services/Overlay/Platforms/Mac*.cs`
+- **Overlay Windows**: `Services/Overlay/Platforms/Windows*.cs`, `Mac*.cs`
+- **Screen Capture**: `Services/Capture/Platforms/Windows*.cs`, `Mac*.cs`
+- **Clipboard**: `Services/Clipboard/Platforms/Windows*.cs`, `Mac*.cs`
+- **Element Detection**: `Services/ElementDetection/Windows*.cs`, `Platforms/Null*.cs`
+- **Rendering**: `Rendering/Overlays/Windows*.cs`
 
 ## Common Tasks
 

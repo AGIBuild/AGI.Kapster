@@ -47,3 +47,10 @@ The overlay system uses events to maintain loose coupling:
 
 ### Multi-Screen Support
 All overlay operations affect all screens simultaneously through `SimplifiedOverlayManager`.
+
+### Directory Organization (Updated 2024)
+The project has been reorganized for better maintainability:
+- **Services by Topic**: `Clipboard/`, `Capture/`, `ElementDetection/`, `Export/`, `Settings/`, `Adapters/`
+- **Platform Implementations**: Each service has a `Platforms/` subdirectory
+- **Rendering Components**: Moved to `Rendering/Overlays/` for better separation
+- **Namespace Alignment**: All namespaces match their physical file locations

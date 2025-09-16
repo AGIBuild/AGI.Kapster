@@ -166,20 +166,36 @@ src/AGI.Captor.Desktop/
 │   ├── RegionSelectedEventArgs.cs      # Event args for selection
 │   └── ...
 ├── Services/
-│   └── Overlay/
-│       ├── SimplifiedOverlayManager.cs # Main overlay controller
-│       ├── IOverlayWindow.cs          # Window interface
-│       ├── IScreenCaptureStrategy.cs  # Capture interface
-│       ├── IClipboardStrategy.cs      # Clipboard interface
-│       ├── BitmapConverter.cs         # SKBitmap ↔ Avalonia.Bitmap
-│       └── Platforms/
-│           ├── WindowsOverlayWindow.cs
-│           ├── MacOverlayWindow.cs
-│           ├── WindowsScreenCaptureStrategy.cs
-│           ├── MacScreenCaptureStrategy.cs
-│           ├── WindowsClipboardStrategy.cs
-│           ├── MacClipboardStrategy.cs
-│           └── NullElementDetector.cs
+│   ├── Overlay/
+│   │   ├── SimplifiedOverlayManager.cs # Main overlay controller
+│   │   ├── IOverlayWindow.cs          # Window interface
+│   │   └── Platforms/
+│   │       ├── WindowsOverlayWindow.cs
+│   │       └── MacOverlayWindow.cs
+│   ├── Capture/
+│   │   ├── IScreenCaptureStrategy.cs  # Capture interface
+│   │   └── Platforms/
+│   │       ├── WindowsScreenCaptureStrategy.cs
+│   │       └── MacScreenCaptureStrategy.cs
+│   ├── Clipboard/
+│   │   ├── IClipboardStrategy.cs      # Clipboard interface
+│   │   └── Platforms/
+│   │       ├── WindowsClipboardStrategy.cs
+│   │       └── MacClipboardStrategy.cs
+│   ├── ElementDetection/
+│   │   ├── IElementDetector.cs        # Element detection interface
+│   │   ├── WindowsElementDetector.cs  # Windows implementation
+│   │   └── Platforms/
+│   │       └── NullElementDetector.cs # Null implementation for unsupported platforms
+│   ├── Export/
+│   │   └── Imaging/
+│   │       └── BitmapConverter.cs     # SKBitmap ↔ Avalonia.Bitmap
+│   └── Adapters/
+│       └── ElementInfoAdapter.cs      # DetectedElement → IElementInfo
+├── Rendering/
+│   └── Overlays/
+│       ├── IOverlayRenderer.cs        # Overlay rendering interface
+│       └── WindowsOverlayRenderer.cs  # Windows implementation (used on all platforms)
 ```
 
 ### 7. Common Issues and Solutions
