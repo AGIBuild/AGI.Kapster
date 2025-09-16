@@ -255,11 +255,11 @@ jobs:
       with:
         files: |
           artifacts/AGI.Captor-win-x64-${{ steps.version.outputs.version }}.zip
-          artifacts/osx-x64/AGI.Captor-osx-x64-${{ steps.version.outputs.version }}.zip
-          artifacts/osx-arm64/AGI.Captor-osx-arm64-${{ steps.version.outputs.version }}.zip
+          artifacts/AGI.Captor-osx-x64-${{ steps.version.outputs.version }}.zip
+          artifacts/AGI.Captor-osx-arm64-${{ steps.version.outputs.version }}.zip
         draft: false
         prerelease: false
         tag_name: ${{ steps.version.outputs.version }}
-        name: ${{ steps.version.outputs.version }}
+        name: AGI.Captor.${{ steps.version.outputs.version }}
         generate_release_notes: true
         token: ${{ secrets.GH_PAT }}
