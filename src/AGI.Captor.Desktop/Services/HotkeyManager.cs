@@ -8,45 +8,25 @@ using Serilog;
 namespace AGI.Captor.Desktop.Services;
 
 /// <summary>
-/// Hotkey manager - strategy-based provider per platform
+/// Hotkey manager - uses dependency injection for platform-specific provider
 /// </summary>
 public class HotkeyManager : IHotkeyManager
 {
-    private IHotkeyProvider _hotkeyProvider;
+    private readonly IHotkeyProvider _hotkeyProvider;
     private readonly ISettingsService _settingsService;
     private readonly IOverlayController _overlayController;
     private bool _escHotkeyRegistered = false;
 
     public HotkeyManager(
+        IHotkeyProvider hotkeyProvider,
         ISettingsService settingsService,
         IOverlayController overlayController)
     {
+        _hotkeyProvider = hotkeyProvider ?? throw new ArgumentNullException(nameof(hotkeyProvider));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _overlayController = overlayController ?? throw new ArgumentNullException(nameof(overlayController));
         
-        // Defer provider creation to InitializeAsync
-        _hotkeyProvider = null!; // Will be created in InitializeAsync
-        
-        Log.Debug("HotkeyManager constructor completed");
-    }
-
-    private static IHotkeyProvider CreateHotkeyProvider()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Log.Debug("Creating Windows hotkey provider");
-            return new WindowsHotkeyProvider();
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            Log.Debug("Creating macOS hotkey provider");
-            return new MacHotkeyProvider();
-        }
-        else
-        {
-            Log.Warning("Unsupported platform for hotkeys");
-            return new UnsupportedHotkeyProvider();
-        }
+        Log.Debug("HotkeyManager constructor completed with provider: {Type}", _hotkeyProvider.GetType().Name);
     }
 
     public async Task InitializeAsync()
@@ -55,10 +35,6 @@ public class HotkeyManager : IHotkeyManager
         {
             Log.Debug("Initializing hotkey manager...");
             
-            // Create hotkey provider
-            _hotkeyProvider = CreateHotkeyProvider();
-            Log.Debug("Hotkey provider created: {Type}", _hotkeyProvider.GetType().Name);
-
             if (!_hotkeyProvider.IsSupported)
             {
                 Log.Warning("Hotkeys not supported on this platform");

@@ -80,9 +80,20 @@ class Program
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
         builder.Services.AddTransient<SettingsWindow>();
         
-        // Element detector is now created by platform factory
-        // Removed direct registration - handled by IPlatformOverlayFactory
-
+        // Register platform-specific hotkey providers
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            builder.Services.AddSingleton<IHotkeyProvider, WindowsHotkeyProvider>();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            builder.Services.AddSingleton<IHotkeyProvider, MacHotkeyProvider>();
+        }
+        else
+        {
+            builder.Services.AddSingleton<IHotkeyProvider, UnsupportedHotkeyProvider>();
+        }
+        
         // Register platform-specific services
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
