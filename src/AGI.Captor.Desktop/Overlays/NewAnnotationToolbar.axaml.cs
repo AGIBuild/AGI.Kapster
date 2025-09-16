@@ -657,9 +657,16 @@ public partial class NewAnnotationToolbar : UserControl
                 if (this.FindAncestorOfType<OverlayWindow>() is { } overlayWindow && Target != null)
                 {
                     // Use the correct Target annotator instance instead of FindControl
-                    overlayWindow.GetType()
-                        .GetMethod("UpdateToolbarPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                        .Invoke(overlayWindow, new object[] { Target.SelectionRect });
+                    // Use dynamic to avoid AOT reflection warnings
+                    dynamic dynamicOverlay = overlayWindow;
+                    try
+                    {
+                        dynamicOverlay.UpdateToolbarPosition(Target.SelectionRect);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Failed to update toolbar position");
+                    }
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
