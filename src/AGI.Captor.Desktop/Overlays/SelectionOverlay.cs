@@ -20,7 +20,7 @@ public sealed class SelectionOverlay : Canvas
     private HandleKind _activeHandle = HandleKind.None;
     private readonly Border _rectBorder;
     private bool _pendingCreate;
-    private const double DragThreshold = 0.5; // 从2.0降低到0.5像素，提高响应速度
+    private const double DragThreshold = 0.5; // Reduced from 2.0 to 0.5 pixels for better responsiveness
     
     private const double HandleSize = 8;
     private const double HandleHit = 10;
