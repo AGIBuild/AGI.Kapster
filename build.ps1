@@ -65,14 +65,21 @@ function Log-Error($msg){ Write-Host "[ERROR] $msg" -ForegroundColor Red }
 function Get-ProjectVersion {
   $csprojPath = "$PROJECT_DIR/$PROJECT_NAME.csproj"
   if (Test-Path $csprojPath) {
-    $content = Get-Content $csprojPath -Raw
-    # Try to find Version tag first
-    if ($content -match '<Version>(.*?)</Version>') {
-      return $matches[1]
-    }
-    # Fallback to CFBundleVersion for macOS projects
-    if ($content -match '<CFBundleVersion>(.*?)</CFBundleVersion>') {
-      return $matches[1]
+    try {
+      [xml]$xml = Get-Content $csprojPath -Raw
+      # Try to find Version tag first
+      $version = $xml.Project.PropertyGroup.Version
+      if ($version) {
+        return $version
+      }
+      # Fallback to CFBundleVersion for macOS projects
+      $cfBundleVersion = $xml.Project.PropertyGroup.CFBundleVersion
+      if ($cfBundleVersion) {
+        return $cfBundleVersion
+      }
+    } catch {
+      # If XML parsing fails, fall back to default
+      return '1.0.0'
     }
   }
   return '1.0.0'
