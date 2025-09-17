@@ -24,6 +24,14 @@
 ### Project Planning
 - **[Plan A Task Breakdown](planA-task-breakdown.md)** - Original project plan and task breakdown
 
+### Testing and Quality
+- **[Testing Architecture](testing-architecture.md)** - Comprehensive testing strategy and patterns
+  - Test organization and structure
+  - Dependency injection for testing
+  - File system abstraction patterns
+  - Mocking strategies with NSubstitute
+  - Test coverage and best practices
+
 ## For AI Agents
 
 When working on the overlay system:
@@ -54,3 +62,11 @@ The project has been reorganized for better maintainability:
 - **Platform Implementations**: Each service has a `Platforms/` subdirectory
 - **Rendering Components**: Moved to `Rendering/Overlays/` for better separation
 - **Namespace Alignment**: All namespaces match their physical file locations
+- **Testable Architecture**: File system abstraction enables comprehensive unit testing
+- **Background-Only Operation**: No main window, system tray integration only
+
+### Recent Architectural Changes (December 2024)
+- **MainWindow Removal**: Eliminated unused main window components for cleaner architecture
+- **SettingsService Refactoring**: Added file system abstraction for testability
+- **Test Coverage**: 95 unit tests with comprehensive coverage of all major components
+- **Dependency Injection**: Enhanced DI patterns for better testability and maintainability

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The overlay system in AGI.Captor is responsible for creating transparent overlay windows that allow users to capture screenshots and add annotations. The system has been refactored to use a simplified architecture based on dependency injection (DI) without factory patterns.
+The overlay system in AGI.Captor is responsible for creating transparent overlay windows that allow users to capture screenshots and add annotations. The system has been refactored to use a simplified architecture based on dependency injection (DI) without factory patterns. The application runs purely in the background with system tray integration - there is no main window.
 
 ## Architecture Components
 
@@ -152,10 +152,10 @@ builder.Services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
 - **Clipboard**: Win32 clipboard API
 
 #### macOS
-- **Screen enumeration**: Uses primary window reference
+- **Screen enumeration**: Uses primary window reference (no MainWindow dependency)
 - **Element detection**: Not supported (uses NullElementDetector)
 - **Screen capture**: screencapture command (planned: CGWindowListCreateImage)
-- **Clipboard**: Avalonia API (planned: NSPasteboard)
+- **Clipboard**: Avalonia API with multiple fallback approaches (planned: NSPasteboard)
 
 ### 6. File Structure
 
@@ -190,12 +190,17 @@ src/AGI.Captor.Desktop/
 │   ├── Export/
 │   │   └── Imaging/
 │   │       └── BitmapConverter.cs     # SKBitmap ↔ Avalonia.Bitmap
+│   ├── Settings/
+│   │   ├── SettingsService.cs         # Settings management with file system abstraction
+│   │   ├── IFileSystemService.cs      # File system interface for testing
+│   │   └── FileSystemService.cs       # Real file system implementation
 │   └── Adapters/
 │       └── ElementInfoAdapter.cs      # DetectedElement → IElementInfo
 ├── Rendering/
 │   └── Overlays/
 │       ├── IOverlayRenderer.cs        # Overlay rendering interface
 │       └── WindowsOverlayRenderer.cs  # Windows implementation (used on all platforms)
+└── App.axaml.cs                       # Application startup (no MainWindow)
 ```
 
 ### 7. Common Issues and Solutions
@@ -229,9 +234,42 @@ src/AGI.Captor.Desktop/
    - Optimize bitmap conversions
    - Reduce memory allocations
 
-### 9. Testing Considerations
+### 9. Testing Architecture
+
+#### Test Organization
+```
+tests/AGI.Captor.Tests/
+├── TestHelpers/
+│   ├── TestBase.cs                    # Base class for all tests
+│   ├── MemoryFileSystemService.cs     # In-memory file system for testing
+│   └── AvaloniaTestHelper.cs          # Avalonia initialization for tests
+├── Services/
+│   ├── SettingsServiceTests.cs        # Settings service with file system mocking
+│   ├── AnnotationServiceTests.cs      # Annotation service tests
+│   └── HotkeyManagerTests.cs          # Hotkey management tests
+├── Models/
+│   └── AnnotationTests.cs             # Annotation model tests
+└── Commands/
+    └── CommandTests.cs                # Command pattern tests
+```
+
+#### Key Testing Patterns
+- **Dependency Injection**: All services use interfaces for easy mocking
+- **File System Abstraction**: `IFileSystemService` enables testing without real files
+- **Memory File System**: `MemoryFileSystemService` provides isolated test environment
+- **Test Isolation**: Each test runs independently without side effects
+- **Comprehensive Coverage**: 95 tests covering all major components
+
+#### Test Categories
+- **Unit Tests**: Individual service testing with mocked dependencies
+- **Integration Tests**: Service interaction testing
+- **Model Tests**: Data model validation and behavior
+- **Command Tests**: Undo/redo functionality verification
+
+### 10. Testing Considerations
 
 - **Unit Tests**: Mock all interfaces for isolated testing
 - **Integration Tests**: Test platform-specific implementations
 - **Multi-monitor Tests**: Ensure consistent behavior across screens
 - **Event Flow Tests**: Verify correct event handling for all scenarios
+- **File System Tests**: Use `MemoryFileSystemService` for settings testing
