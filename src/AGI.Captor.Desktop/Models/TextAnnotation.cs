@@ -313,7 +313,12 @@ public class TextAnnotation : AnnotationItemBase
 
             _textSize = new Size(formattedText.Width, formattedText.Height);
         }
-        catch
+        catch (PlatformNotSupportedException)
+        {
+            // Fallback for test environments or when Avalonia platform is not available
+            _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
+        }
+        catch (NotSupportedException)
         {
             // Fallback for test environments or when Avalonia platform is not available
             _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
