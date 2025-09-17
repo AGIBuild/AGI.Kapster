@@ -12,10 +12,12 @@ namespace AGI.Captor.Tests.Services;
 public class SettingsServiceTests : TestBase
 {
     private readonly SettingsService _settingsService;
+    private readonly MemoryFileSystemService _fileSystemService;
 
     public SettingsServiceTests(ITestOutputHelper output) : base(output)
     {
-        _settingsService = new SettingsService();
+        _fileSystemService = new MemoryFileSystemService();
+        _settingsService = new SettingsService(_fileSystemService);
     }
 
     [Fact]
@@ -154,18 +156,16 @@ public class SettingsServiceTests : TestBase
     [Fact]
     public async Task Settings_ShouldBeSerializable()
     {
-        // Arrange - Create a temporary settings service for this test
-        var tempSettingsService = new SettingsService();
-        tempSettingsService.Settings.Hotkeys.CaptureRegion = "Test+Hotkey";
-        tempSettingsService.Settings.Hotkeys.OpenSettings = "Another+Hotkey";
+        // Arrange
+        _settingsService.Settings.Hotkeys.CaptureRegion = "Test+Hotkey";
+        _settingsService.Settings.Hotkeys.OpenSettings = "Another+Hotkey";
 
         // Act & Assert
-        var action = async () => await tempSettingsService.SaveAsync();
+        var action = async () => await _settingsService.SaveAsync();
         await action.Should().NotThrowAsync();
         
-        // Clean up - restore original settings
-        var originalSettings = new SettingsService();
-        await originalSettings.SaveAsync();
+        // Verify the settings were saved to memory file system
+        _fileSystemService.FileExists(_settingsService.GetSettingsFilePath()).Should().BeTrue();
     }
 
     [Fact]
@@ -184,6 +184,29 @@ public class SettingsServiceTests : TestBase
         action.Should().NotThrow();
         
         _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be("");
+    }
+
+    [Fact]
+    public async Task Settings_ShouldLoadAndSaveCorrectly()
+    {
+        // Arrange
+        var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
+        var newHotkey = "Ctrl+Shift+S";
+        
+        // Act - Change setting
+        _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
+        await _settingsService.SaveAsync();
+        
+        // Create new service instance to test loading
+        var newFileSystem = new MemoryFileSystemService();
+        // Copy the saved data to the new file system
+        var savedData = _fileSystemService.ReadAllText(_settingsService.GetSettingsFilePath());
+        await newFileSystem.WriteAllTextAsync(_settingsService.GetSettingsFilePath(), savedData);
+        
+        var newSettingsService = new SettingsService(newFileSystem);
+        
+        // Assert
+        newSettingsService.Settings.Hotkeys.CaptureRegion.Should().Be(newHotkey);
     }
 
     public override void Dispose()

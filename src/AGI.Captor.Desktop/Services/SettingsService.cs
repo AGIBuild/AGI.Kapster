@@ -15,19 +15,25 @@ namespace AGI.Captor.Desktop.Services;
 public class SettingsService : ISettingsService
 {
     private readonly string _settingsFilePath;
+    private readonly IFileSystemService _fileSystemService;
     private AppSettings _settings;
     
     private static readonly JsonSerializerOptions JsonOptions = AppJsonContext.Default.Options;
     
     public AppSettings Settings => _settings;
     
-    public SettingsService()
+    public SettingsService() : this(new FileSystemService())
     {
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var appFolder = Path.Combine(appDataPath, "AGI.Captor");
+    }
+    
+    public SettingsService(IFileSystemService fileSystemService)
+    {
+        _fileSystemService = fileSystemService ?? throw new ArgumentNullException(nameof(fileSystemService));
+        
+        var appFolder = _fileSystemService.GetApplicationDataPath();
         
         // Ensure application folder exists
-        Directory.CreateDirectory(appFolder);
+        _fileSystemService.EnsureDirectoryExists(appFolder);
         
         _settingsFilePath = Path.Combine(appFolder, "settings.json");
         _settings = new AppSettings();
@@ -42,9 +48,9 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            if (File.Exists(_settingsFilePath))
+            if (_fileSystemService.FileExists(_settingsFilePath))
             {
-                var json = File.ReadAllText(_settingsFilePath);
+                var json = _fileSystemService.ReadAllText(_settingsFilePath);
                 var loadedSettings = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppSettings);
                 
                 if (loadedSettings != null)
@@ -79,7 +85,7 @@ public class SettingsService : ISettingsService
         {
             var json = JsonSerializer.Serialize(_settings, AppJsonContext.Default.AppSettings);
             
-            await File.WriteAllTextAsync(_settingsFilePath, json);
+            await _fileSystemService.WriteAllTextAsync(_settingsFilePath, json);
             
             Log.Information("Settings saved successfully to {FilePath}", _settingsFilePath);
         }

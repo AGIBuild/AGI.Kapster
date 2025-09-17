@@ -74,6 +74,7 @@ class Program
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
         builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
+        builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
         builder.Services.AddTransient<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IApplicationController, ApplicationController>();
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
