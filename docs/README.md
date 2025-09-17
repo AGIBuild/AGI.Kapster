@@ -65,7 +65,7 @@ The project has been reorganized for better maintainability:
 - **Testable Architecture**: File system abstraction enables comprehensive unit testing
 - **Background-Only Operation**: No main window, system tray integration only
 
-### Recent Architectural Changes (December 2024)
+### Recent Architectural Changes
 - **MainWindow Removal**: Eliminated unused main window components for cleaner architecture
 - **SettingsService Refactoring**: Added file system abstraction for testability
 - **Test Coverage**: 95 unit tests with comprehensive coverage of all major components
