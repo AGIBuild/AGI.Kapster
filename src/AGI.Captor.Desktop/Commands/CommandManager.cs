@@ -24,6 +24,11 @@ public class CommandManager
     /// </summary>
     public void ExecuteCommand(ICommand command)
     {
+        if (command == null)
+        {
+            throw new ArgumentNullException(nameof(command));
+        }
+
         try
         {
             command.Execute();
@@ -144,6 +149,11 @@ public class CommandManager
         Log.Debug("Command history cleared");
         OnStackChanged();
     }
+
+    /// <summary>
+    /// Clear all commands (alias for Clear method)
+    /// </summary>
+    public void ClearHistory() => Clear();
     
     /// <summary>
     /// Get undo history for debugging

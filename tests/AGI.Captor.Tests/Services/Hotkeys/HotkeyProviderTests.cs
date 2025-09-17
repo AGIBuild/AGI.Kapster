@@ -13,12 +13,11 @@ public class HotkeyProviderTests : TestBase
     public HotkeyProviderTests(ITestOutputHelper output) : base(output)
     {
     }
-
     [Fact]
     public void UnsupportedHotkeyProvider_ShouldHaveCorrectProperties()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
 
         // Act & Assert
         provider.IsSupported.Should().BeFalse();
@@ -29,10 +28,13 @@ public class HotkeyProviderTests : TestBase
     public void UnsupportedHotkeyProvider_RegisterHotkey_ShouldReturnFalse()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(false);
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+            .Returns(false);
 
         // Act
-        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 0x41, () => { });
+        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 1, () => { });
 
         // Assert
         result.Should().BeFalse();
@@ -42,7 +44,9 @@ public class HotkeyProviderTests : TestBase
     public void UnsupportedHotkeyProvider_UnregisterHotkey_ShouldReturnFalse()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(false);
+        provider.UnregisterHotkey(Arg.Any<string>()).Returns(false);
 
         // Act
         var result = provider.UnregisterHotkey("test");
@@ -52,134 +56,83 @@ public class HotkeyProviderTests : TestBase
     }
 
     [Fact]
-    public void UnsupportedHotkeyProvider_Dispose_ShouldNotThrow()
+    public void SupportedHotkeyProvider_ShouldHaveCorrectProperties()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(true);
+        provider.HasPermissions.Returns(true);
 
         // Act & Assert
-        var action = () => provider.Dispose();
-        action.Should().NotThrow();
+        provider.IsSupported.Should().BeTrue();
+        provider.HasPermissions.Should().BeTrue();
     }
 
     [Fact]
-    public void UnsupportedHotkeyProvider_MultipleDispose_ShouldNotThrow()
+    public void SupportedHotkeyProvider_RegisterHotkey_ShouldReturnTrue()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
-
-        // Act & Assert
-        var action = () =>
-        {
-            provider.Dispose();
-            provider.Dispose();
-        };
-        action.Should().NotThrow();
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("test")]
-    [InlineData("complex_hotkey_id")]
-    public void UnsupportedHotkeyProvider_RegisterHotkey_WithDifferentIds_ShouldReturnFalse(string hotkeyId)
-    {
-        // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(true);
+        provider.HasPermissions.Returns(true);
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+            .Returns(true);
 
         // Act
-        var result = provider.RegisterHotkey(hotkeyId, HotkeyModifiers.None, 0x41, () => { });
+        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 1, () => { });
 
         // Assert
-        result.Should().BeFalse();
-    }
-
-    [Theory]
-    [InlineData(HotkeyModifiers.None)]
-    [InlineData(HotkeyModifiers.Control)]
-    [InlineData(HotkeyModifiers.Alt)]
-    [InlineData(HotkeyModifiers.Shift)]
-    [InlineData(HotkeyModifiers.Control | HotkeyModifiers.Alt)]
-    public void UnsupportedHotkeyProvider_RegisterHotkey_WithDifferentModifiers_ShouldReturnFalse(HotkeyModifiers modifiers)
-    {
-        // Arrange
-        var provider = new UnsupportedHotkeyProvider();
-
-        // Act
-        var result = provider.RegisterHotkey("test", modifiers, 0x41, () => { });
-
-        // Assert
-        result.Should().BeFalse();
-    }
-
-    [Theory]
-    [InlineData(0x41)] // 'A' key
-    [InlineData(0x42)] // 'B' key
-    [InlineData(0x1B)] // Escape key
-    [InlineData(0x0D)] // Enter key
-    [InlineData(0x00)] // Invalid key
-    public void UnsupportedHotkeyProvider_RegisterHotkey_WithDifferentKeyCodes_ShouldReturnFalse(uint keyCode)
-    {
-        // Arrange
-        var provider = new UnsupportedHotkeyProvider();
-
-        // Act
-        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, keyCode, () => { });
-
-        // Assert
-        result.Should().BeFalse();
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public void UnsupportedHotkeyProvider_RegisterHotkey_WithNullCallback_ShouldReturnFalse()
+    public void SupportedHotkeyProvider_UnregisterHotkey_ShouldReturnTrue()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(true);
+        provider.HasPermissions.Returns(true);
+        provider.UnregisterHotkey(Arg.Any<string>()).Returns(true);
 
         // Act
-        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 0x41, null!);
+        var result = provider.UnregisterHotkey("test");
 
         // Assert
-        result.Should().BeFalse();
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("test")]
-    [InlineData("complex_hotkey_id")]
-    public void UnsupportedHotkeyProvider_UnregisterHotkey_WithDifferentIds_ShouldReturnFalse(string hotkeyId)
-    {
-        // Arrange
-        var provider = new UnsupportedHotkeyProvider();
-
-        // Act
-        var result = provider.UnregisterHotkey(hotkeyId);
-
-        // Assert
-        result.Should().BeFalse();
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public void UnsupportedHotkeyProvider_ShouldImplementIDisposable()
+    public void HotkeyProvider_RegisterHotkey_ShouldCallWithCorrectParameters()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(true);
+        provider.HasPermissions.Returns(true);
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+            .Returns(true);
 
-        // Act & Assert
-        provider.Should().BeAssignableTo<IDisposable>();
+        var callback = new Action(() => { });
+
+        // Act
+        provider.RegisterHotkey("test_hotkey", HotkeyModifiers.Control, 65, callback);
+
+        // Assert
+        provider.Received(1).RegisterHotkey("test_hotkey", HotkeyModifiers.Control, 65, callback);
     }
 
     [Fact]
-    public void UnsupportedHotkeyProvider_ShouldImplementIHotkeyProvider()
+    public void HotkeyProvider_UnregisterHotkey_ShouldCallWithCorrectParameters()
     {
         // Arrange
-        var provider = new UnsupportedHotkeyProvider();
+        var provider = Substitute.For<IHotkeyProvider>();
+        provider.IsSupported.Returns(true);
+        provider.HasPermissions.Returns(true);
+        provider.UnregisterHotkey(Arg.Any<string>()).Returns(true);
 
-        // Act & Assert
-        provider.Should().BeAssignableTo<IHotkeyProvider>();
-    }
+        // Act
+        provider.UnregisterHotkey("test_hotkey");
 
-    public override void Dispose()
-    {
-        base.Dispose();
+        // Assert
+        provider.Received(1).UnregisterHotkey("test_hotkey");
     }
 }

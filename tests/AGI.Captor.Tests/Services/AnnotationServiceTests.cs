@@ -6,6 +6,8 @@ using Xunit.Abstractions;
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Tests.TestHelpers;
+using Avalonia;
+using Avalonia.Media;
 
 namespace AGI.Captor.Tests.Services;
 
@@ -17,6 +19,28 @@ public class AnnotationServiceTests : TestBase
     public AnnotationServiceTests(ITestOutputHelper output) : base(output)
     {
         _settingsService = Substitute.For<ISettingsService>();
+        
+        // Setup mock settings
+        var mockSettings = new AppSettings
+        {
+            DefaultStyles = new DefaultStyleSettings
+            {
+                Text = new TextStyleSettings
+                {
+                    FontSize = 16,
+                    FontFamily = "Segoe UI",
+                    Color = Color.FromRgb(0, 0, 0)
+                },
+                Shape = new ShapeStyleSettings
+                {
+                    StrokeColor = Color.FromRgb(255, 0, 0),
+                    StrokeThickness = 2.0,
+                    FillMode = "None"
+                }
+            }
+        };
+        
+        _settingsService.Settings.Returns(mockSettings);
         _annotationService = new AnnotationService(_settingsService);
     }
 
@@ -35,7 +59,7 @@ public class AnnotationServiceTests : TestBase
         var tool = AnnotationToolType.Rectangle;
 
         // Act
-        _annotationService.SetTool(tool);
+        _annotationService.CurrentTool = tool;
 
         // Assert
         _annotationService.CurrentTool.Should().Be(tool);
@@ -46,14 +70,15 @@ public class AnnotationServiceTests : TestBase
     {
         // Arrange
         var tool = AnnotationToolType.Ellipse;
-        AnnotationToolType? eventArgs = null;
+        ToolChangedEventArgs? eventArgs = null;
         _annotationService.ToolChanged += (sender, args) => eventArgs = args;
 
         // Act
-        _annotationService.SetTool(tool);
+        _annotationService.CurrentTool = tool;
 
         // Assert
-        eventArgs.Should().Be(tool);
+        eventArgs.Should().NotBeNull();
+        eventArgs!.NewTool.Should().Be(tool);
     }
 
     [Theory]
@@ -66,7 +91,7 @@ public class AnnotationServiceTests : TestBase
     public void SetTool_ShouldAcceptAllValidTools(AnnotationToolType tool)
     {
         // Act
-        _annotationService.SetTool(tool);
+        _annotationService.CurrentTool = tool;
 
         // Assert
         _annotationService.CurrentTool.Should().Be(tool);
@@ -80,12 +105,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(10, 20);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<RectangleAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<RectangleAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Rectangle);
     }
 
     [Fact]
@@ -96,12 +121,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(15, 25);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<EllipseAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<EllipseAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Ellipse);
     }
 
     [Fact]
@@ -112,12 +137,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(5, 10);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<ArrowAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<ArrowAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Arrow);
     }
 
     [Fact]
@@ -128,12 +153,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(30, 40);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<TextAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<TextAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Text);
     }
 
     [Fact]
@@ -144,12 +169,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(50, 60);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<FreehandAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<FreehandAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Freehand);
     }
 
     [Fact]
@@ -160,12 +185,12 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(70, 80);
 
         // Act
-        _annotationService.StartAnnotation(startPoint);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Assert
-        var annotations = _annotationService.Manager.Items.ToList();
-        annotations.Should().HaveCount(1);
-        annotations[0].Should().BeOfType<EmojiAnnotation>();
+        annotation.Should().NotBeNull();
+        annotation.Should().BeOfType<EmojiAnnotation>();
+        annotation.Type.Should().Be(AnnotationType.Emoji);
     }
 
     [Fact]
@@ -176,11 +201,10 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(10, 20);
         var endPoint = new Avalonia.Point(50, 60);
         
-        _annotationService.StartAnnotation(startPoint);
-        var annotation = _annotationService.Manager.Items.First() as RectangleAnnotation;
+        var annotation = _annotationService.StartCreate(startPoint) as RectangleAnnotation;
 
         // Act
-        _annotationService.UpdateAnnotation(endPoint);
+        _annotationService.UpdateCreate(endPoint, annotation!);
 
         // Assert
         annotation!.Rectangle.Should().Be(new Avalonia.Rect(10, 20, 40, 40));
@@ -194,11 +218,10 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(5, 10);
         var endPoint = new Avalonia.Point(25, 35);
         
-        _annotationService.StartAnnotation(startPoint);
-        var annotation = _annotationService.Manager.Items.First() as EllipseAnnotation;
+        var annotation = _annotationService.StartCreate(startPoint) as EllipseAnnotation;
 
         // Act
-        _annotationService.UpdateAnnotation(endPoint);
+        _annotationService.UpdateCreate(endPoint, annotation!);
 
         // Assert
         annotation!.BoundingRect.Should().Be(new Avalonia.Rect(5, 10, 20, 25));
@@ -212,11 +235,10 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(0, 0);
         var endPoint = new Avalonia.Point(100, 100);
         
-        _annotationService.StartAnnotation(startPoint);
-        var annotation = _annotationService.Manager.Items.First() as ArrowAnnotation;
+        var annotation = _annotationService.StartCreate(startPoint) as ArrowAnnotation;
 
         // Act
-        _annotationService.UpdateAnnotation(endPoint);
+        _annotationService.UpdateCreate(endPoint, annotation!);
 
         // Assert
         annotation!.EndPoint.Should().Be(endPoint);
@@ -230,12 +252,11 @@ public class AnnotationServiceTests : TestBase
         var startPoint = new Avalonia.Point(10, 20);
         var additionalPoint = new Avalonia.Point(30, 40);
         
-        _annotationService.StartAnnotation(startPoint);
-        var annotation = _annotationService.Manager.Items.First() as FreehandAnnotation;
+        var annotation = _annotationService.StartCreate(startPoint) as FreehandAnnotation;
         var initialPointCount = annotation!.Points.Count;
 
         // Act
-        _annotationService.UpdateAnnotation(additionalPoint);
+        _annotationService.UpdateCreate(additionalPoint, annotation);
 
         // Assert
         annotation.Points.Should().HaveCount(initialPointCount + 1);
@@ -248,14 +269,13 @@ public class AnnotationServiceTests : TestBase
         // Arrange
         _annotationService.SetTool(AnnotationToolType.Rectangle);
         var startPoint = new Avalonia.Point(10, 20);
-        _annotationService.StartAnnotation(startPoint);
-        var annotation = _annotationService.Manager.Items.First();
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Act
-        _annotationService.FinishAnnotation();
+        _annotationService.FinishCreate(annotation!);
 
         // Assert
-        annotation.State.Should().Be(AnnotationState.Completed);
+        annotation!.State.Should().Be(AnnotationState.Normal);
     }
 
     [Fact]
@@ -264,15 +284,13 @@ public class AnnotationServiceTests : TestBase
         // Arrange
         _annotationService.SetTool(AnnotationToolType.Rectangle);
         var startPoint = new Avalonia.Point(10, 20);
-        _annotationService.StartAnnotation(startPoint);
-        
-        var initialCount = _annotationService.Manager.Items.Count();
-        initialCount.Should().Be(1);
+        var annotation = _annotationService.StartCreate(startPoint);
 
         // Act
-        _annotationService.CancelAnnotation();
+        _annotationService.CancelCreate(annotation!);
 
         // Assert
+        // The annotation should be cancelled and not added to manager
         _annotationService.Manager.Items.Should().BeEmpty();
     }
 
@@ -281,9 +299,9 @@ public class AnnotationServiceTests : TestBase
     {
         // Arrange
         _annotationService.SetTool(AnnotationToolType.Rectangle);
-        _annotationService.StartAnnotation(new Avalonia.Point(10, 10));
-        _annotationService.UpdateAnnotation(new Avalonia.Point(50, 50));
-        _annotationService.FinishAnnotation();
+        var annotation = _annotationService.StartCreate(new Avalonia.Point(10, 10));
+        _annotationService.UpdateCreate(new Avalonia.Point(50, 50), annotation!);
+        _annotationService.FinishCreate(annotation!);
 
         var testRegion = new Avalonia.Rect(20, 20, 20, 20);
 
@@ -315,7 +333,7 @@ public class AnnotationServiceTests : TestBase
         _annotationService.CurrentTool.Should().Be(AnnotationToolType.Rectangle);
 
         // Act
-        _annotationService.SetTool(AnnotationToolType.None);
+        _annotationService.CurrentTool = AnnotationToolType.None;
 
         // Assert
         _annotationService.CurrentTool.Should().Be(AnnotationToolType.None);

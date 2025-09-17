@@ -1,14 +1,9 @@
 {
   "methodDisplay": "method",
-  "methodDisplayOptions": "all",
   "parallelizeAssembly": false,
-  "parallelizeTestCollections": true,
-  "maxParallelThreads": 4,
-  "shadowCopy": false,
-  "diagnosticMessages": true,
-  "internalDiagnosticMessages": false,
-  "preEnumerateTheories": true,
-  "stopOnFail": false,
-  "longRunningTestSeconds": 30,
-  "appDomain": "denied"
+  "parallelizeTestCollections": false,
+  "maxParallelThreads": 1,
+  "longRunningTestSeconds": 10,
+  "diagnosticMessages": false,
+  "internalDiagnosticMessages": false
 }

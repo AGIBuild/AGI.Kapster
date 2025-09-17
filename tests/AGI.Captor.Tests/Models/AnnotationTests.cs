@@ -21,11 +21,11 @@ public class AnnotationTests : TestBase
         var style = new AnnotationStyle();
 
         // Act
-        var annotation = new RectangleAnnotation(position, size, style);
+        var annotation = new RectangleAnnotation(position, new Avalonia.Point(position.X + size.Width, position.Y + size.Height), style);
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Position.Should().Be(position);
+        annotation.Rectangle.TopLeft.Should().Be(position); // Use Rectangle.TopLeft instead of Bounds.Position
         annotation.Rectangle.Should().Be(new Avalonia.Rect(position, size));
         annotation.Style.Should().Be(style);
         annotation.Type.Should().Be(AnnotationType.Rectangle);
@@ -81,7 +81,7 @@ public class AnnotationTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Position.Should().Be(position);
+        annotation.Bounds.Position.Should().Be(position);
         annotation.Text.Should().Be(text);
         annotation.Style.Should().Be(style);
         annotation.Type.Should().Be(AnnotationType.Text);
@@ -117,7 +117,7 @@ public class AnnotationTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Position.Should().Be(position);
+        annotation.Position.Should().Be(position); // Use Position property instead of Bounds.Position
         annotation.Emoji.Should().Be(emoji);
         annotation.Style.Should().Be(style);
         annotation.Type.Should().Be(AnnotationType.Emoji);
@@ -217,7 +217,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
 
         // Act
@@ -235,7 +235,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
         
         manager.AddItem(annotation);
@@ -255,7 +255,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
         
         manager.AddItem(annotation);
@@ -275,7 +275,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
         
         manager.AddItem(annotation);
@@ -296,7 +296,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation1 = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
         var annotation2 = new EllipseAnnotation(
             new Avalonia.Rect(30, 40, 80, 60),
@@ -305,7 +305,7 @@ public class AnnotationTests : TestBase
         manager.AddItem(annotation1);
         manager.AddItem(annotation2);
         manager.SelectItem(annotation1);
-        manager.SelectItem(annotation2);
+        manager.SelectItem(annotation2, addToSelection: true);
         manager.SelectedItems.Should().HaveCount(2);
 
         // Act
@@ -313,6 +313,8 @@ public class AnnotationTests : TestBase
 
         // Assert
         manager.SelectedItems.Should().BeEmpty();
+        annotation1.State.Should().Be(AnnotationState.Normal);
+        annotation2.State.Should().Be(AnnotationState.Normal);
     }
 
     [Fact]
@@ -322,7 +324,7 @@ public class AnnotationTests : TestBase
         var manager = new AnnotationManager();
         var annotation1 = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
         var annotation2 = new EllipseAnnotation(
             new Avalonia.Rect(30, 40, 80, 60),

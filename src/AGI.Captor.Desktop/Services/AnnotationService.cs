@@ -333,6 +333,11 @@ public class AnnotationService : IAnnotationService
         }
 
         var settings = _settingsService.Settings;
+        if (settings == null)
+        {
+            return new AnnotationStyle(); // Default style
+        }
+
         var style = new AnnotationStyle();
 
         // Apply text settings
@@ -390,4 +395,9 @@ public class AnnotationService : IAnnotationService
     {
         return CurrentStyle.StrokeColor;
     }
+
+    // Convenience methods for backward compatibility
+    public void SetTool(AnnotationToolType tool) => CurrentTool = tool;
+    public IAnnotationItem? StartAnnotation(Point startPoint) => StartCreate(startPoint);
+    public void UpdateAnnotation(Point currentPoint, IAnnotationItem item) => UpdateCreate(currentPoint, item);
 }

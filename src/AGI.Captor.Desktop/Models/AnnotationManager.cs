@@ -224,6 +224,21 @@ public class AnnotationManager
     }
 
     /// <summary>
+    /// 取消选择指定项目
+    /// </summary>
+    public void DeselectItem(IAnnotationItem item)
+    {
+        if (item == null || !_selectedItems.Contains(item)) return;
+        
+        var oldSelection = _selectedItems.ToList();
+        
+        _selectedItems.Remove(item);
+        item.State = AnnotationState.Normal;
+        
+        SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, _selectedItems));
+    }
+
+    /// <summary>
     /// Select all annotations
     /// </summary>
     public void SelectAll()

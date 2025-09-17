@@ -454,4 +454,18 @@ public class ExportService : IExportService
             }
         });
     }
+
+    /// <summary>
+    /// Export annotated screenshot (convenience method for backward compatibility)
+    /// </summary>
+    public async Task ExportAsync(Bitmap screenshot, string filePath, ExportFormat format)
+    {
+        var settings = new ExportSettings
+        {
+            Format = format,
+            Quality = 90
+        };
+        
+        await ExportToFileAsync(screenshot, new List<IAnnotationItem>(), new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height), filePath, settings);
+    }
 }

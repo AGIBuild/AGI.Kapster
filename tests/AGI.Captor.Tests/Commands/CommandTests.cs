@@ -3,7 +3,10 @@ using Xunit;
 using Xunit.Abstractions;
 using AGI.Captor.Desktop.Commands;
 using AGI.Captor.Desktop.Models;
+using AGI.Captor.Desktop.Rendering;
 using AGI.Captor.Tests.TestHelpers;
+using NSubstitute;
+using Avalonia.Controls;
 
 namespace AGI.Captor.Tests.Commands;
 
@@ -239,11 +242,13 @@ public class CommandTests : TestBase
         var commandManager = new CommandManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
 
         // Act
-        var command = new AddAnnotationCommand(manager, annotation);
+        var renderer = Substitute.For<IAnnotationRenderer>();
+        var canvas = new Canvas();
+        var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
         commandManager.ExecuteCommand(command);
 
         // Assert
@@ -259,10 +264,12 @@ public class CommandTests : TestBase
         var commandManager = new CommandManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
 
-        var command = new AddAnnotationCommand(manager, annotation);
+        var renderer = Substitute.For<IAnnotationRenderer>();
+        var canvas = new Canvas();
+        var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
         commandManager.ExecuteCommand(command);
         manager.Items.Should().HaveCount(1);
 
@@ -281,14 +288,16 @@ public class CommandTests : TestBase
         var commandManager = new CommandManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
 
         manager.AddItem(annotation);
         manager.Items.Should().HaveCount(1);
 
         // Act
-        var command = new RemoveAnnotationCommand(manager, annotation);
+        var renderer = Substitute.For<IAnnotationRenderer>();
+        var canvas = new Canvas();
+        var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
         commandManager.ExecuteCommand(command);
 
         // Assert
@@ -303,11 +312,13 @@ public class CommandTests : TestBase
         var commandManager = new CommandManager();
         var annotation = new RectangleAnnotation(
             new Avalonia.Point(10, 20),
-            new Avalonia.Size(100, 50),
+            new Avalonia.Point(110, 70),
             new AnnotationStyle());
 
         manager.AddItem(annotation);
-        var command = new RemoveAnnotationCommand(manager, annotation);
+        var renderer = Substitute.For<IAnnotationRenderer>();
+        var canvas = new Canvas();
+        var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
         commandManager.ExecuteCommand(command);
         manager.Items.Should().BeEmpty();
 

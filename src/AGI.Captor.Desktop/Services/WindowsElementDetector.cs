@@ -697,5 +697,13 @@ public class WindowsElementDetector : IElementDetector
     private const int SW_HIDE = 0;
     private const int SW_SHOW = 5;
 
+    public bool IsSupported => OperatingSystem.IsWindows();
+    public bool HasPermissions => OperatingSystem.IsWindows(); // Assume we have permissions on Windows
+
+    public void Dispose()
+    {
+        // No resources to dispose
+    }
+
     #endregion
 }
