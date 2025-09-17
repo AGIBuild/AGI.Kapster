@@ -24,10 +24,7 @@ public class CommandManager
     /// </summary>
     public void ExecuteCommand(ICommand command)
     {
-        if (command == null)
-        {
-            throw new ArgumentNullException(nameof(command));
-        }
+        ArgumentNullException.ThrowIfNull(command);
 
         try
         {
