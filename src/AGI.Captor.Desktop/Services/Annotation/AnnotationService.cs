@@ -2,12 +2,13 @@ using AGI.Captor.Desktop.Models;
 using Serilog;
 using AGI.Captor.Desktop.Commands;
 using AGI.Captor.Desktop.Rendering;
+using AGI.Captor.Desktop.Services.Settings;
 using Avalonia;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Annotation;
 
 /// <summary>
 /// Annotation service implementation
@@ -76,7 +77,7 @@ public class AnnotationService : IAnnotationService
     }
 
 
-    public IAnnotationItem? StartCreate(Point startPoint)
+    public IAnnotationItem? StartAnnotation(Point startPoint)
     {
         IAnnotationItem? item = null;
         if (CurrentTool == AnnotationToolType.Rectangle)
@@ -115,7 +116,7 @@ public class AnnotationService : IAnnotationService
         return item;
     }
 
-    public void UpdateCreate(Point currentPoint, IAnnotationItem item)
+    public void UpdateAnnotation(Point currentPoint, IAnnotationItem item)
     {
         switch (item)
         {
@@ -333,6 +334,11 @@ public class AnnotationService : IAnnotationService
         }
 
         var settings = _settingsService.Settings;
+        if (settings == null)
+        {
+            return new AnnotationStyle(); // Default style
+        }
+
         var style = new AnnotationStyle();
 
         // Apply text settings
@@ -390,4 +396,5 @@ public class AnnotationService : IAnnotationService
     {
         return CurrentStyle.StrokeColor;
     }
+
 }

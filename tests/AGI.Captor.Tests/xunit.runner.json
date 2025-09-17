@@ -1,0 +1,9 @@
+{
+  "methodDisplay": "method",
+  "parallelizeAssembly": false,
+  "parallelizeTestCollections": false,
+  "maxParallelThreads": 1,
+  "longRunningTestSeconds": 10,
+  "diagnosticMessages": false,
+  "internalDiagnosticMessages": false
+}

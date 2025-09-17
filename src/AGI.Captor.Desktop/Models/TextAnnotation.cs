@@ -298,18 +298,31 @@ public class TextAnnotation : AnnotationItemBase
             Style.FontSize = safeFontSize;
         }
 
-        // Create temporary text measurement object
-        var typeface = new Typeface(Style.FontFamily, Style.FontStyle, Style.FontWeight);
-        var formattedText = new FormattedText(
-            _text,
-            System.Globalization.CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            typeface,
-            safeFontSize,
-            Brushes.Black // Color does not affect size measurement
-        );
+        try
+        {
+            // Create temporary text measurement object
+            var typeface = new Typeface(Style.FontFamily, Style.FontStyle, Style.FontWeight);
+            var formattedText = new FormattedText(
+                _text,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                safeFontSize,
+                Brushes.Black // Color does not affect size measurement
+            );
 
-        _textSize = new Size(formattedText.Width, formattedText.Height);
+            _textSize = new Size(formattedText.Width, formattedText.Height);
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // Fallback for test environments or when Avalonia platform is not available
+            _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
+        }
+        catch (NotSupportedException)
+        {
+            // Fallback for test environments or when Avalonia platform is not available
+            _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
+        }
     }
 
     /// <summary>

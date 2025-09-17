@@ -12,6 +12,8 @@ using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Annotation;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Overlays;
 using AGI.Captor.Desktop.Services.ElementDetection;
 using AGI.Captor.Desktop.Views;
@@ -73,9 +75,8 @@ class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
-        builder.Services.AddSingleton<MainWindow>();
-        builder.Services.AddSingleton<AGI.Captor.Desktop.ViewModels.MainWindowViewModel>();
         builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
+        builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
         builder.Services.AddTransient<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IApplicationController, ApplicationController>();
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();

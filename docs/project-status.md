@@ -1,8 +1,8 @@
-# AGI.Captor Project Status - December 2024
+# AGI.Captor Project Status
 
 ## Current Status: Active Development
 
-### Recent Major Changes (December 2024)
+### Recent Major Changes
 
 #### 1. Code Organization Refactoring ✅
 - **Services Directory Reorganization**: Grouped related services by topic
@@ -17,7 +17,21 @@
 - **Namespace Alignment**: All namespaces now match physical file locations
 - **Code Cleanup**: Standardized using statements and file formatting
 
-#### 2. UI/UX Improvements ✅
+#### 2. MainWindow Removal and Background-Only Architecture ✅
+- **Removed MainWindow**: Eliminated unused `MainWindow.axaml`, `MainWindow.axaml.cs`, and `MainWindowViewModel.cs`
+- **Background-Only Operation**: Application now runs purely in background with system tray
+- **Simplified Application Controller**: Removed `ShowMainWindow` and `HideMainWindow` methods
+- **Updated Clipboard Strategy**: Modified macOS clipboard strategy to not rely on MainWindow
+- **Cleaner Architecture**: Reduced complexity by removing unnecessary UI components
+
+#### 3. SettingsService Testability Refactoring ✅
+- **Dependency Injection**: Added `IFileSystemService` interface for file system abstraction
+- **Test Isolation**: Created `MemoryFileSystemService` for in-memory testing
+- **Real Implementation**: Added `FileSystemService` for production file operations
+- **Unit Test Support**: SettingsService now fully supports unit testing without corrupting user files
+- **Backward Compatibility**: Maintained existing API while improving testability
+
+#### 4. UI/UX Improvements ✅
 - **Settings Window Styling**: Fixed dark theme consistency across all panels
 - **Accessibility Permission Dialog**: 
   - Made modal and prevented auto-close
@@ -25,7 +39,7 @@
   - Removed hardcoded paths and "Important" notices
 - **Permission Guide Panel**: Aligned styling with main settings window
 
-#### 3. Platform-Specific Fixes ✅
+#### 5. Platform-Specific Fixes ✅
 - **macOS Multi-Screen Support**: Fixed black screen issue on secondary monitors
 - **macOS Clipboard Access**: Improved clipboard strategy with multiple fallback approaches
 - **Windows Element Detection**: Maintained full UI Automation support
@@ -46,13 +60,21 @@ Services/
 ├── Capture/            # Screen capture strategies
 ├── ElementDetection/   # UI element detection
 ├── Export/            # Image export and processing
-├── Settings/          # Configuration management
+├── Settings/          # Configuration management with testable file system
 ├── Adapters/          # Data conversion utilities
-└── Overlay/           # Overlay window management
+├── Overlay/           # Overlay window management
+└── FileSystem/        # File system abstraction for testing
 
 Rendering/
 └── Overlays/          # Overlay rendering components
 ```
+
+#### Key Architectural Patterns
+- **Dependency Injection**: All services registered in DI container
+- **Interface Segregation**: Platform-specific implementations behind interfaces
+- **Testability**: File system abstraction enables unit testing
+- **Background Operation**: No main window, system tray only
+- **Event-Driven**: Loose coupling through events
 
 ### Current Features
 
@@ -69,7 +91,7 @@ Rendering/
 
 #### 🚧 In Development
 - **CI/CD Pipeline**: Automated build and deployment
-- **Unit Testing**: Comprehensive test coverage
+- **Unit Testing**: Comprehensive test coverage (95 tests passing)
 - **Performance Optimization**: Memory usage and rendering improvements
 
 #### 📋 Planned
@@ -164,5 +186,5 @@ We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for g
 
 ---
 
-*Last Updated: December 2024*
-*Next Review: January 2025*
+*Last Updated: January 2025*
+*Next Review: February 2025*

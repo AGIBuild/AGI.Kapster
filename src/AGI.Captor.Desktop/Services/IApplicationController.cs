@@ -26,15 +26,6 @@ public interface IApplicationController
     /// <returns>True if enabled</returns>
     Task<bool> IsStartupWithWindowsEnabledAsync();
     
-    /// <summary>
-    /// Show the main window if hidden
-    /// </summary>
-    void ShowMainWindow();
-    
-    /// <summary>
-    /// Hide the main window to system tray
-    /// </summary>
-    void HideMainWindow();
     
     /// <summary>
     /// Restart the application

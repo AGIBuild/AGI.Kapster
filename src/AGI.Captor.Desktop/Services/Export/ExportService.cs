@@ -12,10 +12,11 @@ using Avalonia.Threading;
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Rendering;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Settings;
 using Serilog;
 using SkiaSharp;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Export;
 
 /// <summary>
 /// Export service implementation for saving annotated screenshots with multiple format support
@@ -453,5 +454,19 @@ public class ExportService : IExportService
                 throw;
             }
         });
+    }
+
+    /// <summary>
+    /// Export annotated screenshot (convenience method for backward compatibility)
+    /// </summary>
+    public async Task ExportAsync(Bitmap screenshot, string filePath, ExportFormat format)
+    {
+        var settings = new ExportSettings
+        {
+            Format = format,
+            Quality = 90
+        };
+        
+        await ExportToFileAsync(screenshot, new List<IAnnotationItem>(), new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height), filePath, settings);
     }
 }

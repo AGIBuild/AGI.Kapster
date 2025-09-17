@@ -28,4 +28,12 @@ public class NullElementDetector : IElementDetector
     {
         // No-op
     }
+
+    public bool IsSupported => false;
+    public bool HasPermissions => false;
+
+    public void Dispose()
+    {
+        // No-op
+    }
 }

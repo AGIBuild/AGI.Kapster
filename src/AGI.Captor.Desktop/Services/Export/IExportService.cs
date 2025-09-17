@@ -5,7 +5,7 @@ using Avalonia;
 using Avalonia.Media.Imaging;
 using AGI.Captor.Desktop.Models;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Export;
 
 /// <summary>
 /// Export service for saving annotated screenshots

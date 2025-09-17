@@ -5,9 +5,10 @@ using Serilog;
 
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Views;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Hotkeys;
 
 /// <summary>
 /// Hotkey manager - uses dependency injection for platform-specific provider
@@ -156,6 +157,7 @@ public class HotkeyManager : IHotkeyManager
             }
         }
     }
+
 
     private static void ShowSettingsWindow()
     {

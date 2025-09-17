@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Release tag format: such as v1.1.0

@@ -2,7 +2,7 @@ using AGI.Captor.Desktop.Models;
 using System;
 using System.Threading.Tasks;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Settings;
 
 /// <summary>
 /// Settings service interface for managing application settings

@@ -199,16 +199,9 @@ public class MacClipboardStrategy : IClipboardStrategy
     {
         try
         {
-            // First try to get from MainWindow
+            // Try to find any open window with clipboard access
             if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
-                if (desktop.MainWindow?.Clipboard != null)
-                {
-                    Log.Debug("macOS: Using MainWindow clipboard");
-                    return (desktop.MainWindow.Clipboard, null);
-                }
-                
-                // Try to find any open window with clipboard access
                 var windows = desktop.Windows;
                 if (windows != null)
                 {

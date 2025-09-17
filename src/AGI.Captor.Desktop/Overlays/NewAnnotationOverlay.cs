@@ -1,6 +1,9 @@
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Rendering;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Annotation;
+using AGI.Captor.Desktop.Services.Export;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Commands;
 using Avalonia;
 using Avalonia.Controls;
@@ -120,8 +123,16 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         base.OnKeyDown(e);
 
+        Log.Debug("OnKeyDown called with key: {Key}, modifiers: {Modifiers}", e.Key, e.KeyModifiers);
+
         try
         {
+            // If currently editing text, don't handle tool hotkeys
+            if (_editingTextBox != null)
+            {
+                Log.Debug("Text editing active, skipping tool hotkey handling for key: {Key}", e.Key);
+                return;
+            }
             switch (e.Key)
             {
                 case Key.Left:
@@ -170,6 +181,23 @@ public sealed class NewAnnotationOverlay : Canvas
                     e.Handled = true;
                     break;
 
+                case Key.Enter:
+                    // Enter key confirms selection and exits selection state
+                    if (_selectionRect.Width > 0 && _selectionRect.Height > 0)
+                    {
+                        Log.Debug("Enter key pressed - confirming selection and exiting selection state");
+                        var currentSelection = _selectionRect;
+                        
+                        // Clear selection state before confirming to prevent further drawing
+                        _selectionRect = new Rect();
+                        IsHitTestVisible = false;
+                        
+                        // Trigger confirm event
+                        ConfirmRequested?.Invoke(currentSelection);
+                        e.Handled = true;
+                    }
+                    break;
+
                 case Key.Escape:
                     // ESC key will be handled by OverlayWindow to exit screenshot mode
                     // Don't handle it here to let it bubble up
@@ -197,6 +225,43 @@ public sealed class NewAnnotationOverlay : Canvas
                         Log.Information("Redo: {Description}", _commandManager.RedoDescription);
                         e.Handled = true;
                     }
+                    break;
+
+                // Tool hotkeys (only when no modifiers are pressed)
+                case Key.S when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey S pressed - switching to Select tool");
+                    _annotationService.CurrentTool = AnnotationToolType.None; // None is used for selection tool
+                    e.Handled = true;
+                    break;
+                case Key.A when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey A pressed - switching to Arrow tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Arrow;
+                    e.Handled = true;
+                    break;
+                case Key.R when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey R pressed - switching to Rectangle tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Rectangle;
+                    e.Handled = true;
+                    break;
+                case Key.E when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey E pressed - switching to Ellipse tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Ellipse;
+                    e.Handled = true;
+                    break;
+                case Key.T when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey T pressed - switching to Text tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Text;
+                    e.Handled = true;
+                    break;
+                case Key.F when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey F pressed - switching to Freehand tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Freehand;
+                    e.Handled = true;
+                    break;
+                case Key.M when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey M pressed - switching to Emoji tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Emoji;
+                    e.Handled = true;
                     break;
             }
         }
@@ -241,18 +306,30 @@ public sealed class NewAnnotationOverlay : Canvas
             
             if (properties.IsLeftButtonPressed)
             {
-                // Handle double-click outside selection for confirm (legacy behavior)
-                if (e.ClickCount == 2 && hasSelection && !pointInSelection)
+                // Handle double-click for various actions
+                if (e.ClickCount == 2)
                 {
-                    // Save current selection rect before clearing
-                    var currentSelection = _selectionRect;
+                    // Clear annotation selection if any (anchor points)
+                    if (_annotationService.Manager.HasSelection)
+                    {
+                        Log.Debug("Double-click detected with selected annotations - clearing selection");
+                        _annotationService.Manager.ClearSelection();
+                        RefreshRender();
+                    }
                     
-                    // Clear selection state before confirming to prevent further drawing
-                    _selectionRect = new Rect();
-                    IsHitTestVisible = false;
-                    ConfirmRequested?.Invoke(currentSelection);
-                    e.Handled = true;
-                    return;
+                    // Handle save to clipboard operation if there's a selection rect
+                    if (hasSelection && !pointInSelection)
+                    {
+                        // Save current selection rect before clearing
+                        var currentSelection = _selectionRect;
+                        
+                        // Clear selection state before confirming to prevent further drawing
+                        _selectionRect = new Rect();
+                        IsHitTestVisible = false;
+                        ConfirmRequested?.Invoke(currentSelection);
+                        e.Handled = true;
+                        return;
+                    }
                 }
                 
                 // If no selection exists, let SelectionOverlay handle it
@@ -376,7 +453,7 @@ public sealed class NewAnnotationOverlay : Canvas
         if (_isCreating && _creatingItem != null)
         {
             var oldBounds = _creatingItem.Bounds;
-            _annotationService.UpdateCreate(point, _creatingItem);
+            _annotationService.UpdateAnnotation(point, _creatingItem);
             var newBounds = _creatingItem.Bounds;
             var dirty = Union(oldBounds, newBounds).Inflate(DirtyPadding);
             // Ensure creating item participates in rendering during drag
@@ -561,7 +638,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             try
             {
-                var textItem = _annotationService.StartCreate(point) as TextAnnotation;
+                var textItem = _annotationService.StartAnnotation(point) as TextAnnotation;
                 if (textItem != null)
                 {
                 // CRITICAL FIX: Remember the original selection rectangle
@@ -590,7 +667,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             try
             {
-                var emojiItem = _annotationService.StartCreate(point) as EmojiAnnotation;
+                var emojiItem = _annotationService.StartAnnotation(point) as EmojiAnnotation;
                 if (emojiItem != null)
                 {
                     // Get current selected emoji from toolbar
@@ -621,7 +698,7 @@ public sealed class NewAnnotationOverlay : Canvas
         try
         {
             _startPoint = point;
-            _creatingItem = _annotationService.StartCreate(point);
+            _creatingItem = _annotationService.StartAnnotation(point);
             
             if (_creatingItem != null)
             {

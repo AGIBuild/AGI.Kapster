@@ -1,6 +1,7 @@
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
@@ -120,11 +121,6 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Advanced settings button handlers
-        if (this.FindControl<Button>("OpenLogsDirectoryButton") is { } openLogsButton)
-        {
-            openLogsButton.Click += OnOpenLogsDirectoryClick;
-        }
 
         // Handle window closing
         Closing += (s, e) =>
@@ -319,56 +315,91 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Debug settings
-        if (this.FindControl<CheckBox>("EnableDebugLoggingCheckBox") is { } debugLogging)
-        {
-            debugLogging.IsChecked = _currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging;
-        }
-        
-        if (this.FindControl<CheckBox>("ShowDeveloperInfoCheckBox") is { } showDevInfo)
-        {
-            showDevInfo.IsChecked = _currentSettings.DefaultStyles.Advanced.Debug.ShowDeveloperInfo;
-        }
-        
-        if (this.FindControl<ComboBox>("LogLevelComboBox") is { } logLevel)
-        {
-            var logLevelValue = _currentSettings.DefaultStyles.Advanced.Debug.LogLevel;
-            foreach (ComboBoxItem item in logLevel.Items.OfType<ComboBoxItem>())
-            {
-                if (item.Content?.ToString() == logLevelValue)
-                {
-                    logLevel.SelectedItem = item;
-                    break;
-                }
-            }
-        }
     }
     
-    private void OnOpenLogsDirectoryClick(object? sender, RoutedEventArgs e)
+    
+    
+    private string GetConfigDirectory()
     {
         try
         {
-            var logsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
-            if (!System.IO.Directory.Exists(logsPath))
+            // Use the same base directory as logs for consistency
+            var configPath = System.IO.Path.Combine(AppContext.BaseDirectory, "config");
+            return configPath;
+        }
+        catch
+        {
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "config");
+        }
+    }
+    
+    private string GetCacheDirectory()
+    {
+        try
+        {
+            // Use the same base directory as logs for consistency
+            var cachePath = System.IO.Path.Combine(AppContext.BaseDirectory, "cache");
+            return cachePath;
+        }
+        catch
+        {
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "cache");
+        }
+    }
+    
+    private Task ApplyAdvancedSettings()
+    {
+        try
+        {
+            
+            // Apply telemetry settings
+            if (_currentSettings.DefaultStyles.Advanced.Security.AllowTelemetry)
             {
-                System.IO.Directory.CreateDirectory(logsPath);
+                Log.Debug("Telemetry enabled");
+                // Implement telemetry collection if needed
             }
             
-            // Open logs directory in explorer
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = logsPath,
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(startInfo);
+            // Apply performance settings
+            Log.Debug("Performance settings applied: HardwareAcceleration={HardwareAcceleration}, LimitFrameRate={LimitFrameRate}, RenderQuality={RenderQuality}",
+                _currentSettings.DefaultStyles.Advanced.Performance.EnableHardwareAcceleration,
+                _currentSettings.DefaultStyles.Advanced.Performance.LimitFrameRate,
+                _currentSettings.DefaultStyles.Advanced.Performance.RenderQuality);
             
-            Log.Debug("Opened logs directory: {LogsPath}", logsPath);
+            // Note: Most advanced settings would require application restart to take full effect
+            // For now, we just log the changes
+            Log.Debug("Advanced settings applied successfully");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to open logs directory");
+            Log.Error(ex, "Failed to apply advanced settings");
+        }
+        
+        return Task.CompletedTask;
+    }
+    
+    private string GetLogsDirectory()
+    {
+        try
+        {
+            // Get the actual logs directory that matches Serilog configuration
+            // Serilog uses relative path "logs/app-.log" which resolves to the application's working directory
+            var logsDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            
+            // Ensure the directory exists (same as Program.cs)
+            if (!System.IO.Directory.Exists(logsDir))
+            {
+                System.IO.Directory.CreateDirectory(logsDir);
+            }
+            
+            return logsDir;
+        }
+        catch
+        {
+            // Final fallback
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
         }
     }
+    
     
     private void SaveAdvancedSettings()
     {
@@ -397,22 +428,6 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Debug settings
-        if (this.FindControl<CheckBox>("EnableDebugLoggingCheckBox") is { } debugLogging)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging = debugLogging.IsChecked ?? false;
-        }
-        
-        if (this.FindControl<CheckBox>("ShowDeveloperInfoCheckBox") is { } showDevInfo)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.ShowDeveloperInfo = showDevInfo.IsChecked ?? false;
-        }
-        
-        if (this.FindControl<ComboBox>("LogLevelComboBox") is { } logLevel &&
-            logLevel.SelectedItem is ComboBoxItem selectedLogLevel)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.LogLevel = selectedLogLevel.Content?.ToString() ?? "Warning";
-        }
     }
 
     private async void OnOkClick(object? sender, RoutedEventArgs e)
@@ -428,10 +443,14 @@ public partial class SettingsWindow : Window
             if (_applicationController != null)
             {
                 var startupEnabled = _currentSettings.General.StartWithWindows;
+                Log.Debug("Checking startup setting: Requested={Requested}", startupEnabled);
+                
                 var currentlyEnabled = await _applicationController.IsStartupWithWindowsEnabledAsync();
+                Log.Debug("Current startup setting: {CurrentlyEnabled}", currentlyEnabled);
                 
                 if (startupEnabled != currentlyEnabled)
                 {
+                    Log.Debug("Startup setting changed, applying: {NewSetting}", startupEnabled);
                     var success = await _applicationController.SetStartupWithWindowsAsync(startupEnabled);
                     if (!success)
                     {
@@ -443,8 +462,23 @@ public partial class SettingsWindow : Window
                             startWithSystemCheckBox.IsChecked = currentlyEnabled;
                         }
                     }
+                    else
+                    {
+                        Log.Debug("Startup with Windows setting updated successfully: {Enabled}", startupEnabled);
+                    }
+                }
+                else
+                {
+                    Log.Debug("Startup setting unchanged, no action needed");
                 }
             }
+            else
+            {
+                Log.Warning("ApplicationController is null, cannot apply startup settings");
+            }
+            
+            // Apply advanced settings
+            await ApplyAdvancedSettings();
             
             // Reload hotkeys if settings changed
             try

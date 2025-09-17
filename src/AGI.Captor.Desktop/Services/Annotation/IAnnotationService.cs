@@ -2,7 +2,7 @@ using AGI.Captor.Desktop.Models;
 using Avalonia;
 using System;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Annotation;
 
 /// <summary>
 /// 标注工具类型
@@ -53,14 +53,14 @@ public interface IAnnotationService
     /// </summary>
     /// <param name="startPoint">起始点</param>
     /// <returns>正在创建的标注项，如果不支持则返回null</returns>
-    IAnnotationItem? StartCreate(Point startPoint);
+    IAnnotationItem? StartAnnotation(Point startPoint);
     
     /// <summary>
     /// 更新正在创建的标注
     /// </summary>
     /// <param name="currentPoint">当前点</param>
     /// <param name="item">正在创建的标注项</param>
-    void UpdateCreate(Point currentPoint, IAnnotationItem item);
+    void UpdateAnnotation(Point currentPoint, IAnnotationItem item);
     
     /// <summary>
     /// 完成创建标注
@@ -88,6 +88,7 @@ public interface IAnnotationService
     /// <param name="region">测试区域</param>
     /// <returns>命中的标注项集合</returns>
     System.Collections.Generic.IEnumerable<IAnnotationItem> HitTest(Rect region);
+
 }
 
 /// <summary>

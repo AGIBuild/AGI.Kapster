@@ -10,6 +10,7 @@
     <ApplicationIcon>logo.ico</ApplicationIcon>
     <!-- Suppress Avalonia XAML warnings -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <!-- macOS App Bundle Configuration -->
