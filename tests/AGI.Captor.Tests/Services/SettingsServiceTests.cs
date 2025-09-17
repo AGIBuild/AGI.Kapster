@@ -154,13 +154,18 @@ public class SettingsServiceTests : TestBase
     [Fact]
     public async Task Settings_ShouldBeSerializable()
     {
-        // Arrange
-        _settingsService.Settings.Hotkeys.CaptureRegion = "Test+Hotkey";
-        _settingsService.Settings.Hotkeys.OpenSettings = "Another+Hotkey";
+        // Arrange - Create a temporary settings service for this test
+        var tempSettingsService = new SettingsService();
+        tempSettingsService.Settings.Hotkeys.CaptureRegion = "Test+Hotkey";
+        tempSettingsService.Settings.Hotkeys.OpenSettings = "Another+Hotkey";
 
         // Act & Assert
-        var action = async () => await _settingsService.SaveAsync();
+        var action = async () => await tempSettingsService.SaveAsync();
         await action.Should().NotThrowAsync();
+        
+        // Clean up - restore original settings
+        var originalSettings = new SettingsService();
+        await originalSettings.SaveAsync();
     }
 
     [Fact]

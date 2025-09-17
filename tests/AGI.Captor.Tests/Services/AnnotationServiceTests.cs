@@ -109,8 +109,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<RectangleAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Rectangle);
+        annotation!.Should().BeOfType<RectangleAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Rectangle);
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<EllipseAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Ellipse);
+        annotation!.Should().BeOfType<EllipseAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Ellipse);
     }
 
     [Fact]
@@ -141,8 +141,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<ArrowAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Arrow);
+        annotation!.Should().BeOfType<ArrowAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Arrow);
     }
 
     [Fact]
@@ -157,8 +157,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<TextAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Text);
+        annotation!.Should().BeOfType<TextAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Text);
     }
 
     [Fact]
@@ -173,8 +173,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<FreehandAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Freehand);
+        annotation!.Should().BeOfType<FreehandAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Freehand);
     }
 
     [Fact]
@@ -189,8 +189,8 @@ public class AnnotationServiceTests : TestBase
 
         // Assert
         annotation.Should().NotBeNull();
-        annotation.Should().BeOfType<EmojiAnnotation>();
-        annotation.Type.Should().Be(AnnotationType.Emoji);
+        annotation!.Should().BeOfType<EmojiAnnotation>();
+        annotation!.Type.Should().Be(AnnotationType.Emoji);
     }
 
     [Fact]
