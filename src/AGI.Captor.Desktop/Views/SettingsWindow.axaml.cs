@@ -121,22 +121,6 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Advanced settings button handlers
-        if (this.FindControl<Button>("OpenLogsDirectoryButton") is { } openLogsButton)
-        {
-            openLogsButton.Click += OnOpenLogsDirectoryClick;
-        }
-        
-        // Add more advanced buttons if they exist
-        if (this.FindControl<Button>("OpenConfigDirectoryButton") is { } openConfigButton)
-        {
-            openConfigButton.Click += OnOpenConfigDirectoryClick;
-        }
-        
-        if (this.FindControl<Button>("ClearCacheButton") is { } clearCacheButton)
-        {
-            clearCacheButton.Click += OnClearCacheClick;
-        }
 
         // Handle window closing
         Closing += (s, e) =>
@@ -331,81 +315,9 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Debug settings
-        if (this.FindControl<CheckBox>("EnableDebugLoggingCheckBox") is { } debugLogging)
-        {
-            debugLogging.IsChecked = _currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging;
-        }
-        
-        if (this.FindControl<CheckBox>("ShowDeveloperInfoCheckBox") is { } showDevInfo)
-        {
-            showDevInfo.IsChecked = _currentSettings.DefaultStyles.Advanced.Debug.ShowDeveloperInfo;
-        }
-        
-        if (this.FindControl<ComboBox>("LogLevelComboBox") is { } logLevel)
-        {
-            var logLevelValue = _currentSettings.DefaultStyles.Advanced.Debug.LogLevel;
-            foreach (ComboBoxItem item in logLevel.Items.OfType<ComboBoxItem>())
-            {
-                if (item.Content?.ToString() == logLevelValue)
-                {
-                    logLevel.SelectedItem = item;
-                    break;
-                }
-            }
-        }
     }
     
-    private void OnOpenConfigDirectoryClick(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var configPath = GetConfigDirectory();
-            if (!System.IO.Directory.Exists(configPath))
-            {
-                System.IO.Directory.CreateDirectory(configPath);
-            }
-            
-            // Open config directory in explorer
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = configPath,
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(startInfo);
-            
-            Log.Debug("Opened config directory: {ConfigPath}", configPath);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to open config directory");
-        }
-    }
     
-    private void OnClearCacheClick(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var cachePath = GetCacheDirectory();
-            if (System.IO.Directory.Exists(cachePath))
-            {
-                System.IO.Directory.Delete(cachePath, true);
-                System.IO.Directory.CreateDirectory(cachePath);
-                Log.Debug("Cache cleared: {CachePath}", cachePath);
-                
-                // Show success message
-                // Note: In a real implementation, you might want to show a dialog
-            }
-            else
-            {
-                Log.Debug("Cache directory does not exist: {CachePath}", cachePath);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to clear cache");
-        }
-    }
     
     private string GetConfigDirectory()
     {
@@ -439,13 +351,6 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            // Apply debug logging settings
-            if (_currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging)
-            {
-                Log.Debug("Debug logging enabled");
-                // Note: Serilog configuration is typically set at application startup
-                // This would require restarting the application to take effect
-            }
             
             // Apply telemetry settings
             if (_currentSettings.DefaultStyles.Advanced.Security.AllowTelemetry)
@@ -495,46 +400,6 @@ public partial class SettingsWindow : Window
         }
     }
     
-    private void OnOpenLogsDirectoryClick(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            // Get the actual log directory from Serilog configuration
-            var logsPath = GetLogsDirectory();
-            if (!System.IO.Directory.Exists(logsPath))
-            {
-                System.IO.Directory.CreateDirectory(logsPath);
-            }
-            
-            // Open logs directory in explorer
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = logsPath,
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(startInfo);
-            
-            Log.Debug("Opened logs directory: {LogsPath}", logsPath);
-            
-            // Verify that this is the same path where logs are actually written
-            var expectedLogPath = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
-            if (logsPath.Equals(expectedLogPath, StringComparison.OrdinalIgnoreCase))
-            {
-                Log.Debug("Logs directory path matches Serilog configuration: {Path}", logsPath);
-            }
-            else
-            {
-                Log.Warning("Logs directory path mismatch! Expected: {Expected}, Actual: {Actual}", expectedLogPath, logsPath);
-            }
-            
-            // Create a test log entry to verify the path
-            Log.Information("Test log entry created from settings window - this should appear in the logs directory");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to open logs directory");
-        }
-    }
     
     private void SaveAdvancedSettings()
     {
@@ -563,22 +428,6 @@ public partial class SettingsWindow : Window
         }
         
         
-        // Debug settings
-        if (this.FindControl<CheckBox>("EnableDebugLoggingCheckBox") is { } debugLogging)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging = debugLogging.IsChecked ?? false;
-        }
-        
-        if (this.FindControl<CheckBox>("ShowDeveloperInfoCheckBox") is { } showDevInfo)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.ShowDeveloperInfo = showDevInfo.IsChecked ?? false;
-        }
-        
-        if (this.FindControl<ComboBox>("LogLevelComboBox") is { } logLevel &&
-            logLevel.SelectedItem is ComboBoxItem selectedLogLevel)
-        {
-            _currentSettings.DefaultStyles.Advanced.Debug.LogLevel = selectedLogLevel.Content?.ToString() ?? "Warning";
-        }
     }
 
     private async void OnOkClick(object? sender, RoutedEventArgs e)

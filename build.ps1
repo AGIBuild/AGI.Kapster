@@ -288,26 +288,6 @@ function Build-WindowsPackage {
   $exeNew = Join-Path $windowsDir "$APP_NAME.exe"
   if (Test-Path $exeOld) { Move-Item $exeOld $exeNew -Force }
 
-  # Installer script
-  $installer = @'
-# Windows Installer Script for AGI Captor
-param(
-  [string]$InstallDir = "$env:ProgramFiles\AGI Captor"
-)
-$AppName = "AGI Captor"
-$SourceDir = $PSScriptRoot
-Write-Host "Installing $AppName to $InstallDir..."
-if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null }
-Copy-Item -Path "$SourceDir\*" -Destination $InstallDir -Recurse -Force -Exclude 'Install.ps1'
-$WshShell = New-Object -comObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\$AppName.lnk")
-$Shortcut.TargetPath = "$InstallDir\$AppName.exe"
-$Shortcut.WorkingDirectory = $InstallDir
-$Shortcut.Save()
-Write-Host "$AppName installed successfully!"
-Write-Host 'Desktop shortcut created.'
-'@
-  Set-Content -LiteralPath (Join-Path $windowsDir 'Install.ps1') -Value $installer -Encoding UTF8
   Log-Success "Windows package created at: $windowsDir"
 }
 

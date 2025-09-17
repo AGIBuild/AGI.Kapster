@@ -255,10 +255,6 @@ public class AdvancedSettings
     /// </summary>
     public SecuritySettings Security { get; set; } = new();
     
-    /// <summary>
-    /// Debug settings
-    /// </summary>
-    public DebugSettings Debug { get; set; } = new();
 }
 
 /// <summary>
@@ -295,23 +291,3 @@ public class SecuritySettings
     
 }
 
-/// <summary>
-/// Debug settings
-/// </summary>
-public class DebugSettings
-{
-    /// <summary>
-    /// Enable detailed debug logging
-    /// </summary>
-    public bool EnableDebugLogging { get; set; } = false;
-    
-    /// <summary>
-    /// Show developer information in UI
-    /// </summary>
-    public bool ShowDeveloperInfo { get; set; } = false;
-    
-    /// <summary>
-    /// Log level (Error, Warning, Information, Debug)
-    /// </summary>
-    public string LogLevel { get; set; } = "Warning";
-}

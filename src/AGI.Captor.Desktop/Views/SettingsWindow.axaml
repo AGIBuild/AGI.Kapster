@@ -483,37 +483,6 @@
 							</StackPanel>
 						</Border>
 
-						<!-- Debug Settings -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Debug"/>
-
-								<CheckBox x:Name="EnableDebugLoggingCheckBox"
-										  Content="Enable detailed debug logging"
-										  Margin="0,5"/>
-
-								<CheckBox x:Name="ShowDeveloperInfoCheckBox"
-										  Content="Show developer information in UI"
-										  Margin="0,5"/>
-
-								<Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
-									<TextBlock Grid.Column="0" Text="Log level:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-									<ComboBox Grid.Column="1" x:Name="LogLevelComboBox" Width="150" HorizontalAlignment="Left">
-										<ComboBoxItem Content="Error" />
-										<ComboBoxItem Content="Warning" IsSelected="True"/>
-										<ComboBoxItem Content="Information" />
-										<ComboBoxItem Content="Debug" />
-									</ComboBox>
-									<Button Grid.Column="2" x:Name="OpenLogsDirectoryButton" Content="Open Logs" Margin="10,0,0,0" Classes="action"/>
-								</Grid>
-
-								<StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-									<Button x:Name="OpenConfigDirectoryButton" Content="Open Config" Classes="action"/>
-									<Button x:Name="ClearCacheButton" Content="Clear Cache" Classes="action"/>
-								</StackPanel>
-
-							</StackPanel>
-						</Border>
 
 					</StackPanel>
 				</ScrollViewer>

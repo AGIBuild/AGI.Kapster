@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Cross-platform build script for AGI.Captor.Desktop
-# Supports Windows (.exe + installer) and macOS (.app bundle)
+# Supports Windows (.exe) and macOS (.app bundle)
 
 set -e
 
@@ -291,38 +291,6 @@ build_windows_package() {
     
     log_success "Windows package created at: $windows_dir"
     
-    # Create installer script
-    cat > "$windows_dir/Install.ps1" << 'EOF'
-# Windows Installer Script for AGI Captor
-param(
-    [string]$InstallDir = "$env:ProgramFiles\AGI Captor"
-)
-
-$AppName = "AGI Captor"
-$SourceDir = $PSScriptRoot
-
-Write-Host "Installing $AppName to $InstallDir..."
-
-# Create install directory
-if (-not (Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-}
-
-# Copy files
-Copy-Item -Path "$SourceDir\*" -Destination $InstallDir -Recurse -Force -Exclude "Install.ps1"
-
-# Create desktop shortcut
-$WshShell = New-Object -comObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\$AppName.lnk")
-$Shortcut.TargetPath = "$InstallDir\$AppName.exe"
-$Shortcut.WorkingDirectory = $InstallDir
-$Shortcut.Save()
-
-Write-Host "$AppName installed successfully!"
-Write-Host "Desktop shortcut created."
-EOF
-    
-    log_success "Windows installer script created: $windows_dir/Install.ps1"
 }
 
 # Build macOS package
