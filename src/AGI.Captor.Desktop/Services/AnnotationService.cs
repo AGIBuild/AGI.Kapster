@@ -76,7 +76,7 @@ public class AnnotationService : IAnnotationService
     }
 
 
-    public IAnnotationItem? StartCreate(Point startPoint)
+    public IAnnotationItem? StartAnnotation(Point startPoint)
     {
         IAnnotationItem? item = null;
         if (CurrentTool == AnnotationToolType.Rectangle)
@@ -115,7 +115,7 @@ public class AnnotationService : IAnnotationService
         return item;
     }
 
-    public void UpdateCreate(Point currentPoint, IAnnotationItem item)
+    public void UpdateAnnotation(Point currentPoint, IAnnotationItem item)
     {
         switch (item)
         {
@@ -396,8 +396,4 @@ public class AnnotationService : IAnnotationService
         return CurrentStyle.StrokeColor;
     }
 
-    // Convenience methods for backward compatibility
-    public void SetTool(AnnotationToolType tool) => CurrentTool = tool;
-    public IAnnotationItem? StartAnnotation(Point startPoint) => StartCreate(startPoint);
-    public void UpdateAnnotation(Point currentPoint, IAnnotationItem item) => UpdateCreate(currentPoint, item);
 }

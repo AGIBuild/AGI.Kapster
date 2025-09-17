@@ -376,7 +376,7 @@ public sealed class NewAnnotationOverlay : Canvas
         if (_isCreating && _creatingItem != null)
         {
             var oldBounds = _creatingItem.Bounds;
-            _annotationService.UpdateCreate(point, _creatingItem);
+            _annotationService.UpdateAnnotation(point, _creatingItem);
             var newBounds = _creatingItem.Bounds;
             var dirty = Union(oldBounds, newBounds).Inflate(DirtyPadding);
             // Ensure creating item participates in rendering during drag
@@ -561,7 +561,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             try
             {
-                var textItem = _annotationService.StartCreate(point) as TextAnnotation;
+                var textItem = _annotationService.StartAnnotation(point) as TextAnnotation;
                 if (textItem != null)
                 {
                 // CRITICAL FIX: Remember the original selection rectangle
@@ -590,7 +590,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             try
             {
-                var emojiItem = _annotationService.StartCreate(point) as EmojiAnnotation;
+                var emojiItem = _annotationService.StartAnnotation(point) as EmojiAnnotation;
                 if (emojiItem != null)
                 {
                     // Get current selected emoji from toolbar
@@ -621,7 +621,7 @@ public sealed class NewAnnotationOverlay : Canvas
         try
         {
             _startPoint = point;
-            _creatingItem = _annotationService.StartCreate(point);
+            _creatingItem = _annotationService.StartAnnotation(point);
             
             if (_creatingItem != null)
             {

@@ -53,14 +53,14 @@ public interface IAnnotationService
     /// </summary>
     /// <param name="startPoint">起始点</param>
     /// <returns>正在创建的标注项，如果不支持则返回null</returns>
-    IAnnotationItem? StartCreate(Point startPoint);
+    IAnnotationItem? StartAnnotation(Point startPoint);
     
     /// <summary>
     /// 更新正在创建的标注
     /// </summary>
     /// <param name="currentPoint">当前点</param>
     /// <param name="item">正在创建的标注项</param>
-    void UpdateCreate(Point currentPoint, IAnnotationItem item);
+    void UpdateAnnotation(Point currentPoint, IAnnotationItem item);
     
     /// <summary>
     /// 完成创建标注
@@ -89,25 +89,6 @@ public interface IAnnotationService
     /// <returns>命中的标注项集合</returns>
     System.Collections.Generic.IEnumerable<IAnnotationItem> HitTest(Rect region);
 
-    /// <summary>
-    /// 设置当前工具（便利方法）
-    /// </summary>
-    /// <param name="tool">工具类型</param>
-    void SetTool(AnnotationToolType tool) => CurrentTool = tool;
-
-    /// <summary>
-    /// 开始创建标注（便利方法）
-    /// </summary>
-    /// <param name="startPoint">起始点</param>
-    /// <returns>正在创建的标注项</returns>
-    IAnnotationItem? StartAnnotation(Point startPoint) => StartCreate(startPoint);
-
-    /// <summary>
-    /// 更新正在创建的标注（便利方法）
-    /// </summary>
-    /// <param name="currentPoint">当前点</param>
-    /// <param name="item">正在创建的标注项</param>
-    void UpdateAnnotation(Point currentPoint, IAnnotationItem item) => UpdateCreate(currentPoint, item);
 }
 
 /// <summary>
