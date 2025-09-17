@@ -211,8 +211,16 @@ run_application() {
         exit 1
     fi
     
-    log_info "Starting $current application: $exe_path"
-    "$exe_path"
+    # Resolve to absolute path and validate
+    local abs_exe_path
+    abs_exe_path=$(realpath "$exe_path")
+    if [[ "$abs_exe_path" != "$(realpath "$PROJECT_DIR")"* ]]; then
+        log_error "Executable path is outside the project directory: $abs_exe_path"
+        exit 1
+    fi
+    
+    log_info "Starting $current application: $abs_exe_path"
+    "$abs_exe_path"
     
     log_success "Application started successfully"
 }
