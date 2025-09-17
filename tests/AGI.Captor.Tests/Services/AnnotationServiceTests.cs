@@ -101,7 +101,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithRectangleTool_ShouldCreateRectangleAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Rectangle);
+        _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var startPoint = new Avalonia.Point(10, 20);
 
         // Act
@@ -117,7 +117,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithEllipseTool_ShouldCreateEllipseAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Ellipse);
+        _annotationService.CurrentTool = AnnotationToolType.Ellipse;
         var startPoint = new Avalonia.Point(15, 25);
 
         // Act
@@ -133,7 +133,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithArrowTool_ShouldCreateArrowAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Arrow);
+        _annotationService.CurrentTool = AnnotationToolType.Arrow;
         var startPoint = new Avalonia.Point(5, 10);
 
         // Act
@@ -149,7 +149,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithTextTool_ShouldCreateTextAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Text);
+        _annotationService.CurrentTool = AnnotationToolType.Text;
         var startPoint = new Avalonia.Point(30, 40);
 
         // Act
@@ -165,7 +165,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithFreehandTool_ShouldCreateFreehandAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Freehand);
+        _annotationService.CurrentTool = AnnotationToolType.Freehand;
         var startPoint = new Avalonia.Point(50, 60);
 
         // Act
@@ -181,7 +181,7 @@ public class AnnotationServiceTests : TestBase
     public void StartAnnotation_WithEmojiTool_ShouldCreateEmojiAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Emoji);
+        _annotationService.CurrentTool = AnnotationToolType.Emoji;
         var startPoint = new Avalonia.Point(70, 80);
 
         // Act
@@ -197,7 +197,7 @@ public class AnnotationServiceTests : TestBase
     public void UpdateAnnotation_WithRectangle_ShouldUpdateRectangleBounds()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Rectangle);
+        _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var startPoint = new Avalonia.Point(10, 20);
         var endPoint = new Avalonia.Point(50, 60);
         
@@ -214,7 +214,7 @@ public class AnnotationServiceTests : TestBase
     public void UpdateAnnotation_WithEllipse_ShouldUpdateEllipseBounds()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Ellipse);
+        _annotationService.CurrentTool = AnnotationToolType.Ellipse;
         var startPoint = new Avalonia.Point(5, 10);
         var endPoint = new Avalonia.Point(25, 35);
         
@@ -231,7 +231,7 @@ public class AnnotationServiceTests : TestBase
     public void UpdateAnnotation_WithArrow_ShouldUpdateArrowEndPoint()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Arrow);
+        _annotationService.CurrentTool = AnnotationToolType.Arrow;
         var startPoint = new Avalonia.Point(0, 0);
         var endPoint = new Avalonia.Point(100, 100);
         
@@ -248,7 +248,7 @@ public class AnnotationServiceTests : TestBase
     public void UpdateAnnotation_WithFreehand_ShouldAddPointToFreehand()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Freehand);
+        _annotationService.CurrentTool = AnnotationToolType.Freehand;
         var startPoint = new Avalonia.Point(10, 20);
         var additionalPoint = new Avalonia.Point(30, 40);
         
@@ -267,7 +267,7 @@ public class AnnotationServiceTests : TestBase
     public void FinishAnnotation_ShouldCompleteCurrentAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Rectangle);
+        _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var startPoint = new Avalonia.Point(10, 20);
         var annotation = _annotationService.StartAnnotation(startPoint);
 
@@ -282,7 +282,7 @@ public class AnnotationServiceTests : TestBase
     public void CancelAnnotation_ShouldRemoveCurrentAnnotation()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Rectangle);
+        _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var startPoint = new Avalonia.Point(10, 20);
         var annotation = _annotationService.StartAnnotation(startPoint);
 
@@ -298,7 +298,7 @@ public class AnnotationServiceTests : TestBase
     public void HitTest_ShouldReturnAnnotationsInRegion()
     {
         // Arrange
-        _annotationService.CurrentTool = AnnotationToolType.Rectangle);
+        _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var annotation = _annotationService.StartAnnotation(new Avalonia.Point(10, 10));
         _annotationService.UpdateAnnotation(new Avalonia.Point(50, 50), annotation!);
         _annotationService.FinishCreate(annotation!);
