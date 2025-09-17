@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using AGI.Captor.Desktop.Services;
 using Serilog;
+using AGI.Captor.Desktop.Services.Overlay;
 
 namespace AGI.Captor.Desktop.Overlays;
 

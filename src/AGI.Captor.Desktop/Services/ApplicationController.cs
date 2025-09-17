@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Win32;
 using Serilog;
+using AGI.Captor.Desktop.Services.Settings;
 
 namespace AGI.Captor.Desktop.Services;
 

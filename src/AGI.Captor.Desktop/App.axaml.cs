@@ -14,6 +14,7 @@ using AGI.Captor.Desktop.Overlays;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Views;
 
 namespace AGI.Captor.Desktop;

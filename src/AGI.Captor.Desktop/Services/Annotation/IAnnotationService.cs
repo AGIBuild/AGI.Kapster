@@ -2,7 +2,7 @@ using AGI.Captor.Desktop.Models;
 using Avalonia;
 using System;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Annotation;
 
 /// <summary>
 /// 标注工具类型

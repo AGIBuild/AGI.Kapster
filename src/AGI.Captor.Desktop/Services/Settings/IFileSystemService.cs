@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Settings;
 
 /// <summary>
 /// File system service interface for dependency injection and testing

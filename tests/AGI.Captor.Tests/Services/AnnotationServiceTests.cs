@@ -5,6 +5,8 @@ using Xunit;
 using Xunit.Abstractions;
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Annotation;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Tests.TestHelpers;
 using Avalonia;
 using Avalonia.Media;

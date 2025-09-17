@@ -50,6 +50,17 @@ detect_platform() {
     esac
 }
 
+# Get runtime identifier
+get_runtime_identifier() {
+    local platform=$(detect_platform)
+    case "$platform" in
+        "Windows")  echo "win-x64" ;;
+        "macOS")    echo "osx-x64" ;;
+        "Linux")    echo "linux-x64" ;;
+        *)          echo "unknown" ;;
+    esac
+}
+
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -179,33 +190,29 @@ run_application() {
     log_info "Running application..."
     
     local current=$(detect_platform)
+    local rid=$(get_runtime_identifier)
     
-    case "$current" in
-        "macOS")
-            local exe_path="$PROJECT_DIR/bin/$CONFIGURATION/net9.0/osx-x64/publish/$PROJECT_NAME"
-            if [ ! -f "$exe_path" ]; then
-                log_error "Application not found at: $exe_path"
-                log_info "Please build the application first using: ./build.sh --build"
-                exit 1
-            fi
-            log_info "Starting macOS application: $exe_path"
-            "$exe_path"
-            ;;
-        "Linux")
-            local exe_path="$PROJECT_DIR/bin/$CONFIGURATION/net9.0/linux-x64/publish/$PROJECT_NAME"
-            if [ ! -f "$exe_path" ]; then
-                log_error "Application not found at: $exe_path"
-                log_info "Please build the application first using: ./build.sh --build"
-                exit 1
-            fi
-            log_info "Starting Linux application: $exe_path"
-            "$exe_path"
-            ;;
-        *)
-            log_error "Unsupported platform for running: $current"
-            exit 1
-            ;;
-    esac
+    if [ "$rid" = "unknown" ]; then
+        log_error "Unsupported platform for running: $current"
+        exit 1
+    fi
+    
+    # Determine executable extension
+    local exe_extension=""
+    if [ "$current" = "Windows" ]; then
+        exe_extension=".exe"
+    fi
+    
+    local exe_path="$PROJECT_DIR/bin/$CONFIGURATION/net9.0/$rid/$PROJECT_NAME$exe_extension"
+    
+    if [ ! -f "$exe_path" ]; then
+        log_error "Application not found at: $exe_path"
+        log_info "Please build the application first using: ./build.sh --build"
+        exit 1
+    fi
+    
+    log_info "Starting $current application: $exe_path"
+    "$exe_path"
     
     log_success "Application started successfully"
 }

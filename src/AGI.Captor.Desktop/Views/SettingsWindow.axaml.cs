@@ -1,6 +1,7 @@
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
@@ -124,6 +125,17 @@ public partial class SettingsWindow : Window
         if (this.FindControl<Button>("OpenLogsDirectoryButton") is { } openLogsButton)
         {
             openLogsButton.Click += OnOpenLogsDirectoryClick;
+        }
+        
+        // Add more advanced buttons if they exist
+        if (this.FindControl<Button>("OpenConfigDirectoryButton") is { } openConfigButton)
+        {
+            openConfigButton.Click += OnOpenConfigDirectoryClick;
+        }
+        
+        if (this.FindControl<Button>("ClearCacheButton") is { } clearCacheButton)
+        {
+            clearCacheButton.Click += OnClearCacheClick;
         }
 
         // Handle window closing
@@ -344,11 +356,151 @@ public partial class SettingsWindow : Window
         }
     }
     
+    private void OnOpenConfigDirectoryClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var configPath = GetConfigDirectory();
+            if (!System.IO.Directory.Exists(configPath))
+            {
+                System.IO.Directory.CreateDirectory(configPath);
+            }
+            
+            // Open config directory in explorer
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(startInfo);
+            
+            Log.Debug("Opened config directory: {ConfigPath}", configPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to open config directory");
+        }
+    }
+    
+    private void OnClearCacheClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var cachePath = GetCacheDirectory();
+            if (System.IO.Directory.Exists(cachePath))
+            {
+                System.IO.Directory.Delete(cachePath, true);
+                System.IO.Directory.CreateDirectory(cachePath);
+                Log.Debug("Cache cleared: {CachePath}", cachePath);
+                
+                // Show success message
+                // Note: In a real implementation, you might want to show a dialog
+            }
+            else
+            {
+                Log.Debug("Cache directory does not exist: {CachePath}", cachePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to clear cache");
+        }
+    }
+    
+    private string GetConfigDirectory()
+    {
+        try
+        {
+            // Use the same base directory as logs for consistency
+            var configPath = System.IO.Path.Combine(AppContext.BaseDirectory, "config");
+            return configPath;
+        }
+        catch
+        {
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "config");
+        }
+    }
+    
+    private string GetCacheDirectory()
+    {
+        try
+        {
+            // Use the same base directory as logs for consistency
+            var cachePath = System.IO.Path.Combine(AppContext.BaseDirectory, "cache");
+            return cachePath;
+        }
+        catch
+        {
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "cache");
+        }
+    }
+    
+    private Task ApplyAdvancedSettings()
+    {
+        try
+        {
+            // Apply debug logging settings
+            if (_currentSettings.DefaultStyles.Advanced.Debug.EnableDebugLogging)
+            {
+                Log.Debug("Debug logging enabled");
+                // Note: Serilog configuration is typically set at application startup
+                // This would require restarting the application to take effect
+            }
+            
+            // Apply telemetry settings
+            if (_currentSettings.DefaultStyles.Advanced.Security.AllowTelemetry)
+            {
+                Log.Debug("Telemetry enabled");
+                // Implement telemetry collection if needed
+            }
+            
+            // Apply performance settings
+            Log.Debug("Performance settings applied: HardwareAcceleration={HardwareAcceleration}, LimitFrameRate={LimitFrameRate}, RenderQuality={RenderQuality}",
+                _currentSettings.DefaultStyles.Advanced.Performance.EnableHardwareAcceleration,
+                _currentSettings.DefaultStyles.Advanced.Performance.LimitFrameRate,
+                _currentSettings.DefaultStyles.Advanced.Performance.RenderQuality);
+            
+            // Note: Most advanced settings would require application restart to take full effect
+            // For now, we just log the changes
+            Log.Debug("Advanced settings applied successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to apply advanced settings");
+        }
+        
+        return Task.CompletedTask;
+    }
+    
+    private string GetLogsDirectory()
+    {
+        try
+        {
+            // Get the actual logs directory that matches Serilog configuration
+            // Serilog uses relative path "logs/app-.log" which resolves to the application's working directory
+            var logsDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            
+            // Ensure the directory exists (same as Program.cs)
+            if (!System.IO.Directory.Exists(logsDir))
+            {
+                System.IO.Directory.CreateDirectory(logsDir);
+            }
+            
+            return logsDir;
+        }
+        catch
+        {
+            // Final fallback
+            return System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+        }
+    }
+    
     private void OnOpenLogsDirectoryClick(object? sender, RoutedEventArgs e)
     {
         try
         {
-            var logsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            // Get the actual log directory from Serilog configuration
+            var logsPath = GetLogsDirectory();
             if (!System.IO.Directory.Exists(logsPath))
             {
                 System.IO.Directory.CreateDirectory(logsPath);
@@ -363,6 +515,20 @@ public partial class SettingsWindow : Window
             System.Diagnostics.Process.Start(startInfo);
             
             Log.Debug("Opened logs directory: {LogsPath}", logsPath);
+            
+            // Verify that this is the same path where logs are actually written
+            var expectedLogPath = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            if (logsPath.Equals(expectedLogPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Debug("Logs directory path matches Serilog configuration: {Path}", logsPath);
+            }
+            else
+            {
+                Log.Warning("Logs directory path mismatch! Expected: {Expected}, Actual: {Actual}", expectedLogPath, logsPath);
+            }
+            
+            // Create a test log entry to verify the path
+            Log.Information("Test log entry created from settings window - this should appear in the logs directory");
         }
         catch (Exception ex)
         {
@@ -428,10 +594,14 @@ public partial class SettingsWindow : Window
             if (_applicationController != null)
             {
                 var startupEnabled = _currentSettings.General.StartWithWindows;
+                Log.Debug("Checking startup setting: Requested={Requested}", startupEnabled);
+                
                 var currentlyEnabled = await _applicationController.IsStartupWithWindowsEnabledAsync();
+                Log.Debug("Current startup setting: {CurrentlyEnabled}", currentlyEnabled);
                 
                 if (startupEnabled != currentlyEnabled)
                 {
+                    Log.Debug("Startup setting changed, applying: {NewSetting}", startupEnabled);
                     var success = await _applicationController.SetStartupWithWindowsAsync(startupEnabled);
                     if (!success)
                     {
@@ -443,8 +613,23 @@ public partial class SettingsWindow : Window
                             startWithSystemCheckBox.IsChecked = currentlyEnabled;
                         }
                     }
+                    else
+                    {
+                        Log.Debug("Startup with Windows setting updated successfully: {Enabled}", startupEnabled);
+                    }
+                }
+                else
+                {
+                    Log.Debug("Startup setting unchanged, no action needed");
                 }
             }
+            else
+            {
+                Log.Warning("ApplicationController is null, cannot apply startup settings");
+            }
+            
+            // Apply advanced settings
+            await ApplyAdvancedSettings();
             
             // Reload hotkeys if settings changed
             try

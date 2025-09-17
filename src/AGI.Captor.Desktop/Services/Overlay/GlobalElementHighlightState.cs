@@ -2,7 +2,7 @@ using System;
 using AGI.Captor.Desktop.Models;
 using Serilog;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Overlay;
 
 /// <summary>
 /// Global singleton to manage element highlighting across multiple overlay windows

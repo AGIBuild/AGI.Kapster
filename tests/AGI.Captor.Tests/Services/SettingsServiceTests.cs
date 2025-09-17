@@ -5,6 +5,7 @@ using Xunit;
 using Xunit.Abstractions;
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Tests.TestHelpers;
 
 namespace AGI.Captor.Tests.Services;

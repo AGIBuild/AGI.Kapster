@@ -6,6 +6,7 @@ using Xunit.Abstractions;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Tests.TestHelpers;
 
 namespace AGI.Captor.Tests.Services;

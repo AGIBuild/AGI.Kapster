@@ -1,25 +1,21 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-
+using AGI.Captor.Desktop.Dialogs;
+using AGI.Captor.Desktop.Models;
+using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Annotation;
+using AGI.Captor.Desktop.Services.Export;
+using AGI.Captor.Desktop.Services.Overlay;
+using AGI.Captor.Desktop.Services.Settings;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
-
 using Serilog;
-using SkiaSharp;
-
-using AGI.Captor.Desktop.Dialogs;
-using AGI.Captor.Desktop.Models;
-using AGI.Captor.Desktop.Services;
-using AGI.Captor.Desktop.Services.Overlay;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace AGI.Captor.Desktop.Overlays;
 
@@ -78,6 +74,9 @@ public partial class OverlayWindow : Window
 					// Update the reference for later setup
 					existingAnnotator = newAnnotator;
 					_annotator = newAnnotator; // Store reference to avoid FindControl issues
+					
+					// Set focus to enable keyboard shortcuts
+					newAnnotator.Focus();
 				}
 			}
 		}
@@ -111,7 +110,30 @@ public partial class OverlayWindow : Window
 		// Set up mouse event handlers for element selection
 		this.PointerPressed += OnOverlayPointerPressed;
 		this.PointerMoved += OnOverlayPointerMoved;
+		
+		// Set focus to annotator when window is loaded
+		this.Loaded += OnOverlayWindowLoaded;
+		
+		// Setup selection overlay
+		SetupSelectionOverlay();
+	}
 
+	private void OnOverlayWindowLoaded(object? sender, EventArgs e)
+	{
+		// Ensure annotator has focus for keyboard shortcuts
+		if (_annotator != null)
+		{
+			_annotator.Focus();
+			Log.Debug("Focus set to annotator after window loaded");
+			
+			// Also set focus to the window itself to ensure keyboard events are captured
+			this.Focus();
+			Log.Debug("Focus also set to overlay window");
+		}
+	}
+
+	private void SetupSelectionOverlay()
+	{
 		if (this.FindControl<SelectionOverlay>("Selector") is { } selector)
 		{
 			// Backdrop removed to avoid blur/ghosting issues
@@ -121,6 +143,13 @@ public partial class OverlayWindow : Window
 				// Keep selection for annotation; don't capture yet
 				_hasEditableSelection = true; // Mark that we have an editable selection
 				Log.Information("Selection finished: {X},{Y} {W}x{H} - editable selection created", r.X, r.Y, r.Width, r.Height);
+				
+				// Ensure focus is on annotator for keyboard shortcuts
+				if (_annotator != null)
+				{
+					_annotator.Focus();
+					Log.Debug("Focus set to annotator after selection finished");
+				}
 				
 				// Raise public event with isEditableSelection = true
 				RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
@@ -160,7 +189,7 @@ public partial class OverlayWindow : Window
 						if (screenshot != null)
 						{
 							// Create composite image with annotations
-							var exportService = new Services.ExportService();
+							var exportService = new ExportService();
 							compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
 							Log.Debug("Composite image created successfully from selector (unified)");
 						}
@@ -176,24 +205,24 @@ public partial class OverlayWindow : Window
 			};
 		}
 
-		if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } toolbar && existingAnnotator != null)
+		if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } toolbar && _annotator != null)
 		{
 			// Set default tool to Arrow first
 			Log.Information("Setting default tool to Arrow");
-			existingAnnotator.CurrentTool = Services.AnnotationToolType.Arrow;
-			Log.Information("Default tool set to: {CurrentTool}", existingAnnotator.CurrentTool);
+			_annotator.CurrentTool = AnnotationToolType.Arrow;
+			Log.Information("Default tool set to: {CurrentTool}", _annotator.CurrentTool);
 			
 			// Then set up toolbar (this will call UpdateUIFromTarget and sync the UI)
-			toolbar.SetTarget(existingAnnotator);
+			toolbar.SetTarget(_annotator);
 			
 			// Subscribe to export events
-			existingAnnotator.ExportRequested += HandleExportRequest;
+			_annotator.ExportRequested += HandleExportRequest;
 			
 			// Handle double-click confirm (unified cross-platform logic)
-			existingAnnotator.ConfirmRequested += async r =>
+			_annotator.ConfirmRequested += async r =>
 			{
 				Bitmap? compositeImage = null;
-				var annotations = existingAnnotator.GetAnnotationService()?.Manager?.Items;
+				var annotations = _annotator.GetAnnotationService()?.Manager?.Items;
 				if (annotations != null && annotations.Any())
 				{
 					try
@@ -204,7 +233,7 @@ public partial class OverlayWindow : Window
 						if (screenshot != null)
 						{
 							// Create composite image with annotations
-							var exportService = new Services.ExportService();
+							var exportService = new ExportService();
 							compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
 							Log.Debug("Composite image created successfully (unified)");
 						}
@@ -694,6 +723,31 @@ public partial class OverlayWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to capture region");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get full screen screenshot for color sampling
+    /// </summary>
+    public async Task<Bitmap?> GetFullScreenScreenshotAsync()
+    {
+        if (_screenCaptureStrategy == null)
+        {
+            Log.Debug("No screen capture strategy available for full screen screenshot");
+            return null;
+        }
+        
+        try
+        {
+            // Get the full screen bounds
+            var screenBounds = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
+            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(screenBounds, this);
+            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Failed to capture full screen screenshot for color sampling");
             return null;
         }
     }

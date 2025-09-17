@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Hotkeys;
 
 /// <summary>
 /// 热键管理器接口

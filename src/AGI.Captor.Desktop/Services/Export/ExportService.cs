@@ -12,10 +12,11 @@ using Avalonia.Threading;
 using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Rendering;
 using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Settings;
 using Serilog;
 using SkiaSharp;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Export;
 
 /// <summary>
 /// Export service implementation for saving annotated screenshots with multiple format support

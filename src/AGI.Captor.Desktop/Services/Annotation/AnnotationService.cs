@@ -2,12 +2,13 @@ using AGI.Captor.Desktop.Models;
 using Serilog;
 using AGI.Captor.Desktop.Commands;
 using AGI.Captor.Desktop.Rendering;
+using AGI.Captor.Desktop.Services.Settings;
 using Avalonia;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Annotation;
 
 /// <summary>
 /// Annotation service implementation

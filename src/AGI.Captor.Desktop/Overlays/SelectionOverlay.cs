@@ -4,9 +4,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using Serilog;
-using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Overlay;
 
 namespace AGI.Captor.Desktop.Overlays;
 
@@ -19,6 +20,7 @@ public sealed class SelectionOverlay : Canvas
     private bool _isDraggingMove;
     private HandleKind _activeHandle = HandleKind.None;
     private readonly Border _rectBorder;
+    private readonly SelectionInfoOverlay _infoOverlay;
     private bool _pendingCreate;
     private const double DragThreshold = 0.5; // Reduced from 2.0 to 0.5 pixels for better responsiveness
     
@@ -49,6 +51,10 @@ public sealed class SelectionOverlay : Canvas
             IsHitTestVisible = false
         };
         Children.Add(_rectBorder);
+
+        // Create info overlay
+        _infoOverlay = new SelectionInfoOverlay();
+        Children.Add(_infoOverlay);
 
         // Subscribe to global selection state changes
         GlobalSelectionState.SelectionStateChanged += OnGlobalSelectionStateChanged;
@@ -128,83 +134,26 @@ public sealed class SelectionOverlay : Canvas
     {
         base.OnPointerMoved(e);
         var p = e.GetPosition(this);
-        if (_pendingCreate && !_isDraggingCreate)
+        
+        // Handle different interaction modes
+        if (HandleDragCreation(p))
         {
-            var delta = p - _dragStart;
-            if (Math.Abs(delta.X) >= DragThreshold || Math.Abs(delta.Y) >= DragThreshold)
-            {
-                _isDraggingCreate = true;
-                SelectionRect = new Rect(_dragStart, _dragStart);
-                
-                // Set global selection state when drag starts
-                var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-                if (parentWindow != null)
-                {
-                    GlobalSelectionState.SetSelection(parentWindow);
-                    Log.Information("SelectionOverlay: Started selection on window");
-                }
-            }
+            // Drag creation handled
         }
-
-        if (_isDraggingCreate)
+        else if (HandleDragMove(p))
         {
-            // Free draw from press point to current pointer
-            SelectionRect = Normalize(new Rect(_dragStart, p));
-            UpdateVisuals();
+            // Drag move handled
         }
-        else if (_isDraggingMove)
+        else if (HandleResize(p))
         {
-            var delta = p - _moveStart;
-            _moveStart = p;
-            SelectionRect = new Rect(SelectionRect.Position + delta, SelectionRect.Size);
-            UpdateVisuals();
-        }
-        else if (_activeHandle != HandleKind.None)
-        {
-            var r = SelectionRect;
-            switch (_activeHandle)
-            {
-                case HandleKind.N: r = new Rect(r.X, Math.Min(p.Y, r.Bottom - 1), r.Width, Math.Max(1, r.Bottom - Math.Min(p.Y, r.Bottom - 1))); break;
-                case HandleKind.S: r = new Rect(r.X, r.Y, r.Width, Math.Max(1, p.Y - r.Y)); break;
-                case HandleKind.W: r = new Rect(Math.Min(p.X, r.Right - 1), r.Y, Math.Max(1, r.Right - Math.Min(p.X, r.Right - 1)), r.Height); break;
-                case HandleKind.E: r = new Rect(r.X, r.Y, Math.Max(1, p.X - r.X), r.Height); break;
-                case HandleKind.NW: r = Normalize(new Rect(p, r.BottomRight)); break;
-                case HandleKind.NE: r = Normalize(new Rect(new Point(r.X, p.Y), new Point(p.X, r.Bottom))); break;
-                case HandleKind.SW: r = Normalize(new Rect(new Point(p.X, r.Y), new Point(r.Right, p.Y))); break;
-                case HandleKind.SE: r = Normalize(new Rect(r.Position, p)); break;
-            }
-            SelectionRect = r;
-            UpdateVisuals();
+            // Resize handled
         }
         else
         {
-            // update cursor on hover
-            var handle = HitTestHandle(p);
-            var hasSel = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
-            if (handle != HandleKind.None)
-            {
-                Cursor = handle switch
-                {
-                    HandleKind.N or HandleKind.S => new Cursor(StandardCursorType.SizeNorthSouth),
-                    HandleKind.E or HandleKind.W => new Cursor(StandardCursorType.SizeWestEast),
-                    _ => new Cursor(StandardCursorType.SizeAll)
-                };
-            }
-            else if (hasSel && !SelectionRect.Contains(p))
-            {
-                // selection exists and pointer is outside -> selection mode
-                Cursor = new Cursor(StandardCursorType.Arrow);
-            }
-            else if (hasSel && SelectionRect.Contains(p))
-            {
-                Cursor = new Cursor(StandardCursorType.SizeAll);
-            }
-            else
-            {
-                // no selection -> draw mode
-                Cursor = new Cursor(StandardCursorType.Cross);
-            }
+            // Handle cursor updates and info overlay for hover state
+            HandleHoverState(p);
         }
+        
         e.Handled = true;
     }
 
@@ -220,7 +169,17 @@ public sealed class SelectionOverlay : Canvas
 
         if (SelectionRect.Width >= 2 && SelectionRect.Height >= 2)
         {
+            // Keep showing both size and color info after selection is finished
+            // Ensure info overlay is visible and update with current mouse position
+            _infoOverlay.Show();
+            UpdateInfoOverlay(e.GetPosition(this));
+            
             SelectionFinished?.Invoke(SelectionRect);
+        }
+        else
+        {
+            // Hide info overlay if selection is too small
+            _infoOverlay.Hide();
         }
     }
 
@@ -306,6 +265,202 @@ public sealed class SelectionOverlay : Canvas
             new Point(r.Center.X, r.Bottom) // S
         };
     }
+
+    /// <summary>
+    /// Update the info overlay with current selection and mouse position
+    /// </summary>
+    private void UpdateInfoOverlay(Point mousePosition)
+    {
+        // Always update info overlay when there's a selection
+        if (SelectionRect.Width > 0 && SelectionRect.Height > 0)
+        {
+            _infoOverlay.UpdateInfo(SelectionRect, mousePosition);
+        }
+    }
+
+    #region Pointer Movement Handlers
+
+    /// <summary>
+    /// Handle drag creation logic
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    /// <returns>True if drag creation was handled</returns>
+    private bool HandleDragCreation(Point p)
+    {
+        // Check if we should start drag creation
+        if (_pendingCreate && !_isDraggingCreate)
+        {
+            var delta = p - _dragStart;
+            if (Math.Abs(delta.X) >= DragThreshold || Math.Abs(delta.Y) >= DragThreshold)
+            {
+                StartDragCreation();
+                return true;
+            }
+            return false;
+        }
+
+        // Handle ongoing drag creation
+        if (_isDraggingCreate)
+        {
+            SelectionRect = Normalize(new Rect(_dragStart, p));
+            UpdateVisualsAndInfo(p, showInfo: true);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Handle drag move logic
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    /// <returns>True if drag move was handled</returns>
+    private bool HandleDragMove(Point p)
+    {
+        if (_isDraggingMove)
+        {
+            var delta = p - _moveStart;
+            _moveStart = p;
+            SelectionRect = new Rect(SelectionRect.Position + delta, SelectionRect.Size);
+            UpdateVisualsAndInfo(p);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Handle resize logic
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    /// <returns>True if resize was handled</returns>
+    private bool HandleResize(Point p)
+    {
+        if (_activeHandle != HandleKind.None)
+        {
+            var newRect = CalculateResizedRect(p);
+            SelectionRect = newRect;
+            UpdateVisualsAndInfo(p);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Handle hover state (cursor updates and info overlay)
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    private void HandleHoverState(Point p)
+    {
+        UpdateCursor(p);
+        UpdateInfoOverlayIfNeeded(p);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    /// <summary>
+    /// Start drag creation and set global selection state
+    /// </summary>
+    private void StartDragCreation()
+    {
+        _isDraggingCreate = true;
+        SelectionRect = new Rect(_dragStart, _dragStart);
+        
+        // Set global selection state when drag starts
+        var parentWindow = this.FindAncestorOfType<OverlayWindow>();
+        if (parentWindow != null)
+        {
+            GlobalSelectionState.SetSelection(parentWindow);
+            Log.Information("SelectionOverlay: Started selection on window");
+        }
+    }
+
+    /// <summary>
+    /// Update visuals and info overlay
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    /// <param name="showInfo">Whether to show info overlay</param>
+    private void UpdateVisualsAndInfo(Point p, bool showInfo = false)
+    {
+        UpdateVisuals();
+        if (showInfo)
+        {
+            _infoOverlay.Show();
+        }
+        UpdateInfoOverlay(p);
+    }
+
+    /// <summary>
+    /// Calculate resized rectangle based on active handle and pointer position
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    /// <returns>New rectangle after resize</returns>
+    private Rect CalculateResizedRect(Point p)
+    {
+        var r = SelectionRect;
+        return _activeHandle switch
+        {
+            HandleKind.N => new Rect(r.X, Math.Min(p.Y, r.Bottom - 1), r.Width, Math.Max(1, r.Bottom - Math.Min(p.Y, r.Bottom - 1))),
+            HandleKind.S => new Rect(r.X, r.Y, r.Width, Math.Max(1, p.Y - r.Y)),
+            HandleKind.W => new Rect(Math.Min(p.X, r.Right - 1), r.Y, Math.Max(1, r.Right - Math.Min(p.X, r.Right - 1)), r.Height),
+            HandleKind.E => new Rect(r.X, r.Y, Math.Max(1, p.X - r.X), r.Height),
+            HandleKind.NW => Normalize(new Rect(p, r.BottomRight)),
+            HandleKind.NE => Normalize(new Rect(new Point(r.X, p.Y), new Point(p.X, r.Bottom))),
+            HandleKind.SW => Normalize(new Rect(new Point(p.X, r.Y), new Point(r.Right, p.Y))),
+            HandleKind.SE => Normalize(new Rect(r.Position, p)),
+            _ => r
+        };
+    }
+
+    /// <summary>
+    /// Update cursor based on pointer position and selection state
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    private void UpdateCursor(Point p)
+    {
+        var handle = HitTestHandle(p);
+        var hasSel = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
+        
+        if (handle != HandleKind.None)
+        {
+            Cursor = handle switch
+            {
+                HandleKind.N or HandleKind.S => new Cursor(StandardCursorType.SizeNorthSouth),
+                HandleKind.E or HandleKind.W => new Cursor(StandardCursorType.SizeWestEast),
+                _ => new Cursor(StandardCursorType.SizeAll)
+            };
+        }
+        else if (hasSel && !SelectionRect.Contains(p))
+        {
+            // Selection exists and pointer is outside -> selection mode
+            Cursor = new Cursor(StandardCursorType.Arrow);
+        }
+        else if (hasSel && SelectionRect.Contains(p))
+        {
+            Cursor = new Cursor(StandardCursorType.SizeAll);
+        }
+        else
+        {
+            // No selection -> draw mode
+            Cursor = new Cursor(StandardCursorType.Cross);
+        }
+    }
+
+    /// <summary>
+    /// Update info overlay if selection exists
+    /// </summary>
+    /// <param name="p">Current pointer position</param>
+    private void UpdateInfoOverlayIfNeeded(Point p)
+    {
+        var hasSel = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
+        if (hasSel)
+        {
+            UpdateInfoOverlay(p);
+        }
+    }
+
+    #endregion
 }
 
 

@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 using AGI.Captor.Desktop.Services.Serialization;
 using System.Threading.Tasks;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Settings;
 
 /// <summary>
 /// Settings service implementation with JSON file persistence

@@ -1,6 +1,6 @@
 using System;
 
-namespace AGI.Captor.Desktop.Services;
+namespace AGI.Captor.Desktop.Services.Overlay;
 
 /// <summary>
 /// Global state manager for selection across multiple overlay windows

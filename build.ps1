@@ -85,6 +85,16 @@ function Detect-Platform {
   return 'Unknown'
 }
 
+function Get-RuntimeIdentifier {
+  $platform = Detect-Platform
+  switch ($platform) {
+    'Windows' { return 'win-x64' }
+    'macOS' { return 'osx-x64' }
+    'Linux' { return 'linux-x64' }
+    default { return 'unknown' }
+  }
+}
+
 function Check-Prereqs {
   Log-Info 'Checking prerequisites...'
   $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -187,32 +197,30 @@ function Run-Application {
   Log-Info 'Running application...'
   
   $current = Detect-Platform
+  $rid = Get-RuntimeIdentifier
   
-  switch ($current) {
-    'Windows' { 
-      $exePath = Join-Path $PROJECT_DIR "bin/$Configuration/net9.0/win-x64/publish/$PROJECT_NAME.exe"
-      if (-not (Test-Path $exePath)) {
-        Log-Error "Application not found at: $exePath"
-        Log-Info "Please build the application first using: .\build.ps1 -Build"
-        exit 1
-      }
-      Log-Info "Starting Windows application: $exePath"
-      Start-Process -FilePath $exePath -NoNewWindow
-    }
-    'macOS' { 
-      $exePath = Join-Path $PROJECT_DIR "bin/$Configuration/net9.0/osx-x64/publish/$PROJECT_NAME"
-      if (-not (Test-Path $exePath)) {
-        Log-Error "Application not found at: $exePath"
-        Log-Info "Please build the application first using: .\build.ps1 -Build"
-        exit 1
-      }
-      Log-Info "Starting macOS application: $exePath"
-      & $exePath
-    }
-    Default { 
-      Log-Error "Unsupported platform for running: $current"
-      exit 1
-    }
+  if ($rid -eq 'unknown') {
+    Log-Error "Unsupported platform for running: $current"
+    exit 1
+  }
+  
+  # Determine executable extension
+  $exeExtension = if ($current -eq 'Windows') { '.exe' } else { '' }
+  
+  $exePath = Join-Path $PROJECT_DIR "bin/$Configuration/net9.0/$rid/$PROJECT_NAME$exeExtension"
+  
+  if (-not (Test-Path $exePath)) {
+    Log-Error "Application not found at: $exePath"
+    Log-Info "Please build the application first using: .\build.ps1 -Build"
+    exit 1
+  }
+  
+  Log-Info "Starting $current application: $exePath"
+  
+  if ($current -eq 'Windows') {
+    Start-Process -FilePath $exePath -NoNewWindow
+  } else {
+    & $exePath
   }
   
   Log-Success 'Application started successfully'

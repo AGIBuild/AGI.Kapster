@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Settings;
 
 namespace AGI.Captor.Tests.TestHelpers;
 

@@ -1,10 +1,9 @@
 using AGI.Captor.Desktop.Models;
-using AGI.Captor.Desktop.Services;
+using AGI.Captor.Desktop.Services.Annotation;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.VisualTree;
@@ -45,13 +44,28 @@ public partial class NewAnnotationToolbar : UserControl
 
     private void SetupToolButtons()
     {
-        // Collect all tool buttons
-        _toolButtons.Add(this.FindControl<ToggleButton>("SelectToolButton")!);
-        _toolButtons.Add(this.FindControl<ToggleButton>("ArrowToolButton")!);
-        _toolButtons.Add(this.FindControl<ToggleButton>("RectangleToolButton")!);
-        _toolButtons.Add(this.FindControl<ToggleButton>("EllipseToolButton")!);
-        _toolButtons.Add(this.FindControl<ToggleButton>("TextToolButton")!);
-        _toolButtons.Add(this.FindControl<ToggleButton>("FreehandToolButton")!);
+        // Collect all tool buttons and set up tooltips with hotkeys
+        var selectButton = this.FindControl<ToggleButton>("SelectToolButton")!;
+        var arrowButton = this.FindControl<ToggleButton>("ArrowToolButton")!;
+        var rectangleButton = this.FindControl<ToggleButton>("RectangleToolButton")!;
+        var ellipseButton = this.FindControl<ToggleButton>("EllipseToolButton")!;
+        var textButton = this.FindControl<ToggleButton>("TextToolButton")!;
+        var freehandButton = this.FindControl<ToggleButton>("FreehandToolButton")!;
+
+        // Set tooltips with hotkeys
+        ToolTip.SetTip(selectButton, $"Select Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.None)})");
+        ToolTip.SetTip(arrowButton, $"Arrow Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Arrow)})");
+        ToolTip.SetTip(rectangleButton, $"Rectangle Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Rectangle)})");
+        ToolTip.SetTip(ellipseButton, $"Ellipse Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Ellipse)})");
+        ToolTip.SetTip(textButton, $"Text Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Text)})");
+        ToolTip.SetTip(freehandButton, $"Freehand Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Freehand)})");
+
+        _toolButtons.Add(selectButton);
+        _toolButtons.Add(arrowButton);
+        _toolButtons.Add(rectangleButton);
+        _toolButtons.Add(ellipseButton);
+        _toolButtons.Add(textButton);
+        _toolButtons.Add(freehandButton);
 
         // Setup event handlers for tool buttons
         foreach (var button in _toolButtons)
@@ -280,6 +294,8 @@ public partial class NewAnnotationToolbar : UserControl
         if (currentEmojiDisplay != null)
         {
             currentEmojiDisplay.Click += OnCurrentEmojiDisplayClick;
+            // Set tooltip with hotkey for emoji tool
+            ToolTip.SetTip(currentEmojiDisplay, $"Emoji Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Emoji)})");
         }
     }
 
@@ -527,15 +543,43 @@ public partial class NewAnnotationToolbar : UserControl
         if (Target != null)
         {
             Target.StyleChanged -= OnTargetStyleChanged;
+            // Unsubscribe from annotation service events
+            if (Target.GetAnnotationService() is { } annotationService)
+            {
+                annotationService.ToolChanged -= OnToolChanged;
+            }
         }
         
         Target = target;
         
-        // Subscribe to new target's style changes
+        // Subscribe to new target's events
         if (target != null)
         {
             target.StyleChanged += OnTargetStyleChanged;
+            
+            // Subscribe to annotation service tool changes
+            if (target.GetAnnotationService() is { } annotationService)
+            {
+                annotationService.ToolChanged += OnToolChanged;
+            }
+            
             UpdateUIFromTarget();
+        }
+    }
+
+    /// <summary>
+    /// Handle tool changes from annotation service
+    /// </summary>
+    private void OnToolChanged(object? sender, ToolChangedEventArgs e)
+    {
+        try
+        {
+            Log.Debug("Tool changed from {OldTool} to {NewTool}, updating toolbar UI", e.OldTool, e.NewTool);
+            UpdateUIFromTarget();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to update toolbar UI after tool change");
         }
     }
 
