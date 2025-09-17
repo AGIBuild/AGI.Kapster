@@ -224,7 +224,38 @@ AGI.Captor/
 
 ## 🆕 Changelog
 
-### v1.0.0 (Current Development Version)
+### v1.2.0 (Current Release)
+- ✅ **Enhanced Annotation Toolbar** (December 2024)
+  - Added tooltips with hotkey shortcuts for all annotation tools
+  - Improved toolbar responsiveness with real-time tool change updates
+  - Better integration with annotation service events
+  - Enhanced user experience with visual feedback
+- ✅ **AOT Compatibility Improvements**
+  - Fixed .NET 9 AOT compilation warnings
+  - Replaced reflection-based method calls with dynamic invocation
+  - Improved build stability across all platforms
+- ✅ **Code Quality Enhancements**
+  - Better error handling and logging
+  - Improved event subscription management
+  - Enhanced code maintainability
+
+### v1.1.0 (Previous Release)
+- ✅ **Code organization refactoring** (December 2024)
+  - Reorganized Services directory by topic (Clipboard, Capture, ElementDetection, Export, Settings, Adapters)
+  - Moved platform-specific implementations to Platforms subdirectories
+  - Separated rendering components to Rendering/Overlays directory
+  - Aligned all namespaces with physical file locations
+  - Standardized using statements across all files
+- ✅ **UI/UX improvements**
+  - Fixed dark theme consistency across settings panels
+  - Improved accessibility permission dialog (modal behavior, dynamic app path)
+  - Enhanced permission guide panel styling
+- ✅ **Platform-specific fixes**
+  - Fixed macOS multi-screen overlay display issues
+  - Improved macOS clipboard access with multiple fallback strategies
+  - Maintained Windows element detection functionality
+
+### v1.0.0 (Previous Version)
 - ✅ Basic screenshot functionality
 - ✅ Multiple annotation tools (Arrow, Rectangle, Ellipse, Text, Freehand, Emoji)
 - ✅ Global hotkey support (Windows & macOS)
