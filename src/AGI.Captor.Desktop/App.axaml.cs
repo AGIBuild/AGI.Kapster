@@ -108,10 +108,7 @@ public partial class App : Application
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to initialize system tray");
-                // Fallback: create a main window if tray fails
-                var window = Services!.GetRequiredService<MainWindow>();
-                window.DataContext = Services!.GetRequiredService<AGI.Captor.Desktop.ViewModels.MainWindowViewModel>();
-                desktop.MainWindow = window;
+                // No fallback window needed - application runs in background
             }
 
             // Hotkeys are now managed by HotkeyManager service (initialized above)

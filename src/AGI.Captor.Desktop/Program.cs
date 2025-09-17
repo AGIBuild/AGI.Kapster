@@ -73,8 +73,6 @@ class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
-        builder.Services.AddSingleton<MainWindow>();
-        builder.Services.AddSingleton<AGI.Captor.Desktop.ViewModels.MainWindowViewModel>();
         builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
         builder.Services.AddTransient<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IApplicationController, ApplicationController>();

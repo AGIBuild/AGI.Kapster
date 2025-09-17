@@ -19,7 +19,6 @@ public class ApplicationController : IApplicationController
     private const string AppName = "AGI.Captor";
     
     private readonly ISettingsService _settingsService;
-    private Window? _mainWindow;
 
     public ApplicationController(ISettingsService settingsService)
     {
@@ -32,11 +31,7 @@ public class ApplicationController : IApplicationController
         {
             // Settings are loaded in constructor now
             
-            // Get main window reference
-            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                _mainWindow = desktop.MainWindow;
-            }
+            // No main window needed - application runs in background
             
             // Apply startup settings
             var shouldStartWithWindows = _settingsService.Settings.General.StartWithWindows;
@@ -130,49 +125,6 @@ public class ApplicationController : IApplicationController
         }
     }
 
-    public void ShowMainWindow()
-    {
-        try
-        {
-            if (_mainWindow != null)
-            {
-                _mainWindow.Show();
-                _mainWindow.WindowState = WindowState.Normal;
-                _mainWindow.Activate();
-                _mainWindow.Topmost = true;
-                _mainWindow.Topmost = false; // Flash to bring to front
-                _mainWindow.ShowInTaskbar = true;
-                
-                Log.Debug("Main window shown");
-            }
-            else
-            {
-                Log.Warning("Main window reference is null, cannot show");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to show main window");
-        }
-    }
-
-    public void HideMainWindow()
-    {
-        try
-        {
-            if (_mainWindow != null)
-            {
-                _mainWindow.Hide();
-                _mainWindow.ShowInTaskbar = false;
-                
-                Log.Debug("Main window hidden to system tray");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to hide main window");
-        }
-    }
 
     public void RestartApplication()
     {
