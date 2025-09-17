@@ -471,17 +471,33 @@ expand_config() {
 get_project_version() {
     local csproj_path="$PROJECT_DIR/$PROJECT_NAME.csproj"
     if [ -f "$csproj_path" ]; then
-        # Try to find Version tag first
-        local version=$(grep -o '<Version>.*</Version>' "$csproj_path" | sed 's/<Version>\(.*\)<\/Version>/\1/')
-        if [ -n "$version" ]; then
-            echo "$version"
-        else
-            # Fallback to CFBundleVersion for macOS projects
-            version=$(grep -o '<CFBundleVersion>.*</CFBundleVersion>' "$csproj_path" | sed 's/<CFBundleVersion>\(.*\)<\/CFBundleVersion>/\1/')
+        if command -v xmllint >/dev/null 2>&1; then
+            # Try to find Version tag first using xmllint
+            local version=$(xmllint --xpath "string(//Version)" "$csproj_path" 2>/dev/null)
             if [ -n "$version" ]; then
                 echo "$version"
             else
-                echo "1.0.0"
+                # Fallback to CFBundleVersion for macOS projects
+                version=$(xmllint --xpath "string(//CFBundleVersion)" "$csproj_path" 2>/dev/null)
+                if [ -n "$version" ]; then
+                    echo "$version"
+                else
+                    echo "1.0.0"
+                fi
+            fi
+        else
+            # Fallback to grep/sed if xmllint is not available, with warning
+            echo -e "${YELLOW}Warning: xmllint not found, falling back to grep/sed for XML parsing.${NC}" >&2
+            local version=$(grep -o '<Version>.*</Version>' "$csproj_path" | sed 's/<Version>\(.*\)<\/Version>/\1/')
+            if [ -n "$version" ]; then
+                echo "$version"
+            else
+                version=$(grep -o '<CFBundleVersion>.*</CFBundleVersion>' "$csproj_path" | sed 's/<CFBundleVersion>\(.*\)<\/CFBundleVersion>/\1/')
+                if [ -n "$version" ]; then
+                    echo "$version"
+                else
+                    echo "1.0.0"
+                fi
             fi
         fi
     else
