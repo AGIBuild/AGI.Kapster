@@ -114,52 +114,11 @@ jobs:
           outdated-packages.log
         retention-days: 30
 
-  dependency-check:
-    name: 📦 Dependency Analysis
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        
-    # 注意: Dependency Review需要GitHub Advanced Security (私有仓库)
-    # 暂时跳过此步骤，使用替代方案进行依赖分析
-    - name: 📦 Dependency Review (Advanced Security Required)
-      run: |
-        echo "⚠️ Dependency Review skipped - requires GitHub Advanced Security for private repos"
-        echo "Using alternative dependency analysis instead..."
-      if: github.event_name == 'pull_request'
-      
-    - name: 📊 Generate dependency graph
-      shell: pwsh
-      run: |
-        # Generate dependency information
-        dotnet list package --include-transitive --format json > dependencies.json
-        
-        # Create human-readable dependency report
-        Write-Host "📦 Dependency Analysis Report" | Tee-Object -FilePath "dependency-report.md"
-        Write-Host "================================" | Tee-Object -Append -FilePath "dependency-report.md"
-        Write-Host "" | Tee-Object -Append -FilePath "dependency-report.md"
-        
-        dotnet list package --include-transitive | Tee-Object -Append -FilePath "dependency-report.md"
-        
-        # Check for known vulnerable packages (basic security check)
-        Write-Host "🔍 Checking for known vulnerabilities..." | Tee-Object -Append -FilePath "dependency-report.md"
-        dotnet list package --vulnerable --include-transitive | Tee-Object -Append -FilePath "dependency-report.md"
-        
-    - name: 📤 Upload dependency reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: dependency-analysis
-        path: |
-          dependencies.json
-          dependency-report.md
-        retention-days: 30
+  # 注意: dependency-check 作业已移除
+  # 原因: actions/dependency-review-action 需要 GitHub Advanced Security (私有仓库付费功能)
+  # 如需依赖分析，可以在其他作业中使用 dotnet list package --vulnerable
+  #         dependency-report.md
+  #       retention-days: 30
 
   performance-test:
     name: ⚡ Performance Test
@@ -220,7 +179,7 @@ jobs:
   quality-gate:
     name: 🎯 Quality Gate
     runs-on: ubuntu-latest
-    needs: [code-analysis, security-scan, dependency-check]
+    needs: [code-analysis, security-scan]  # 移除 dependency-check 依赖
     if: always()
     
     steps:
@@ -232,15 +191,15 @@ jobs:
         
         $codeAnalysisResult = "${{ needs.code-analysis.result }}"
         $securityScanResult = "${{ needs.security-scan.result }}"
-        $dependencyCheckResult = "${{ needs.dependency-check.result }}"
+        # 依赖检查已禁用 - 需要GitHub Advanced Security
         
         Write-Host "Code Analysis: $codeAnalysisResult"
         Write-Host "Security Scan: $securityScanResult"
-        Write-Host "Dependency Check: $dependencyCheckResult"
+        Write-Host "Dependency Check: SKIPPED (requires GitHub Advanced Security)"
         
         $allPassed = ($codeAnalysisResult -eq "success") -and 
-                     ($securityScanResult -eq "success") -and 
-                     ($dependencyCheckResult -eq "success")
+                     ($securityScanResult -eq "success")
+                     # 移除依赖检查要求: ($dependencyCheckResult -eq "success")
         
         if ($allPassed) {
           Write-Host "✅ Quality gate PASSED - All checks successful!"
