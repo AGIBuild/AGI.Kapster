@@ -2,6 +2,7 @@ using AGI.Captor.Desktop.Models;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Settings;
+using AGI.Captor.Desktop.Services.Update;
 using AGI.Captor.Desktop.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
@@ -23,6 +24,7 @@ public partial class SettingsWindow : Window
 {
     private readonly ISettingsService _settingsService;
     private readonly IApplicationController? _applicationController;
+    private readonly IUpdateService? _updateService;
     private AppSettings _originalSettings;
     private AppSettings _currentSettings;
     public bool DialogResult { get; private set; }
@@ -36,10 +38,11 @@ public partial class SettingsWindow : Window
         }
     }
 
-    public SettingsWindow(ISettingsService settingsService, IApplicationController? applicationController = null)
+    public SettingsWindow(ISettingsService settingsService, IApplicationController? applicationController = null, IUpdateService? updateService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _applicationController = applicationController;
+        _updateService = updateService;
         
         InitializeComponent();
         
@@ -121,6 +124,26 @@ public partial class SettingsWindow : Window
         }
         
         
+        // Updates tab events
+        if (this.FindControl<CheckBox>("EnableAutoUpdateCheckBox") is { } enableAutoUpdate)
+        {
+            enableAutoUpdate.IsCheckedChanged += OnEnableAutoUpdateChanged;
+        }
+        
+        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
+        {
+            updateFrequency.SelectionChanged += OnUpdateFrequencyChanged;
+        }
+        
+        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
+        {
+            notifyOnUpdates.IsCheckedChanged += OnNotifyOnUpdatesChanged;
+        }
+        
+        if (this.FindControl<Button>("CheckForUpdatesButton") is { } checkForUpdatesButton)
+        {
+            checkForUpdatesButton.Click += OnCheckForUpdatesClick;
+        }
 
         // Handle window closing
         Closing += (s, e) =>
@@ -212,6 +235,9 @@ public partial class SettingsWindow : Window
             
             // Advanced settings
             LoadAdvancedSettings();
+            
+            // Updates settings
+            LoadUpdateSettings();
             
             UpdateColorPreviews();
             
@@ -315,6 +341,54 @@ public partial class SettingsWindow : Window
         }
         
         
+    }
+
+    private void LoadUpdateSettings()
+    {
+        if (_currentSettings.AutoUpdate == null) return;
+        
+        // Auto-update enabled
+        if (this.FindControl<CheckBox>("EnableAutoUpdateCheckBox") is { } enableAutoUpdate)
+        {
+            enableAutoUpdate.IsChecked = _currentSettings.AutoUpdate.Enabled;
+        }
+        
+        // Update frequency
+        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
+        {
+            var hours = _currentSettings.AutoUpdate.CheckFrequencyHours;
+            foreach (ComboBoxItem item in updateFrequency.Items.OfType<ComboBoxItem>())
+            {
+                if (item.Tag is string tagValue && 
+                    int.TryParse(tagValue, out int itemHours) && 
+                    itemHours == hours)
+                {
+                    updateFrequency.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+        
+        // Notify on updates
+        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
+        {
+            notifyOnUpdates.IsChecked = _currentSettings.AutoUpdate.NotifyBeforeInstall;
+        }
+        
+        // Current version info
+        if (this.FindControl<TextBlock>("CurrentVersionText") is { } currentVersionText)
+        {
+            // Get version from assembly
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            currentVersionText.Text = version?.ToString(3) ?? "1.0.0";
+        }
+        
+        if (this.FindControl<TextBlock>("ReleaseDateText") is { } releaseDateText)
+        {
+            // Get build date approximation
+            var buildDate = System.IO.File.GetCreationTime(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            releaseDateText.Text = buildDate.ToString("yyyy-MM-dd");
+        }
     }
     
     
@@ -428,6 +502,32 @@ public partial class SettingsWindow : Window
         }
         
         
+    }
+
+    private void SaveUpdateSettings()
+    {
+        if (_currentSettings.AutoUpdate == null) return;
+        
+        // Auto-update enabled
+        if (this.FindControl<CheckBox>("EnableAutoUpdateCheckBox") is { } enableAutoUpdate)
+        {
+            _currentSettings.AutoUpdate.Enabled = enableAutoUpdate.IsChecked ?? true;
+        }
+        
+        // Update frequency
+        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency &&
+            updateFrequency.SelectedItem is ComboBoxItem selectedItem &&
+            selectedItem.Tag is string tagValue &&
+            int.TryParse(tagValue, out int hours))
+        {
+            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
+        }
+        
+        // Notify on updates
+        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
+        {
+            _currentSettings.AutoUpdate.NotifyBeforeInstall = notifyOnUpdates.IsChecked ?? false;
+        }
     }
 
     private async void OnOkClick(object? sender, RoutedEventArgs e)
@@ -562,6 +662,9 @@ public partial class SettingsWindow : Window
             
             // Save advanced settings
             SaveAdvancedSettings();
+            
+            // Save update settings  
+            SaveUpdateSettings();
             
             // Style settings are already updated in real-time through sliders and color clicks
             
@@ -832,6 +935,128 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show permission debug info");
+        }
+    }
+
+    // Updates tab event handlers
+    private void OnEnableAutoUpdateChanged(object? sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox checkBox && _currentSettings.AutoUpdate != null)
+        {
+            _currentSettings.AutoUpdate.Enabled = checkBox.IsChecked == true;
+            Log.Debug("Auto-update enabled changed: {Enabled}", _currentSettings.AutoUpdate.Enabled);
+        }
+    }
+
+    private void OnUpdateFrequencyChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox comboBox && 
+            comboBox.SelectedItem is ComboBoxItem selectedItem &&
+            selectedItem.Tag is string tagValue &&
+            int.TryParse(tagValue, out int hours) &&
+            _currentSettings.AutoUpdate != null)
+        {
+            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
+            Log.Debug("Update frequency changed: {Hours} hours", hours);
+        }
+    }
+
+    private void OnNotifyOnUpdatesChanged(object? sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox checkBox && _currentSettings.AutoUpdate != null)
+        {
+            _currentSettings.AutoUpdate.NotifyBeforeInstall = checkBox.IsChecked == true;
+            Log.Debug("Notify on updates changed: {Notify}", _currentSettings.AutoUpdate.NotifyBeforeInstall);
+        }
+    }
+
+    private async void OnCheckForUpdatesClick(object? sender, RoutedEventArgs e)
+    {
+        if (_updateService == null) return;
+
+        try
+        {
+            // Update UI state
+            if (this.FindControl<Button>("CheckForUpdatesButton") is { } button)
+            {
+                button.IsEnabled = false;
+                button.Content = "Checking...";
+            }
+
+            if (this.FindControl<TextBlock>("UpdateStatusText") is { } statusText)
+            {
+                statusText.Text = "Checking for updates...";
+                statusText.Foreground = new SolidColorBrush(Colors.Gray);
+            }
+
+            if (this.FindControl<ProgressBar>("UpdateProgressBar") is { } progressBar)
+            {
+                progressBar.IsVisible = true;
+                progressBar.IsIndeterminate = true;
+            }
+
+            // Check for updates
+            var updateInfo = await _updateService.CheckForUpdatesAsync();
+
+            // Update UI with results
+            if (updateInfo != null)
+            {
+                if (this.FindControl<TextBlock>("UpdateStatusText") is { } statusTextResult)
+                {
+                    statusTextResult.Text = $"Update available: v{updateInfo.Version}";
+                    statusTextResult.Foreground = new SolidColorBrush(Colors.Green);
+                }
+
+                if (this.FindControl<TextBlock>("UpdateDetailsText") is { } detailsText)
+                {
+                    detailsText.Text = $"Released: {updateInfo.PublishedAt:yyyy-MM-dd}\nSize: {updateInfo.FileSize / 1024 / 1024:F1} MB";
+                    detailsText.IsVisible = true;
+                }
+
+                if (this.FindControl<Button>("CheckForUpdatesButton") is { } updateButton)
+                {
+                    updateButton.Content = "Download Update";
+                    updateButton.IsEnabled = true;
+                    // TODO: Handle download functionality
+                }
+            }
+            else
+            {
+                if (this.FindControl<TextBlock>("UpdateStatusText") is { } statusTextCurrent)
+                {
+                    statusTextCurrent.Text = "You have the latest version";
+                    statusTextCurrent.Foreground = new SolidColorBrush(Colors.Green);
+                }
+
+                if (this.FindControl<Button>("CheckForUpdatesButton") is { } currentButton)
+                {
+                    currentButton.Content = "Check for Updates";
+                    currentButton.IsEnabled = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to check for updates");
+            
+            if (this.FindControl<TextBlock>("UpdateStatusText") is { } errorStatusText)
+            {
+                errorStatusText.Text = "Failed to check for updates";
+                errorStatusText.Foreground = new SolidColorBrush(Colors.Red);
+            }
+
+            if (this.FindControl<Button>("CheckForUpdatesButton") is { } errorButton)
+            {
+                errorButton.Content = "Check for Updates";
+                errorButton.IsEnabled = true;
+            }
+        }
+        finally
+        {
+            if (this.FindControl<ProgressBar>("UpdateProgressBar") is { } finalProgressBar)
+            {
+                finalProgressBar.IsVisible = false;
+            }
         }
     }
 }

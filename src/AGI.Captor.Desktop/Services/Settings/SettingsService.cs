@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AGI.Captor.Desktop.Services.Serialization;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace AGI.Captor.Desktop.Services.Settings;
 
@@ -16,19 +17,21 @@ public class SettingsService : ISettingsService
 {
     private readonly string _settingsFilePath;
     private readonly IFileSystemService _fileSystemService;
+    private readonly IConfiguration? _configuration;
     private AppSettings _settings;
     
     private static readonly JsonSerializerOptions JsonOptions = AppJsonContext.Default.Options;
     
     public AppSettings Settings => _settings;
     
-    public SettingsService() : this(new FileSystemService())
+    public SettingsService() : this(new FileSystemService(), null)
     {
     }
     
-    public SettingsService(IFileSystemService fileSystemService)
+    public SettingsService(IFileSystemService fileSystemService, IConfiguration? configuration = null)
     {
         _fileSystemService = fileSystemService ?? throw new ArgumentNullException(nameof(fileSystemService));
+        _configuration = configuration;
         
         var appFolder = _fileSystemService.GetApplicationDataPath();
         
@@ -56,18 +59,20 @@ public class SettingsService : ISettingsService
                 if (loadedSettings != null)
                 {
                     _settings = loadedSettings;
+                    // Merge with configuration defaults if settings don't have AutoUpdate configured
+                    MergeWithConfigurationDefaults();
                     Log.Debug("Settings loaded successfully from {FilePath}", _settingsFilePath);
                 }
                 else
                 {
                     Log.Warning("Failed to deserialize settings, using defaults");
-                    _settings = new AppSettings();
+                    _settings = CreateDefaultSettings();
                 }
             }
             else
             {
                 Log.Debug("Settings file not found, using default settings");
-                _settings = new AppSettings();
+                _settings = CreateDefaultSettings();
                 // Save default settings synchronously
                 SaveAsync().ConfigureAwait(false).GetAwaiter().GetResult();
             }
@@ -75,7 +80,7 @@ public class SettingsService : ISettingsService
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to load settings from {FilePath}, using defaults", _settingsFilePath);
-            _settings = new AppSettings();
+            _settings = CreateDefaultSettings();
         }
     }
     
@@ -117,5 +122,53 @@ public class SettingsService : ISettingsService
     public string GetSettingsFilePath()
     {
         return _settingsFilePath;
+    }
+
+    private AppSettings CreateDefaultSettings()
+    {
+        var defaultSettings = new AppSettings();
+        
+        // Load AutoUpdate defaults from configuration if available
+        if (_configuration != null)
+        {
+            var autoUpdateSection = _configuration.GetSection("AutoUpdate");
+            if (autoUpdateSection.Exists())
+            {
+                defaultSettings.AutoUpdate = new AutoUpdateSettings
+                {
+                    Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
+                    CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
+                    InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
+                    NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
+                    UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
+                    LastCheckTime = DateTime.MinValue
+                };
+            }
+        }
+        
+        return defaultSettings;
+    }
+
+    private void MergeWithConfigurationDefaults()
+    {
+        if (_configuration == null) return;
+        
+        // If AutoUpdate settings don't exist in user settings, use configuration defaults
+        if (_settings.AutoUpdate == null)
+        {
+            var autoUpdateSection = _configuration.GetSection("AutoUpdate");
+            if (autoUpdateSection.Exists())
+            {
+                _settings.AutoUpdate = new AutoUpdateSettings
+                {
+                    Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
+                    CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
+                    InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
+                    NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
+                    UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
+                    LastCheckTime = DateTime.MinValue
+                };
+            }
+        }
     }
 }

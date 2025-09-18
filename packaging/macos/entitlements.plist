@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Sandbox -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    
+    <!-- Network Access -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    
+    <!-- File System Access -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    
+    <!-- Screen Capture and Recording -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    
+    <!-- Microphone Access for screen recording -->
+    <key>com.apple.security.device.microphone</key>
+    <true/>
+    
+    <!-- Screen Recording -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    
+    <!-- Accessibility for screen capture -->
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>com.apple.windowserver.active</string>
+        <string>com.apple.CoreGraphics.WindowServer</string>
+    </array>
+    
+    <!-- Core Graphics for screen capture -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    
+    <!-- Disable library validation for native dependencies -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    
+    <!-- Allow unsigned executable memory -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    
+    <!-- Hardware exceptions -->
+    <key>com.apple.security.device.usb</key>
+    <true/>
+    
+    <!-- Hardened Runtime -->
+    <key>com.apple.security.cs.debugger</key>
+    <true/>
+</dict>
+</plist>

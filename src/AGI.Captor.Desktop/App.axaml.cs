@@ -13,6 +13,7 @@ using Serilog;
 using AGI.Captor.Desktop.Overlays;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
+using AGI.Captor.Desktop.Services.Update;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Views;
@@ -132,7 +133,8 @@ public partial class App : Application
             
             var settingsService = Services!.GetRequiredService<ISettingsService>();
             var applicationController = Services!.GetRequiredService<IApplicationController>();
-            var settingsWindow = new SettingsWindow(settingsService, applicationController);
+            var updateService = Services!.GetRequiredService<IUpdateService>();
+            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
             settingsWindow.Show();
             settingsWindow.Activate();
             Log.Debug("Settings window opened");

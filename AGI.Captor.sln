@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AGI.Captor.Desktop", "src\A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AGI.Captor.Tests", "tests\AGI.Captor.Tests\AGI.Captor.Tests.csproj", "{B9C8D7E6-F5A4-4321-8765-432109EDCBA9}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "_build", "build\_build.csproj", "{4AD08F55-3320-498E-B0E8-D903D3A7B977}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,16 @@ Global
 		{B9C8D7E6-F5A4-4321-8765-432109EDCBA9}.Release|x64.Build.0 = Release|Any CPU
 		{B9C8D7E6-F5A4-4321-8765-432109EDCBA9}.Release|x86.ActiveCfg = Release|Any CPU
 		{B9C8D7E6-F5A4-4321-8765-432109EDCBA9}.Release|x86.Build.0 = Release|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Debug|x64.Build.0 = Debug|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Debug|x86.Build.0 = Debug|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Release|x64.ActiveCfg = Release|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Release|x64.Build.0 = Release|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Release|x86.ActiveCfg = Release|Any CPU
+		{4AD08F55-3320-498E-B0E8-D903D3A7B977}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

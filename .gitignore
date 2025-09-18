@@ -394,8 +394,17 @@ Temporary Items
 
 # Distribution/Build directories
 dist/
-build/
 publish/
+
+# Package outputs
+artifacts/packages/
+*.msi
+*.pkg
+*.dmg
+*.deb
+*.rpm
+*.appimage
+*.zip
 
 # Test executables
 test_cgeventtap

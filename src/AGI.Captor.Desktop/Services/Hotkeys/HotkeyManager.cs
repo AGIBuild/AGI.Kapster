@@ -6,6 +6,7 @@ using Serilog;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Settings;
+using AGI.Captor.Desktop.Services.Update;
 using AGI.Captor.Desktop.Views;
 
 namespace AGI.Captor.Desktop.Services.Hotkeys;
@@ -166,8 +167,9 @@ public class HotkeyManager : IHotkeyManager
             // Create proper service instances - avoid default constructor
             var settingsService = new SettingsService();
             var applicationController = App.Services?.GetService(typeof(IApplicationController)) as IApplicationController;
+            var updateService = App.Services?.GetService(typeof(IUpdateService)) as IUpdateService;
             
-            var settingsWindow = new SettingsWindow(settingsService, applicationController);
+            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
             settingsWindow.Show();
             
         }

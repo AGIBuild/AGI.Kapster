@@ -2,8 +2,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <Nullable>warnings</Nullable>
+    <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
+    <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -11,7 +11,17 @@
     <!-- Suppress Avalonia XAML warnings -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-    <PublishAot>True</PublishAot>
+    <!-- Disable AOT for easier packaging and deployment -->
+    <PublishAot>False</PublishAot>
+    
+    <!-- Version Information -->
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <Product>AGI Captor</Product>
+    <Company>AGI Build</Company>
+    <Copyright>Copyright © AGI Build 2025</Copyright>
+    <Description>Advanced Screenshot and Annotation Tool</Description>
   </PropertyGroup>
 
   <!-- macOS App Bundle Configuration -->

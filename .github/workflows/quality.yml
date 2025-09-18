@@ -1,0 +1,247 @@
+name: Code Quality
+
+# Comprehensive code quality checks
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run quality checks daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  code-analysis:
+    name: 🔍 Code Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 📦 Restore dependencies
+      shell: pwsh
+      run: ./build.ps1 Restore
+      
+    - name: 🔨 Build with analysis
+      shell: pwsh
+      run: |
+        ./build.ps1 Build --configuration Release
+        
+    - name: 🧪 Run tests with coverage
+      shell: pwsh
+      run: |
+        ./build.ps1 Test --configuration Release --coverage
+        
+    - name: 📊 Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        directory: artifacts/coverage/
+        fail_ci_if_error: false
+        verbose: true
+        
+    - name: 📈 Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: code-analysis-results
+        path: |
+          artifacts/test-results/
+          artifacts/coverage/
+        retention-days: 30
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 🔍 Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        
+    - name: 🔨 Build for analysis
+      shell: pwsh
+      run: |
+        ./build.ps1 Clean
+        ./build.ps1 Restore
+        ./build.ps1 Build --configuration Release
+        
+    - name: 🔍 Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      
+    - name: 🔐 Run security audit
+      shell: pwsh
+      run: |
+        # Check for known vulnerabilities in NuGet packages
+        dotnet list package --vulnerable --include-transitive 2>&1 | Tee-Object -FilePath "security-audit.log"
+        
+        # Check for outdated packages
+        dotnet list package --outdated 2>&1 | Tee-Object -FilePath "outdated-packages.log"
+        
+    - name: 📤 Upload security reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          security-audit.log
+          outdated-packages.log
+        retention-days: 30
+
+  dependency-check:
+    name: 📦 Dependency Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 📦 Dependency Review
+      uses: actions/dependency-review-action@v4
+      if: github.event_name == 'pull_request'
+      
+    - name: 📊 Generate dependency graph
+      shell: pwsh
+      run: |
+        # Generate dependency information
+        dotnet list package --include-transitive --format json > dependencies.json
+        
+        # Create human-readable dependency report
+        Write-Host "📦 Dependency Analysis Report" | Tee-Object -FilePath "dependency-report.md"
+        Write-Host "================================" | Tee-Object -Append -FilePath "dependency-report.md"
+        Write-Host "" | Tee-Object -Append -FilePath "dependency-report.md"
+        
+        dotnet list package --include-transitive | Tee-Object -Append -FilePath "dependency-report.md"
+        
+    - name: 📤 Upload dependency reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-analysis
+        path: |
+          dependencies.json
+          dependency-report.md
+        retention-days: 30
+
+  performance-test:
+    name: ⚡ Performance Test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'  # Skip on scheduled runs
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 🔨 Build optimized version
+      shell: pwsh
+      run: |
+        ./build.ps1 Clean
+        ./build.ps1 Restore
+        ./build.ps1 Build --configuration Release
+        
+    - name: ⚡ Run performance tests
+      shell: pwsh
+      run: |
+        # Run performance-related tests if they exist
+        if (Test-Path "tests/AGI.Captor.PerformanceTests") {
+          ./build.ps1 Test --configuration Release --test-filter "Category=Performance"
+        } else {
+          Write-Host "ℹ️ No performance tests found, skipping..."
+        }
+        
+    - name: 📊 Performance analysis
+      shell: pwsh
+      run: |
+        # Basic performance metrics
+        Write-Host "📊 Build Performance Metrics" | Tee-Object -FilePath "performance-report.md"
+        Write-Host "=============================" | Tee-Object -Append -FilePath "performance-report.md"
+        Write-Host "" | Tee-Object -Append -FilePath "performance-report.md"
+        
+        # Check assembly sizes
+        Write-Host "## Assembly Sizes" | Tee-Object -Append -FilePath "performance-report.md"
+        if (Test-Path "artifacts/publish") {
+          Get-ChildItem "artifacts/publish" -Recurse -Filter "*.dll" | 
+            Sort-Object Length -Descending | 
+            Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}} | 
+            Format-Table | Out-String | Tee-Object -Append -FilePath "performance-report.md"
+        }
+        
+    - name: 📤 Upload performance reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-reports
+        path: performance-report.md
+        retention-days: 30
+
+  quality-gate:
+    name: 🎯 Quality Gate
+    runs-on: ubuntu-latest
+    needs: [code-analysis, security-scan, dependency-check]
+    if: always()
+    
+    steps:
+    - name: 📊 Evaluate quality metrics
+      shell: pwsh
+      run: |
+        Write-Host "🎯 Quality Gate Evaluation"
+        Write-Host "=========================="
+        
+        $codeAnalysisResult = "${{ needs.code-analysis.result }}"
+        $securityScanResult = "${{ needs.security-scan.result }}"
+        $dependencyCheckResult = "${{ needs.dependency-check.result }}"
+        
+        Write-Host "Code Analysis: $codeAnalysisResult"
+        Write-Host "Security Scan: $securityScanResult"
+        Write-Host "Dependency Check: $dependencyCheckResult"
+        
+        $allPassed = ($codeAnalysisResult -eq "success") -and 
+                     ($securityScanResult -eq "success") -and 
+                     ($dependencyCheckResult -eq "success")
+        
+        if ($allPassed) {
+          Write-Host "✅ Quality gate PASSED - All checks successful!"
+        } else {
+          Write-Host "❌ Quality gate FAILED - Some checks failed!"
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request") {
+            Write-Host "::error::Quality gate failed. Please address the issues before merging."
+            exit 1
+          } else {
+            Write-Host "::warning::Quality gate failed on $env:GITHUB_REF_NAME branch."
+          }
+        }

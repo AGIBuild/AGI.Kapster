@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Media;
 using System.Text.Json.Serialization;
 
@@ -22,6 +23,11 @@ public class AppSettings
     /// Default annotation styles
     /// </summary>
     public DefaultStyleSettings DefaultStyles { get; set; } = new();
+    
+    /// <summary>
+    /// Auto-update settings
+    /// </summary>
+    public AutoUpdateSettings? AutoUpdate { get; set; } = new();
 }
 
 /// <summary>
@@ -288,6 +294,41 @@ public class SecuritySettings
     /// Allow anonymous usage data collection
     /// </summary>
     public bool AllowTelemetry { get; set; } = false;
-    
+}
+
+/// <summary>
+/// Auto-update settings
+/// </summary>
+public class AutoUpdateSettings
+{
+    /// <summary>
+    /// Whether automatic updates are enabled
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Frequency of update checks in hours
+    /// </summary>
+    public int CheckFrequencyHours { get; set; } = 24;
+
+    /// <summary>
+    /// Whether to install updates automatically
+    /// </summary>
+    public bool InstallAutomatically { get; set; } = true;
+
+    /// <summary>
+    /// Whether to notify user before installing
+    /// </summary>
+    public bool NotifyBeforeInstall { get; set; } = false;
+
+    /// <summary>
+    /// Whether to include pre-release versions
+    /// </summary>
+    public bool UsePreReleases { get; set; } = false;
+
+    /// <summary>
+    /// Last successful update check time
+    /// </summary>
+    public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
 }
 
