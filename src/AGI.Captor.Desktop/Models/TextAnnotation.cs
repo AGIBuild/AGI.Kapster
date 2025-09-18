@@ -323,6 +323,11 @@ public class TextAnnotation : AnnotationItemBase
             // Fallback for test environments or when Avalonia platform is not available
             _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
         }
+        catch (InvalidOperationException)
+        {
+            // Fallback for test environments when Avalonia font manager is not available
+            _textSize = new Size(_text.Length * safeFontSize * 0.6, safeFontSize * 1.2);
+        }
     }
 
     /// <summary>

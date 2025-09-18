@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <Nullable>enable</Nullable>
+    <Nullable>warnings</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -11,6 +11,7 @@
     <!-- Suppress Avalonia XAML warnings -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <PublishAot>True</PublishAot>
   </PropertyGroup>
 
   <!-- macOS App Bundle Configuration -->
@@ -26,6 +27,9 @@
     <CFBundleIconFile>logo.icns</CFBundleIconFile>
     <NSHighResolutionCapable>true</NSHighResolutionCapable>
     <LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Avalonia">
+    <AvaloniaXamlVerboseExceptions>True</AvaloniaXamlVerboseExceptions>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="logo.ico" />
