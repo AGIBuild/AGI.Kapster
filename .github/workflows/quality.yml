@@ -127,8 +127,12 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
-    - name: 📦 Dependency Review
-      uses: actions/dependency-review-action@v4
+    # 注意: Dependency Review需要GitHub Advanced Security (私有仓库)
+    # 暂时跳过此步骤，使用替代方案进行依赖分析
+    - name: 📦 Dependency Review (Advanced Security Required)
+      run: |
+        echo "⚠️ Dependency Review skipped - requires GitHub Advanced Security for private repos"
+        echo "Using alternative dependency analysis instead..."
       if: github.event_name == 'pull_request'
       
     - name: 📊 Generate dependency graph
@@ -143,6 +147,10 @@ jobs:
         Write-Host "" | Tee-Object -Append -FilePath "dependency-report.md"
         
         dotnet list package --include-transitive | Tee-Object -Append -FilePath "dependency-report.md"
+        
+        # Check for known vulnerable packages (basic security check)
+        Write-Host "🔍 Checking for known vulnerabilities..." | Tee-Object -Append -FilePath "dependency-report.md"
+        dotnet list package --vulnerable --include-transitive | Tee-Object -Append -FilePath "dependency-report.md"
         
     - name: 📤 Upload dependency reports
       uses: actions/upload-artifact@v4
