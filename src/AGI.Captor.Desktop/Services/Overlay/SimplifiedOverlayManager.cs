@@ -32,9 +32,9 @@ public class SimplifiedOverlayManager : IOverlayController
         try
         {
             Log.Information("Showing overlay windows");
-            
+
             CloseAll(); // Clean up any existing windows
-            
+
             var screens = GetAvailableScreens();
             if (screens == null || screens.Count == 0)
             {
@@ -68,7 +68,7 @@ public class SimplifiedOverlayManager : IOverlayController
     public void CloseAll()
     {
         Log.Information("Closing all overlay windows");
-        
+
         foreach (var window in _windows)
         {
             try
@@ -82,7 +82,7 @@ public class SimplifiedOverlayManager : IOverlayController
                 Log.Error(ex, "Error closing overlay window");
             }
         }
-        
+
         _windows.Clear();
     }
 
@@ -90,12 +90,12 @@ public class SimplifiedOverlayManager : IOverlayController
     {
         _captureStrategy = _serviceProvider.GetService<IScreenCaptureStrategy>();
         _clipboardStrategy = _serviceProvider.GetService<IClipboardStrategy>();
-        
+
         if (_captureStrategy == null)
         {
             Log.Warning("No screen capture strategy available");
         }
-        
+
         if (_clipboardStrategy == null)
         {
             Log.Warning("No clipboard strategy available");
@@ -137,11 +137,11 @@ public class SimplifiedOverlayManager : IOverlayController
                 SystemDecorations = SystemDecorations.None,
                 Opacity = 0
             };
-            
+
             tempWindow.Show();
             var screens = tempWindow.Screens?.All?.ToList();
             tempWindow.Close();
-            
+
             return screens;
         }
         catch (Exception ex)
@@ -156,11 +156,11 @@ public class SimplifiedOverlayManager : IOverlayController
         try
         {
             Log.Information("Region selected: {Region}", e.Region);
-            
+
             if (_captureStrategy != null && _clipboardStrategy != null)
             {
                 SkiaSharp.SKBitmap? bitmapToClipboard = null;
-                
+
                 // Check if we have a composite image from OverlayWindow (macOS with annotations)
                 // The composite image is passed through CaptureTarget property
                 if (e.CaptureTarget is Avalonia.Media.Imaging.Bitmap compositeImage)
@@ -168,13 +168,13 @@ public class SimplifiedOverlayManager : IOverlayController
                     Log.Debug("Using composite image with annotations from OverlayWindow");
                     bitmapToClipboard = BitmapConverter.ConvertToSKBitmap(compositeImage);
                 }
-                
+
                 // If no composite image, capture normally
                 if (bitmapToClipboard == null)
                 {
                     bitmapToClipboard = await _captureStrategy.CaptureRegionAsync(e.Region);
                 }
-                
+
                 if (bitmapToClipboard != null)
                 {
                     // Copy to clipboard
@@ -186,7 +186,7 @@ public class SimplifiedOverlayManager : IOverlayController
                     Log.Warning("Failed to capture region");
                 }
             }
-            
+
             CloseAll();
         }
         catch (Exception ex)
@@ -207,7 +207,7 @@ public class SimplifiedOverlayManager : IOverlayController
         {
             _windows.Remove(window);
             UnsubscribeWindowEvents(window);
-            
+
             if (_windows.Count == 0)
             {
                 Log.Information("All overlay windows closed");

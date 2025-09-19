@@ -48,7 +48,7 @@ public interface IExportService
     /// </summary>
     /// <returns>List of supported export formats</returns>
     ExportFormat[] GetSupportedFormats();
-    
+
     /// <summary>
     /// Get default export settings
     /// </summary>

@@ -16,7 +16,7 @@ namespace AGI.Captor.Desktop.Overlays;
 public partial class NewAnnotationToolbar : UserControl
 {
     public NewAnnotationOverlay? Target { get; set; }
-    
+
     private readonly List<ToggleButton> _toolButtons = new();
     private Border? _currentColorDisplay;
     private Button? _colorPickerButton;
@@ -90,7 +90,7 @@ public partial class NewAnnotationToolbar : UserControl
                 button.Background = Brushes.Transparent;
             }
         }
-        
+
         // Also reset emoji button background when other tools are selected
         if (this.FindControl<Button>("CurrentEmojiDisplay") is { } emojiButton)
         {
@@ -115,7 +115,7 @@ public partial class NewAnnotationToolbar : UserControl
         };
 
         Target.CurrentTool = toolType;
-        
+
         // Ensure focus returns to overlay for immediate keyboard shortcuts
         Target.Focus();
 
@@ -124,13 +124,13 @@ public partial class NewAnnotationToolbar : UserControl
         {
             fontPanel.IsVisible = toolType == AnnotationToolType.Text;
         }
-        
+
         // Emoji panel is now always visible (simplified)
-        
+
         // Trigger layout update and notify parent to reposition toolbar
         InvalidateArrange();
         InvalidateMeasure();
-        
+
         // Use dispatcher to ensure layout is updated before repositioning
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
@@ -149,12 +149,12 @@ public partial class NewAnnotationToolbar : UserControl
     {
         _currentColorDisplay = this.FindControl<Border>("CurrentColorDisplay");
         _colorPickerButton = this.FindControl<Button>("ColorPickerButton");
-        
+
         if (_colorPickerButton != null)
         {
             _colorPickerButton.Click += OnColorPickerButtonClick;
         }
-        
+
         // Initialize current color display
         UpdateCurrentColorDisplay();
     }
@@ -174,17 +174,17 @@ public partial class NewAnnotationToolbar : UserControl
         }
 
         _colorPickerWindow = CreateColorPickerWindow();
-        
+
         // Position to the right of the color picker button
         if (this.GetVisualRoot() is Window parentWindow && _colorPickerButton != null)
         {
             var buttonBounds = _colorPickerButton.Bounds;
             var buttonScreenPos = _colorPickerButton.PointToScreen(new Point(buttonBounds.Right + 5, 0));
-            
+
             _colorPickerWindow.WindowStartupLocation = WindowStartupLocation.Manual;
             _colorPickerWindow.Position = new PixelPoint((int)buttonScreenPos.X, (int)buttonScreenPos.Y);
         }
-        
+
         _colorPickerWindow.Show();
     }
 
@@ -206,7 +206,7 @@ public partial class NewAnnotationToolbar : UserControl
         grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
         grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
-        
+
         for (int i = 0; i < 5; i++)
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -255,7 +255,7 @@ public partial class NewAnnotationToolbar : UserControl
         };
 
         window.Content = border;
-        
+
         // Handle window focus lost
         window.Deactivated += (s, e) =>
         {
@@ -285,12 +285,12 @@ public partial class NewAnnotationToolbar : UserControl
     {
         var emojiPickerButton = this.FindControl<Button>("EmojiPickerButton");
         var currentEmojiDisplay = this.FindControl<Button>("CurrentEmojiDisplay");
-        
+
         if (emojiPickerButton != null)
         {
             emojiPickerButton.Click += OnEmojiPickerButtonClick;
         }
-        
+
         if (currentEmojiDisplay != null)
         {
             currentEmojiDisplay.Click += OnCurrentEmojiDisplayClick;
@@ -310,20 +310,20 @@ public partial class NewAnnotationToolbar : UserControl
         if (Target != null)
         {
             Target.CurrentTool = AnnotationToolType.Emoji;
-            
+
             // Update visual state - uncheck all tool buttons
             foreach (var button in _toolButtons)
             {
                 button.IsChecked = false;
                 button.Background = Brushes.Transparent;
             }
-            
+
             // Highlight the emoji display button
             if (sender is Button emojiButton)
             {
                 emojiButton.Background = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)); // Semi-transparent white
             }
-            
+
             Log.Debug("Switched to emoji tool via CurrentEmojiDisplay click");
         }
     }
@@ -408,29 +408,29 @@ public partial class NewAnnotationToolbar : UserControl
             {
                 // Get the button's position relative to screen
                 var buttonPoint = pickerButton.PointToScreen(new Point(0, 0));
-                
+
                 // Position to the right of the button with a small gap
                 var x = buttonPoint.X + (int)buttonBounds.Width + 5;
                 var y = buttonPoint.Y;
-                
+
                 // Ensure the picker doesn't go off-screen
                 var screen = parentWindow.Screens.ScreenFromPoint(buttonPoint);
                 if (screen != null)
                 {
                     var maxX = screen.WorkingArea.Width - 380; // picker width
                     var maxY = screen.WorkingArea.Height - 280; // picker height
-                    
+
                     if (x > maxX)
                     {
                         // Position to the left of the button instead
                         x = buttonPoint.X - 380 - 5;
                     }
-                    
+
                     if (y > maxY)
                     {
                         y = maxY;
                     }
-                    
+
                     // Ensure minimum position
                     x = Math.Max(0, x);
                     y = Math.Max(0, y);
@@ -549,20 +549,20 @@ public partial class NewAnnotationToolbar : UserControl
                 annotationService.ToolChanged -= OnToolChanged;
             }
         }
-        
+
         Target = target;
-        
+
         // Subscribe to new target's events
         if (target != null)
         {
             target.StyleChanged += OnTargetStyleChanged;
-            
+
             // Subscribe to annotation service tool changes
             if (target.GetAnnotationService() is { } annotationService)
             {
                 annotationService.ToolChanged += OnToolChanged;
             }
-            
+
             UpdateUIFromTarget();
         }
     }
@@ -655,7 +655,7 @@ public partial class NewAnnotationToolbar : UserControl
             this.FindControl<TextBlock>("WidthValueText") is { } widthText)
         {
             var width = (int)style.StrokeWidth;
-            
+
             // Temporarily disable event handler
             widthSlider.ValueChanged -= OnWidthSliderChanged;
             widthSlider.Value = width;
@@ -668,7 +668,7 @@ public partial class NewAnnotationToolbar : UserControl
             this.FindControl<TextBlock>("FontSizeValueText") is { } fontText)
         {
             var fontSize = (int)style.FontSize;
-            
+
             // Temporarily disable event handler
             fontSlider.ValueChanged -= OnFontSizeSliderChanged;
             fontSlider.Value = fontSize;
@@ -678,22 +678,22 @@ public partial class NewAnnotationToolbar : UserControl
 
         // Update panel visibility
         bool layoutChanged = false;
-        
+
         if (this.FindControl<StackPanel>("FontSizePanel") is { } fontPanel && Target != null)
         {
             bool wasVisible = fontPanel.IsVisible;
             fontPanel.IsVisible = Target.CurrentTool == AnnotationToolType.Text;
             if (wasVisible != fontPanel.IsVisible) layoutChanged = true;
         }
-        
+
         // Emoji panel is now always visible (no dynamic show/hide)
-        
+
         // If visibility changed, trigger repositioning
         if (layoutChanged)
         {
             InvalidateArrange();
             InvalidateMeasure();
-            
+
             // Use dispatcher to ensure layout is updated before repositioning
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {

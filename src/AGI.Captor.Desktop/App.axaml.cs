@@ -13,6 +13,7 @@ using Serilog;
 using AGI.Captor.Desktop.Overlays;
 using AGI.Captor.Desktop.Services;
 using AGI.Captor.Desktop.Services.Hotkeys;
+using AGI.Captor.Desktop.Services.Update;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Settings;
 using AGI.Captor.Desktop.Views;
@@ -26,11 +27,11 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        
+
         // Setup global exception handling
         SetupGlobalExceptionHandling();
     }
-    
+
     /// <summary>
     /// Setup global exception handling
     /// </summary>
@@ -41,7 +42,7 @@ public partial class App : Application
         {
             var exception = e.ExceptionObject as Exception;
             Log.Fatal(exception, "Unhandled domain exception occurred. IsTerminating: {IsTerminating}", e.IsTerminating);
-            
+
             if (!e.IsTerminating)
             {
                 // Try to continue running
@@ -67,7 +68,7 @@ public partial class App : Application
         {
             // Change shutdown mode to only exit when explicitly requested
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
-            
+
             // Initialize services asynchronously
             Task.Run(async () =>
             {
@@ -75,12 +76,12 @@ public partial class App : Application
                 {
                     // Settings service initializes automatically
                     Log.Debug("Settings service initialized");
-                    
+
                     // Initialize application controller
                     var appController = Services!.GetRequiredService<IApplicationController>();
                     await appController.InitializeAsync();
                     Log.Debug("Application controller initialized");
-                    
+
                     // Initialize hotkey manager
                     Log.Debug("Getting hotkey manager service...");
                     var hotkeyManager = Services!.GetRequiredService<IHotkeyManager>();
@@ -93,17 +94,17 @@ public partial class App : Application
                     Log.Error(ex, "Failed to initialize services");
                 }
             });
-            
+
             // Initialize system tray instead of main window
             try
             {
                 var trayService = Services!.GetRequiredService<ISystemTrayService>();
                 trayService.Initialize();
-                
+
                 // Handle tray events
                 trayService.OpenSettingsRequested += OnOpenSettingsRequested;
                 trayService.ExitRequested += OnExitRequested;
-                
+
                 Log.Debug("System tray initialized");
             }
             catch (Exception ex)
@@ -129,10 +130,11 @@ public partial class App : Application
                 Log.Debug("Settings window request ignored - screenshot overlay is active");
                 return;
             }
-            
+
             var settingsService = Services!.GetRequiredService<ISettingsService>();
             var applicationController = Services!.GetRequiredService<IApplicationController>();
-            var settingsWindow = new SettingsWindow(settingsService, applicationController);
+            var updateService = Services!.GetRequiredService<IUpdateService>();
+            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
             settingsWindow.Show();
             settingsWindow.Activate();
             Log.Debug("Settings window opened");
@@ -148,7 +150,7 @@ public partial class App : Application
         try
         {
             Log.Debug("Application exit requested from system tray");
-            
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.Shutdown();

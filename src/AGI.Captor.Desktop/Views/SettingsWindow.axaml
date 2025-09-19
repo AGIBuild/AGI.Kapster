@@ -439,6 +439,111 @@
 				</ScrollViewer>
 			</TabItem>
 
+			<!-- Updates Tab -->
+			<TabItem Header="Updates">
+				<ScrollViewer Padding="8">
+					<StackPanel Spacing="8">
+
+						<!-- Auto-Update Settings -->
+						<Border Classes="group">
+							<StackPanel>
+								<TextBlock Classes="header" Text="Automatic Updates"/>
+
+								<CheckBox x:Name="EnableAutoUpdateCheckBox"
+										  Content="Enable automatic update checking"
+										  Margin="0,5"/>
+
+								<TextBlock Text="Check for updates in the background and install them automatically."
+										   FontSize="12" Foreground="Gray" Margin="0,0,0,10"
+										   TextWrapping="Wrap"/>
+
+								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
+									<Grid.Styles>
+										<Style Selector="TextBlock">
+											<Setter Property="VerticalAlignment" Value="Center"/>
+											<Setter Property="Margin" Value="0,5,10,5"/>
+										</Style>
+									</Grid.Styles>
+
+									<TextBlock Grid.Row="0" Grid.Column="0" Text="Check frequency:" Width="120"/>
+									<ComboBox Grid.Row="0" Grid.Column="1" x:Name="UpdateFrequencyComboBox" Width="180" HorizontalAlignment="Left">
+										<ComboBoxItem Content="Every hour" Tag="1"/>
+										<ComboBoxItem Content="Every 2 hours" Tag="2"/>
+										<ComboBoxItem Content="Every 6 hours" Tag="6" IsSelected="True"/>
+										<ComboBoxItem Content="Every 12 hours" Tag="12"/>
+										<ComboBoxItem Content="Daily" Tag="24"/>
+									</ComboBox>
+
+									<TextBlock Grid.Row="1" Grid.Column="0" Text="Notify on updates:" />
+									<CheckBox Grid.Row="1" Grid.Column="1" x:Name="NotifyOnUpdatesCheckBox"
+											  Content="Show notification when updates are available"
+											  IsChecked="True"/>
+								</Grid>
+
+							</StackPanel>
+						</Border>
+
+						<!-- Manual Update Check -->
+						<Border Classes="group">
+							<StackPanel>
+								<TextBlock Classes="header" Text="Manual Update Check"/>
+
+								<StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+									<Button x:Name="CheckForUpdatesButton" 
+											Content="Check for Updates" 
+											Classes="action"/>
+									<TextBlock x:Name="UpdateStatusText" 
+											   Text="Click 'Check for Updates' to check for the latest version."
+											   VerticalAlignment="Center" 
+											   Foreground="Gray"/>
+								</StackPanel>
+
+								<ProgressBar x:Name="UpdateProgressBar" 
+											 Height="4" 
+											 IsVisible="False" 
+											 Margin="0,10,0,0"/>
+
+								<TextBlock x:Name="UpdateDetailsText"
+										   Text=""
+										   FontSize="12"
+										   Foreground="Gray"
+										   Margin="0,5,0,0"
+										   TextWrapping="Wrap"
+										   IsVisible="False"/>
+
+							</StackPanel>
+						</Border>
+
+						<!-- Current Version Info -->
+						<Border Classes="group">
+							<StackPanel>
+								<TextBlock Classes="header" Text="Version Information"/>
+
+								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,10,0,0">
+									<Grid.Styles>
+										<Style Selector="TextBlock">
+											<Setter Property="VerticalAlignment" Value="Center"/>
+											<Setter Property="Margin" Value="0,3"/>
+										</Style>
+									</Grid.Styles>
+
+									<TextBlock Grid.Row="0" Grid.Column="0" Text="Current Version:" FontWeight="SemiBold" Width="120"/>
+									<TextBlock Grid.Row="0" Grid.Column="1" x:Name="CurrentVersionText" Text="1.0.0" />
+
+									<TextBlock Grid.Row="1" Grid.Column="0" Text="Release Date:" FontWeight="SemiBold"/>
+									<TextBlock Grid.Row="1" Grid.Column="1" x:Name="ReleaseDateText" Text="-" />
+
+									<TextBlock Grid.Row="2" Grid.Column="0" Text="Update Channel:" FontWeight="SemiBold"/>
+									<TextBlock Grid.Row="2" Grid.Column="1" Text="Stable" />
+								</Grid>
+
+							</StackPanel>
+						</Border>
+
+					</StackPanel>
+				</ScrollViewer>
+			</TabItem>
+
 			<!-- Advanced Tab -->
 			<TabItem Header="Advanced">
 				<ScrollViewer Padding="8">

@@ -29,9 +29,9 @@ public class AnnotationService : IAnnotationService
         {
             var oldTool = _currentTool;
             _currentTool = value;
-            
+
             Log.Information("AnnotationService.CurrentTool: {OldTool} -> {NewTool} (Instance: {Hash})", oldTool, value, GetHashCode());
-            
+
             if (oldTool != value)
             {
                 ToolChanged?.Invoke(this, new ToolChangedEventArgs(oldTool, value));
@@ -48,7 +48,7 @@ public class AnnotationService : IAnnotationService
         {
             var oldStyle = _currentStyle;
             _currentStyle = value ?? throw new ArgumentNullException(nameof(value));
-            
+
             if (oldStyle != value)
             {
                 StyleChanged?.Invoke(this, new StyleChangedEventArgs(oldStyle, value));
@@ -63,7 +63,7 @@ public class AnnotationService : IAnnotationService
     {
         _settingsService = settingsService;
         _currentStyle = CreateStyleFromSettings();
-        
+
         // Settings are loaded immediately in constructor, no need to subscribe to changes
     }
 
@@ -132,7 +132,7 @@ public class AnnotationService : IAnnotationService
             case FreehandAnnotation freehand:
                 UpdateFreehand(freehand, currentPoint);
                 break;
-            // Text and Emoji annotations don't need update during creation
+                // Text and Emoji annotations don't need update during creation
         }
     }
 
@@ -158,7 +158,7 @@ public class AnnotationService : IAnnotationService
         {
             // Finish the path and apply smoothing
             freehand.FinishPath();
-            
+
             // Validate minimum number of points
             if (freehand.Points.Count < 2)
                 return false;
@@ -198,7 +198,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             CurrentStyle.StrokeWidth
         );
-        
+
         return AnnotationFactory.CreateRectangle(startPoint, startPoint, style);
     }
 
@@ -209,13 +209,13 @@ public class AnnotationService : IAnnotationService
     {
         // Use immutable creation anchor to support all drag directions
         var startPoint = _creationAnchors.TryGetValue(rect.Id, out var sp) ? sp : rect.TopLeft;
-        
+
         // Create new rectangle from start point to current point
         var left = Math.Min(startPoint.X, currentPoint.X);
         var top = Math.Min(startPoint.Y, currentPoint.Y);
         var right = Math.Max(startPoint.X, currentPoint.X);
         var bottom = Math.Max(startPoint.Y, currentPoint.Y);
-        
+
         rect.Rectangle = new Rect(left, top, right - left, bottom - top);
     }
 
@@ -229,7 +229,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             CurrentStyle.StrokeWidth
         );
-        
+
         return AnnotationFactory.CreateEllipse(new Rect(startPoint, startPoint), style);
     }
 
@@ -240,12 +240,12 @@ public class AnnotationService : IAnnotationService
     {
         // Use immutable creation anchor to support all drag directions
         var startPoint = _creationAnchors.TryGetValue(ellipse.Id, out var sp) ? sp : ellipse.BoundingRect.TopLeft;
-        
+
         var left = Math.Min(startPoint.X, currentPoint.X);
         var top = Math.Min(startPoint.Y, currentPoint.Y);
         var right = Math.Max(startPoint.X, currentPoint.X);
         var bottom = Math.Max(startPoint.Y, currentPoint.Y);
-        
+
         ellipse.BoundingRect = new Rect(left, top, right - left, bottom - top);
     }
 
@@ -259,7 +259,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             CurrentStyle.StrokeWidth
         );
-        
+
         return AnnotationFactory.CreateArrow(startPoint, startPoint, style);
     }
 
@@ -281,7 +281,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             fontSize: CurrentStyle.FontSize
         );
-        
+
         var text = AnnotationFactory.CreateText(startPoint, "", style);
         text.State = AnnotationState.Editing; // Start in editing mode
         return text;
@@ -297,7 +297,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             CurrentStyle.StrokeWidth
         );
-        
+
         return AnnotationFactory.CreateFreehand(style);
     }
 
@@ -319,7 +319,7 @@ public class AnnotationService : IAnnotationService
             GetCurrentColor(),
             fontSize: CurrentStyle.FontSize
         );
-        
+
         return AnnotationFactory.CreateEmoji(startPoint, "😀", style);
     }
 
@@ -346,7 +346,7 @@ public class AnnotationService : IAnnotationService
         {
             style.FontSize = settings.DefaultStyles.Text.FontSize;
             style.FontFamily = settings.DefaultStyles.Text.FontFamily;
-            
+
             try
             {
                 style.StrokeColor = settings.DefaultStyles.Text.Color;
@@ -375,7 +375,7 @@ public class AnnotationService : IAnnotationService
         if (settings.DefaultStyles?.Shape != null)
         {
             style.StrokeWidth = settings.DefaultStyles.Shape.StrokeThickness;
-            
+
             try
             {
                 style.StrokeColor = settings.DefaultStyles.Shape.StrokeColor;

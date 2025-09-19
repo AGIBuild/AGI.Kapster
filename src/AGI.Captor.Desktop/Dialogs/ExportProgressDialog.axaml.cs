@@ -14,7 +14,7 @@ namespace AGI.Captor.Desktop.Dialogs;
 public partial class ExportProgressDialog : Window
 {
     private string? _exportedFilePath;
-    
+
     public ExportProgressDialog()
     {
         InitializeComponent();
@@ -50,7 +50,7 @@ public partial class ExportProgressDialog : Window
         {
             if (this.FindControl<ProgressBar>("ProgressBar") is { } progressBar)
                 progressBar.Value = percentage;
-                
+
             if (this.FindControl<TextBlock>("StatusText") is { } statusText)
                 statusText.Text = status;
         });
@@ -77,7 +77,7 @@ public partial class ExportProgressDialog : Window
     public void ShowSuccess(string filePath)
     {
         _exportedFilePath = filePath;
-        
+
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             // Update title
@@ -87,7 +87,7 @@ public partial class ExportProgressDialog : Window
             // Hide progress bar
             if (this.FindControl<ProgressBar>("ProgressBar") is { } progressBar)
                 progressBar.IsVisible = false;
-                
+
             if (this.FindControl<TextBlock>("StatusText") is { } statusText)
                 statusText.IsVisible = false;
 
@@ -131,7 +131,7 @@ public partial class ExportProgressDialog : Window
             // Hide progress bar
             if (this.FindControl<ProgressBar>("ProgressBar") is { } progressBar)
                 progressBar.IsVisible = false;
-                
+
             if (this.FindControl<TextBlock>("StatusText") is { } statusText)
                 statusText.IsVisible = false;
 

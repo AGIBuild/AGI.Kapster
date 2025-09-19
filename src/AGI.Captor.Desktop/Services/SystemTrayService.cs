@@ -15,7 +15,7 @@ public class SystemTrayService : ISystemTrayService
 {
     private TrayIcon? _trayIcon;
     private NativeMenu? _contextMenu;
-    
+
     public event EventHandler? OpenSettingsRequested;
     public event EventHandler? ExitRequested;
 
@@ -64,7 +64,7 @@ public class SystemTrayService : ISystemTrayService
                 using var stream = File.OpenRead(iconPath);
                 return new WindowIcon(stream);
             }
-            
+
             // Try to load from assets
             try
             {
@@ -75,7 +75,7 @@ public class SystemTrayService : ISystemTrayService
             {
                 Log.Warning("logo.ico not found in assets, trying alternative paths");
             }
-            
+
             // Try alternative asset paths
             var assetPaths = new[]
             {
@@ -83,7 +83,7 @@ public class SystemTrayService : ISystemTrayService
                 "avares://AGI.Captor.Desktop/Assets/icon.ico",
                 "avares://AGI.Captor.Desktop/icon.ico"
             };
-            
+
             foreach (var path in assetPaths)
             {
                 try
@@ -101,14 +101,14 @@ public class SystemTrayService : ISystemTrayService
         {
             Log.Warning(ex, "Failed to load tray icon from file");
         }
-        
+
         return null;
     }
 
     private void CreateContextMenu()
     {
         _contextMenu = new NativeMenu();
-        
+
         // Take Screenshot menu item
         var takeScreenshotItem = new NativeMenuItem("Take Screenshot")
         {
@@ -116,10 +116,10 @@ public class SystemTrayService : ISystemTrayService
         };
         takeScreenshotItem.Click += (s, e) => TakeScreenshot();
         _contextMenu.Add(takeScreenshotItem);
-        
+
         // Separator
         _contextMenu.Add(new NativeMenuItemSeparator());
-        
+
         // Settings menu item
         var settingsItem = new NativeMenuItem("Settings...")
         {
@@ -127,7 +127,7 @@ public class SystemTrayService : ISystemTrayService
         };
         settingsItem.Click += (s, e) => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
         _contextMenu.Add(settingsItem);
-        
+
         // About menu item
         var aboutItem = new NativeMenuItem("About")
         {
@@ -135,10 +135,10 @@ public class SystemTrayService : ISystemTrayService
         };
         aboutItem.Click += (s, e) => ShowAbout();
         _contextMenu.Add(aboutItem);
-        
+
         // Separator
         _contextMenu.Add(new NativeMenuItemSeparator());
-        
+
         // Exit menu item
         var exitItem = new NativeMenuItem("Exit")
         {
@@ -146,7 +146,7 @@ public class SystemTrayService : ISystemTrayService
         };
         exitItem.Click += (s, e) => ExitRequested?.Invoke(this, EventArgs.Empty);
         _contextMenu.Add(exitItem);
-        
+
         if (_trayIcon != null)
         {
             _trayIcon.Menu = _contextMenu;
@@ -158,7 +158,7 @@ public class SystemTrayService : ISystemTrayService
         try
         {
             // Get overlay service and show capture UI
-            var overlayService = App.Services?.GetService(typeof(AGI.Captor.Desktop.Services.Overlay.IOverlayController)) 
+            var overlayService = App.Services?.GetService(typeof(AGI.Captor.Desktop.Services.Overlay.IOverlayController))
                 as AGI.Captor.Desktop.Services.Overlay.IOverlayController;
             overlayService?.ShowAll();
         }
@@ -184,7 +184,7 @@ public class SystemTrayService : ISystemTrayService
                 catch (Exception ex)
                 {
                     Log.Error(ex, "Failed to show About dialog on UI thread");
-                    
+
                     // Fallback to notification if dialog fails
                     try
                     {
@@ -213,11 +213,11 @@ public class SystemTrayService : ISystemTrayService
                 // For now, log the notification
                 // In a full implementation, you might use Windows Toast notifications
                 Log.Debug("Notification: {Title} - {Message}", title, message);
-                
+
                 // Update tooltip temporarily to show notification
                 var originalTooltip = _trayIcon.ToolTipText;
                 _trayIcon.ToolTipText = $"{title}: {message}";
-                
+
                 // Reset tooltip after a delay (ensure UI thread)
                 System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ =>
                 {

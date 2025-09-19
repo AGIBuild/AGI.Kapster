@@ -17,8 +17,8 @@ public class AddAnnotationCommand : CommandBase
     private readonly IAnnotationRenderer _renderer;
     private readonly IAnnotationItem _annotation;
     private readonly Canvas _canvas;
-    
-    public AddAnnotationCommand(AnnotationManager manager, IAnnotationRenderer renderer, IAnnotationItem annotation, Canvas canvas) 
+
+    public AddAnnotationCommand(AnnotationManager manager, IAnnotationRenderer renderer, IAnnotationItem annotation, Canvas canvas)
         : base($"Add {annotation.Type}")
     {
         _manager = manager;
@@ -26,14 +26,14 @@ public class AddAnnotationCommand : CommandBase
         _annotation = annotation;
         _canvas = canvas;
     }
-    
+
     public override void Execute()
     {
         _manager.AddItem(_annotation);
         _renderer.RenderAll(_canvas, new[] { _annotation });
         Log.Debug("Added annotation: {Type} {Id}", _annotation.Type, _annotation.Id);
     }
-    
+
     public override void Undo()
     {
         _renderer.RemoveRender(_canvas, _annotation);
@@ -51,8 +51,8 @@ public class RemoveAnnotationCommand : CommandBase
     private readonly IAnnotationRenderer _renderer;
     private readonly IAnnotationItem _annotation;
     private readonly Canvas _canvas;
-    
-    public RemoveAnnotationCommand(AnnotationManager manager, IAnnotationRenderer renderer, IAnnotationItem annotation, Canvas canvas) 
+
+    public RemoveAnnotationCommand(AnnotationManager manager, IAnnotationRenderer renderer, IAnnotationItem annotation, Canvas canvas)
         : base($"Remove {annotation.Type}")
     {
         _manager = manager;
@@ -60,14 +60,14 @@ public class RemoveAnnotationCommand : CommandBase
         _annotation = annotation;
         _canvas = canvas;
     }
-    
+
     public override void Execute()
     {
         _renderer.RemoveRender(_canvas, _annotation);
         _manager.RemoveItem(_annotation);
         Log.Debug("Removed annotation: {Type} {Id}", _annotation.Type, _annotation.Id);
     }
-    
+
     public override void Undo()
     {
         _manager.AddItem(_annotation);
@@ -89,9 +89,9 @@ public class ModifyAnnotationCommand : CommandBase
     private readonly string _propertyName;
     private readonly Action<object> _setter;
     private readonly Canvas _canvas;
-    
-    public ModifyAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation, 
-        string propertyName, object oldValue, object newValue, Action<object> setter, Canvas canvas) 
+
+    public ModifyAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation,
+        string propertyName, object oldValue, object newValue, Action<object> setter, Canvas canvas)
         : base($"Modify {annotation.Type} {propertyName}")
     {
         _renderer = renderer;
@@ -103,20 +103,20 @@ public class ModifyAnnotationCommand : CommandBase
         _setter = setter;
         _canvas = canvas;
     }
-    
+
     public override void Execute()
     {
         _setter(_newValue);
         _renderer.RenderAll(_canvas, _manager.Items);
-        Log.Debug("Modified annotation {Id} {Property}: {Old} -> {New}", 
+        Log.Debug("Modified annotation {Id} {Property}: {Old} -> {New}",
             _annotation.Id, _propertyName, _oldValue, _newValue);
     }
-    
+
     public override void Undo()
     {
         _setter(_oldValue);
         _renderer.RenderAll(_canvas, _manager.Items);
-        Log.Debug("Reverted annotation {Id} {Property}: {New} -> {Old}", 
+        Log.Debug("Reverted annotation {Id} {Property}: {New} -> {Old}",
             _annotation.Id, _propertyName, _newValue, _oldValue);
     }
 }
@@ -131,8 +131,8 @@ public class MoveAnnotationCommand : CommandBase
     private readonly IAnnotationItem _annotation;
     private readonly Avalonia.Vector _delta;
     private readonly Canvas _canvas;
-    
-    public MoveAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation, Avalonia.Vector delta, Canvas canvas) 
+
+    public MoveAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation, Avalonia.Vector delta, Canvas canvas)
         : base($"Move {annotation.Type}")
     {
         _renderer = renderer;
@@ -141,14 +141,14 @@ public class MoveAnnotationCommand : CommandBase
         _delta = delta;
         _canvas = canvas;
     }
-    
+
     public override void Execute()
     {
         _annotation.Move(_delta);
         _renderer.RenderAll(_canvas, _manager.Items);
         Log.Debug("Moved annotation {Id} by {Delta}", _annotation.Id, _delta);
     }
-    
+
     public override void Undo()
     {
         _annotation.Move(-_delta);
@@ -168,9 +168,9 @@ public class TransformAnnotationCommand : CommandBase
     private readonly double _scaleFactor;
     private readonly Avalonia.Point _center;
     private readonly Canvas _canvas;
-    
-    public TransformAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation, 
-        double scaleFactor, Avalonia.Point center, Canvas canvas) 
+
+    public TransformAnnotationCommand(IAnnotationRenderer renderer, AnnotationManager manager, IAnnotationItem annotation,
+        double scaleFactor, Avalonia.Point center, Canvas canvas)
         : base($"Scale {annotation.Type}")
     {
         _renderer = renderer;
@@ -180,19 +180,19 @@ public class TransformAnnotationCommand : CommandBase
         _center = center;
         _canvas = canvas;
     }
-    
+
     public override void Execute()
     {
         _annotation.Scale(_scaleFactor, _center);
         _renderer.RenderAll(_canvas, _manager.Items);
         Log.Debug("Scaled annotation {Id} by {Factor} around {Center}", _annotation.Id, _scaleFactor, _center);
     }
-    
+
     public override void Undo()
     {
         _annotation.Scale(1.0 / _scaleFactor, _center);
         _renderer.RenderAll(_canvas, _manager.Items);
-        Log.Debug("Reverted scale of annotation {Id} by {Factor} around {Center}", 
+        Log.Debug("Reverted scale of annotation {Id} by {Factor} around {Center}",
             _annotation.Id, 1.0 / _scaleFactor, _center);
     }
 }
@@ -248,13 +248,13 @@ public class SetArrowEndpointsCommand : CommandBase
 public class CompositeCommand : CommandBase
 {
     private readonly List<ICommand> _commands;
-    
-    public CompositeCommand(string description, IEnumerable<ICommand> commands) 
+
+    public CompositeCommand(string description, IEnumerable<ICommand> commands)
         : base(description)
     {
         _commands = commands.ToList();
     }
-    
+
     public override void Execute()
     {
         foreach (var command in _commands)
@@ -263,7 +263,7 @@ public class CompositeCommand : CommandBase
         }
         Log.Debug("Executed composite command: {Description} ({Count} commands)", Description, _commands.Count);
     }
-    
+
     public override void Undo()
     {
         // Undo in reverse order
@@ -273,6 +273,6 @@ public class CompositeCommand : CommandBase
         }
         Log.Debug("Undone composite command: {Description} ({Count} commands)", Description, _commands.Count);
     }
-    
+
     public override bool CanUndo => _commands.All(c => c.CanUndo);
 }

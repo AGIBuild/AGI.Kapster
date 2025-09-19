@@ -1,5 +1,31 @@
 # AGI.Captor Documentation Index
 
+## Build and Deployment
+
+### Version Management
+- **[Versioning Strategy](versioning-strategy.md)** - Complete versioning strategy and GitVersion configuration
+  - Branch strategy and version rules
+  - Semantic versioning format
+  - Commit message conventions
+  - CI/CD workflow integration
+
+- **[Commands Reference](commands-reference.md)** - Quick reference for common commands
+  - Build system commands
+  - GitVersion operations
+  - Git workflow commands
+  - Testing and packaging
+
+### Build System
+- **[Build System](build-system.md)** - Nuke-based build automation
+  - Build targets and configuration
+  - Cross-platform build support
+  - Packaging and distribution
+
+- **[Packaging Guide](packaging-guide.md)** - Platform-specific packaging instructions
+  - Windows MSI creation
+  - Linux DEB/RPM packages
+  - macOS PKG and App Store
+
 ## Architecture and Design Documents
 
 ### Overlay System (截图遮罩层系统)

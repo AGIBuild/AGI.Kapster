@@ -20,7 +20,7 @@ public class MemoryFileSystemService : IFileSystemService
     {
         return _files.ContainsKey(NormalizePath(path));
     }
-    
+
     public async Task<string> ReadAllTextAsync(string path)
     {
         var normalizedPath = NormalizePath(path);
@@ -30,14 +30,14 @@ public class MemoryFileSystemService : IFileSystemService
         }
         throw new FileNotFoundException($"File not found: {path}");
     }
-    
+
     public async Task WriteAllTextAsync(string path, string content)
     {
         var normalizedPath = NormalizePath(path);
         _files[normalizedPath] = content;
         await Task.CompletedTask;
     }
-    
+
     public string ReadAllText(string path)
     {
         var normalizedPath = NormalizePath(path);
@@ -47,18 +47,18 @@ public class MemoryFileSystemService : IFileSystemService
         }
         throw new FileNotFoundException($"File not found: {path}");
     }
-    
+
     public void EnsureDirectoryExists(string path)
     {
         var normalizedPath = NormalizePath(path);
         _directories.Add(normalizedPath);
     }
-    
+
     public string GetApplicationDataPath()
     {
         return _applicationDataPath;
     }
-    
+
     /// <summary>
     /// Set custom application data path for testing
     /// </summary>
@@ -66,7 +66,7 @@ public class MemoryFileSystemService : IFileSystemService
     {
         _applicationDataPath = path;
     }
-    
+
     /// <summary>
     /// Clear all files and directories (useful for test cleanup)
     /// </summary>
@@ -75,7 +75,7 @@ public class MemoryFileSystemService : IFileSystemService
         _files.Clear();
         _directories.Clear();
     }
-    
+
     /// <summary>
     /// Get all file paths for debugging
     /// </summary>
@@ -83,7 +83,7 @@ public class MemoryFileSystemService : IFileSystemService
     {
         return _files.Keys;
     }
-    
+
     private static string NormalizePath(string path)
     {
         return Path.GetFullPath(path).ToLowerInvariant();

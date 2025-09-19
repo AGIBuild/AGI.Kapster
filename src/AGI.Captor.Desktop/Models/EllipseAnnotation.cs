@@ -82,25 +82,25 @@ public class EllipseAnnotation : AnnotationItemBase
     public override bool HitTest(Point point)
     {
         if (!IsVisible) return false;
-        
+
         var center = _boundingRect.Center;
         var radiusX = RadiusX;
         var radiusY = RadiusY;
-        
+
         // 标准化坐标到椭圆坐标系
         var normalizedX = (point.X - center.X) / radiusX;
         var normalizedY = (point.Y - center.Y) / radiusY;
         var distanceSquared = normalizedX * normalizedX + normalizedY * normalizedY;
-        
+
         // 如果有填充，检查是否在椭圆内部
         if (Style.FillMode != FillMode.None && distanceSquared <= 1.0)
             return true;
-        
+
         // 检查是否在描边附近 - 增大选择区域提高可选择性
         var strokeThickness = Math.Max(Style.StrokeWidth / Math.Min(radiusX, radiusY), 0.1); // 最小选择区域
         var innerThreshold = Math.Max(0, 1.0 - strokeThickness);
         var outerThreshold = 1.0 + strokeThickness * 1.5; // 增大外边界
-        
+
         return distanceSquared >= innerThreshold && distanceSquared <= outerThreshold;
     }
 
@@ -113,10 +113,10 @@ public class EllipseAnnotation : AnnotationItemBase
     {
         var topLeft = _boundingRect.TopLeft;
         var bottomRight = _boundingRect.BottomRight;
-        
+
         var newTopLeft = center + (topLeft - center) * scale;
         var newBottomRight = center + (bottomRight - center) * scale;
-        
+
         _boundingRect = new Rect(newTopLeft, newBottomRight);
     }
 
@@ -125,15 +125,15 @@ public class EllipseAnnotation : AnnotationItemBase
         // 椭圆旋转需要特殊处理，这里暂时通过移动中心点实现简单旋转
         var ellipseCenter = _boundingRect.Center;
         var relative = ellipseCenter - center;
-        
+
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
-        
+
         var newCenter = center + new Vector(
             relative.X * cos - relative.Y * sin,
             relative.X * sin + relative.Y * cos
         );
-        
+
         Center = newCenter;
     }
 
@@ -160,12 +160,12 @@ public class EllipseAnnotation : AnnotationItemBase
     public override void Deserialize(Dictionary<string, object> data)
     {
         base.Deserialize(data);
-        
+
         var x = data.TryGetValue("X", out var xVal) ? Convert.ToDouble(xVal) : 0;
         var y = data.TryGetValue("Y", out var yVal) ? Convert.ToDouble(yVal) : 0;
         var width = data.TryGetValue("Width", out var wVal) ? Convert.ToDouble(wVal) : 0;
         var height = data.TryGetValue("Height", out var hVal) ? Convert.ToDouble(hVal) : 0;
-        
+
         _boundingRect = new Rect(x, y, width, height);
     }
 }

@@ -1,0 +1,42 @@
+# GitVersion 配置 - 新的分支策略  
+# main: 开发分支 (持续开发)
+# release/*: 发布分支 (从release分支创建标签发布)
+mode: ContinuousDeployment
+next-version: 1.3.0
+
+branches:
+  # 主开发分支 - 持续开发，预发布版本
+  main:
+    regex: ^(master|main)$
+    mode: ContinuousDeployment
+    label: alpha
+    increment: Minor
+    
+  # 功能分支 - 从main分支创建
+  feature:
+    regex: ^features?[/-]
+    mode: ContinuousDeployment
+    label: useBranchName
+    increment: Inherit
+    
+  # 发布分支 - 用于发布准备，无预发布标签
+  release:
+    regex: ^releases?[/-]
+    mode: ContinuousDeployment
+    label: ''
+    increment: None
+    
+  # 热修复分支 - 紧急修复
+  hotfix:
+    regex: ^hotfix(es)?[/-]
+    mode: ContinuousDeployment
+    label: hotfix
+    increment: Patch
+
+# 提交消息版本增量控制
+merge-message-formats: {}
+
+major-version-bump-message: '\+semver:\s?(breaking|major)'
+minor-version-bump-message: '\+semver:\s?(feature|minor)'
+patch-version-bump-message: '\+semver:\s?(fix|patch)'
+no-bump-message: '\+semver:\s?(none|skip)'

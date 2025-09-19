@@ -47,7 +47,7 @@ public static class AvaloniaTestHelper
             var brush = new SolidColorBrush(Colors.Red);
             drawingContext.FillRectangle(brush, new Rect(0, 0, width, height));
         }
-        
+
         return renderTarget;
     }
 }

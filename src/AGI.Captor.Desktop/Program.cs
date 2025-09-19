@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
+using Serilog.Settings.Configuration;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
@@ -35,15 +37,15 @@ class Program
         {
             Log.Debug("Application started in minimized mode from command line");
         }
-        
+
         RunApp(args, isMinimizedStart);
     }
-    
-    private static void RunApp(string[] args, bool startMinimized )
+
+    private static void RunApp(string[] args, bool startMinimized)
     {
         var builder = Host.CreateApplicationBuilder(args);
         // Determine environment (default Development for local run; CI/CD sets to Production)
-        var environment = builder.Environment.EnvironmentName ?? "Development";
+        var environment = builder.Environment.EnvironmentName ?? "Production";
         Log.Information("Starting AGI.Captor in {Environment} environment", environment);
 
         builder.Configuration
@@ -51,17 +53,54 @@ class Program
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
-        
-        // Ensure logs directory exists for file sink
-        var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+
+        // Use user data directory for logs to avoid permission issues
+        var userDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var appDataDir = Path.Combine(userDataDir, "AGI.Captor");
+        var logsDir = Path.Combine(appDataDir, "logs");
         Directory.CreateDirectory(logsDir);
-        
-        // Configure Serilog strictly from configuration
-        Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Configuration)
+
+        // Configure Serilog with explicit assemblies for single-file deployment
+        var loggerConfiguration = new LoggerConfiguration()
             .Enrich.WithProperty("Environment", environment)
-            .CreateLogger();
-        
+            .Enrich.WithProperty("LogsDirectory", logsDir);
+
+        // Configure based on environment
+        if (environment == "Development")
+        {
+            loggerConfiguration
+                .MinimumLevel.Debug()
+                .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .WriteTo.File(
+                    path: Path.Combine(logsDir, "app-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 30,
+                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+        }
+        else if (environment == "Production")
+        {
+            loggerConfiguration
+                .MinimumLevel.Warning()
+                .WriteTo.File(
+                    path: Path.Combine(logsDir, "app-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 7,
+                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+        }
+        else
+        {
+            // Default configuration
+            loggerConfiguration
+                .MinimumLevel.Information()
+                .WriteTo.File(
+                    path: Path.Combine(logsDir, "app-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 15,
+                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+        }
+
+        Log.Logger = loggerConfiguration.CreateLogger();
+
         // Register startup arguments
         var startupArgs = new AGI.Captor.Desktop.Models.AppStartupArgs
         {
@@ -77,11 +116,18 @@ class Program
 
         builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
         builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
-        builder.Services.AddTransient<ISettingsService, SettingsService>();
+        builder.Services.AddTransient<ISettingsService>(provider =>
+            new SettingsService(
+                provider.GetRequiredService<IFileSystemService>(),
+                provider.GetRequiredService<IConfiguration>()
+            ));
         builder.Services.AddSingleton<IApplicationController, ApplicationController>();
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
         builder.Services.AddTransient<SettingsWindow>();
-        
+
+        // Auto-update service (only enabled in production)
+        builder.Services.AddSingleton<AGI.Captor.Desktop.Services.Update.IUpdateService, AGI.Captor.Desktop.Services.Update.UpdateService>();
+
         // Register platform-specific hotkey providers
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -95,7 +141,7 @@ class Program
         {
             builder.Services.AddSingleton<IHotkeyProvider, UnsupportedHotkeyProvider>();
         }
-        
+
         // Register platform-specific services
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -122,7 +168,7 @@ class Program
             builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
             builder.Services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
         }
-        
+
         // Register the overlay manager
         builder.Services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
 
@@ -135,8 +181,8 @@ class Program
 
         host.Dispose();
     }
-    
-    
+
+
     // Removed InitializeLogging; Serilog is configured in RunApp strictly from configuration files
 
     // Avalonia configuration, don't remove; also used by visual designer.

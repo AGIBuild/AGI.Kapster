@@ -49,14 +49,14 @@ public class ExportService : IExportService
             progressCallback?.Invoke(10, "Creating composite image...");
             // UI operations must run on UI thread
             var compositeImage = await CreateCompositeImageAsync(screenshot, annotations, selectionRect);
-            
+
             progressCallback?.Invoke(40, "Converting image format...");
             // Convert Avalonia bitmap to SkiaSharp for advanced format support
             using var skiaBitmap = await ConvertToSkiaBitmapAsync(compositeImage, settings);
-            
+
             progressCallback?.Invoke(70, "Encoding image...");
             await SaveSkiaBitmapAsync(skiaBitmap, filePath, settings, progressCallback);
-            
+
             progressCallback?.Invoke(100, "Export completed");
             Log.Information("Exported annotated screenshot to {FilePath} with format {Format}", filePath, settings.Format);
         }
@@ -78,7 +78,7 @@ public class ExportService : IExportService
             var defaultSettings = GetDefaultSettings();
             var tempPath = Path.Combine(Path.GetTempPath(), $"AGI_Captor_Export_{DateTime.Now:yyyyMMdd_HHmmss}.png");
             await ExportToFileAsync(screenshot, annotations, selectionRect, tempPath, defaultSettings);
-            
+
             Log.Information("Exported annotated screenshot to temporary file: {TempPath}", tempPath);
         }
         catch (Exception ex)
@@ -114,17 +114,17 @@ public class ExportService : IExportService
             // Create fresh settings service instance to get latest settings
             var settingsService = new SettingsService();
             var appSettings = settingsService.Settings;
-            
+
             // Determine format from settings
             var formatString = appSettings?.General?.DefaultSaveFormat ?? "PNG";
-            var format = Enum.TryParse<ExportFormat>(formatString, true, out var parsedFormat) 
-                ? parsedFormat 
+            var format = Enum.TryParse<ExportFormat>(formatString, true, out var parsedFormat)
+                ? parsedFormat
                 : ExportFormat.PNG;
-            
+
             // Get quality settings from advanced settings if available
             var jpegQuality = appSettings?.DefaultStyles?.Export?.JpegQuality ?? 90;
             var pngCompression = appSettings?.DefaultStyles?.Export?.PngCompression ?? 6;
-            
+
             return new ExportSettings
             {
                 Format = format,
@@ -163,7 +163,7 @@ public class ExportService : IExportService
             return null;
         }
     }
-    
+
     /// <summary>
     /// Create composite image with annotations rendered on top of screenshot
     /// Must be called on UI thread due to Canvas and RenderTargetBitmap operations
@@ -191,7 +191,7 @@ public class ExportService : IExportService
                     var offsetAnnotation = CreateOffsetAnnotation(annotation, -selectionRect.X, -selectionRect.Y);
                     offsetAnnotations.Add(offsetAnnotation);
                 }
-                
+
                 _renderer.RenderAll(canvas, offsetAnnotations);
             }
 
@@ -208,16 +208,16 @@ public class ExportService : IExportService
                 new Vector(96, 96));
 
             using var context = composite.CreateDrawingContext();
-            
+
             // Draw screenshot portion
             // Since the screenshot is already cropped to selection area, use full screenshot as source
             var sourceRect = new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height);
             var destRect = new Rect(0, 0, selectionRect.Width, selectionRect.Height);
             context.DrawImage(screenshot, sourceRect, destRect);
-            
+
             // Draw annotations on top
             context.DrawImage(annotationBitmap, destRect);
-            
+
             return Task.FromResult<Bitmap>(composite);
         }
         catch (Exception ex)
@@ -226,7 +226,7 @@ public class ExportService : IExportService
             throw;
         }
     }
-    
+
     /// <summary>
     /// Create an offset copy of an annotation for export rendering
     /// </summary>
@@ -243,7 +243,7 @@ public class ExportService : IExportService
                 new Point(arrow.EndPoint.X + offsetX, arrow.EndPoint.Y + offsetY),
                 arrow.Style),
             RectangleAnnotation rect => new RectangleAnnotation(
-                new Rect(rect.Bounds.X + offsetX, rect.Bounds.Y + offsetY, 
+                new Rect(rect.Bounds.X + offsetX, rect.Bounds.Y + offsetY,
                          rect.Bounds.Width, rect.Bounds.Height),
                 rect.Style),
             EllipseAnnotation ellipse => new EllipseAnnotation(
@@ -257,25 +257,25 @@ public class ExportService : IExportService
                 emoji.Style),
             _ => original // Fallback for unknown types
         };
-        
+
         // Ensure the offset item is not selected for clean export
         offsetItem.State = AnnotationState.Normal;
         return offsetItem;
     }
-    
+
     /// <summary>
     /// Create offset freehand annotation by manually copying points
     /// </summary>
     private FreehandAnnotation CreateOffsetFreehandAnnotation(FreehandAnnotation original, double offsetX, double offsetY)
     {
         var offsetFreehand = new FreehandAnnotation(original.Style);
-        
+
         // Add offset points one by one
         foreach (var point in original.Points)
         {
             offsetFreehand.AddPoint(new Point(point.X + offsetX, point.Y + offsetY));
         }
-        
+
         return offsetFreehand;
     }
 
@@ -299,7 +299,7 @@ public class ExportService : IExportService
                 {
                     throw new InvalidOperationException("Failed to create SkiaSharp image from Avalonia bitmap");
                 }
-                
+
                 var skiaBitmap = SKBitmap.FromImage(skiaImage);
                 if (skiaBitmap == null)
                 {
@@ -312,18 +312,18 @@ public class ExportService : IExportService
                     var width = skiaBitmap.Width;
                     var height = skiaBitmap.Height;
                     var backgroundBitmap = new SKBitmap(width, height, SKColorType.Rgb888x, SKAlphaType.Opaque);
-                    
+
                     using var canvas = new SKCanvas(backgroundBitmap);
                     using var paint = new SKPaint
                     {
                         IsAntialias = true,
                         FilterQuality = SKFilterQuality.High
                     };
-                    
+
                     // Use white background for formats that don't support transparency
                     canvas.Clear(SKColors.White);
                     canvas.DrawBitmap(skiaBitmap, 0, 0, paint);
-                    
+
                     skiaBitmap.Dispose(); // Clean up original bitmap
                     return backgroundBitmap;
                 }
@@ -353,16 +353,16 @@ public class ExportService : IExportService
                 using var stream = File.Create(filePath);
 
                 progressCallback?.Invoke(85, $"Encoding as {settings.Format}...");
-                
+
                 // Log quality settings for debugging
                 if (settings.SupportsQuality())
                 {
                     Log.Debug("Exporting {Format} with quality: {Quality}%", settings.Format, settings.Quality);
                 }
-                
+
                 // Create encode options based on format
                 SKData encodedData;
-                
+
                 try
                 {
                     switch (settings.Format)
@@ -370,13 +370,13 @@ public class ExportService : IExportService
                         case ExportFormat.PNG:
                             encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             break;
-                            
+
                         case ExportFormat.JPEG:
                             // Use high-quality JPEG encoding with explicit quality setting
                             // Ensure quality is properly applied (SkiaSharp sometimes ignores low-level settings)
                             var actualQuality = Math.Max(settings.Quality, 85); // Minimum quality for screenshots
                             Log.Debug("Encoding JPEG with quality: {Quality}", actualQuality);
-                            
+
                             // Use proper SkiaSharp JPEG encoding
                             encodedData = image.Encode(SKEncodedImageFormat.Jpeg, actualQuality);
                             if (encodedData == null)
@@ -385,18 +385,18 @@ public class ExportService : IExportService
                                 encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             }
                             break;
-                            
+
                         case ExportFormat.WebP:
                             encodedData = image.Encode(SKEncodedImageFormat.Webp, settings.Quality);
                             break;
-                            
+
                         case ExportFormat.BMP:
                             // Try SkiaSharp BMP encoding first, fallback to PNG if it fails
                             try
                             {
                                 Log.Debug("Attempting BMP encoding with SkiaSharp");
                                 encodedData = image.Encode(SKEncodedImageFormat.Bmp, 100);
-                                
+
                                 if (encodedData == null || encodedData.Size == 0)
                                 {
                                     Log.Warning("SkiaSharp BMP encoding failed, using PNG fallback");
@@ -413,19 +413,19 @@ public class ExportService : IExportService
                                 encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             }
                             break;
-                            
+
                         case ExportFormat.TIFF:
                             // Fallback to PNG for TIFF since SkiaSharp has limited TIFF support
                             Log.Warning("TIFF format not fully supported, saving as PNG");
                             encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             break;
-                            
+
                         case ExportFormat.GIF:
                             // Fallback to PNG for GIF since SkiaSharp has limited GIF encoding support
                             Log.Warning("GIF format encoding not fully supported, saving as PNG");
                             encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             break;
-                            
+
                         default:
                             encodedData = image.Encode(SKEncodedImageFormat.Png, 100);
                             break;
@@ -466,7 +466,7 @@ public class ExportService : IExportService
             Format = format,
             Quality = 90
         };
-        
+
         await ExportToFileAsync(screenshot, new List<IAnnotationItem>(), new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height), filePath, settings);
     }
 }

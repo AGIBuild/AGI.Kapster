@@ -23,7 +23,7 @@ public class HotkeyManagerTests : TestBase
         _hotkeyProvider = Substitute.For<IHotkeyProvider>();
         _settingsService = Substitute.For<ISettingsService>();
         _overlayController = Substitute.For<IOverlayController>();
-        
+
         _hotkeyManager = new HotkeyManager(_hotkeyProvider, _settingsService, _overlayController);
     }
 
@@ -48,8 +48,8 @@ public class HotkeyManagerTests : TestBase
 
         // Assert
         _hotkeyProvider.Received(1).RegisterHotkey(
-            "overlay_escape", 
-            HotkeyModifiers.None, 
+            "overlay_escape",
+            HotkeyModifiers.None,
             27, // Escape key code
             Arg.Any<Action>()
         );
@@ -69,9 +69,9 @@ public class HotkeyManagerTests : TestBase
 
         // Assert
         _hotkeyProvider.Received(1).RegisterHotkey(
-            Arg.Any<string>(), 
-            Arg.Any<HotkeyModifiers>(), 
-            Arg.Any<uint>(), 
+            Arg.Any<string>(),
+            Arg.Any<HotkeyModifiers>(),
+            Arg.Any<uint>(),
             Arg.Any<Action>()
         );
     }
@@ -120,9 +120,9 @@ public class HotkeyManagerTests : TestBase
 
         // Assert
         _hotkeyProvider.DidNotReceive().RegisterHotkey(
-            Arg.Any<string>(), 
-            Arg.Any<HotkeyModifiers>(), 
-            Arg.Any<uint>(), 
+            Arg.Any<string>(),
+            Arg.Any<HotkeyModifiers>(),
+            Arg.Any<uint>(),
             Arg.Any<Action>()
         );
     }
@@ -139,9 +139,9 @@ public class HotkeyManagerTests : TestBase
 
         // Assert
         _hotkeyProvider.DidNotReceive().RegisterHotkey(
-            Arg.Any<string>(), 
-            Arg.Any<HotkeyModifiers>(), 
-            Arg.Any<uint>(), 
+            Arg.Any<string>(),
+            Arg.Any<HotkeyModifiers>(),
+            Arg.Any<uint>(),
             Arg.Any<Action>()
         );
     }

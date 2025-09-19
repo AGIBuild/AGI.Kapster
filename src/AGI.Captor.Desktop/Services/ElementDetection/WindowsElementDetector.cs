@@ -69,7 +69,7 @@ public class WindowsElementDetector : IElementDetector
     private DetectedElement? DetectWindowAt(int x, int y, IntPtr ignoreWindow = default)
     {
         var point = new POINT { X = x, Y = y };
-        
+
         // First attempt: Get window directly
         IntPtr hwnd = WindowFromPoint(point);
 
@@ -86,7 +86,7 @@ public class WindowsElementDetector : IElementDetector
 
         // Check if this is a valid window that we want to select
         IntPtr targetWindow = FindSelectableWindow(hwnd);
-        
+
         return GetWindowInfo(targetWindow, true);
     }
 
@@ -181,7 +181,7 @@ public class WindowsElementDetector : IElementDetector
         {
             // First get the window
             var windowElement = DetectWindowAt(x, y, ignoreWindow);
-            if (windowElement == null) 
+            if (windowElement == null)
             {
                 Log.Debug("No window found at {X}, {Y}", x, y);
                 return null;
@@ -214,7 +214,7 @@ public class WindowsElementDetector : IElementDetector
         try
         {
             // Enhanced multi-strategy element detection
-            
+
             // Strategy 1: Try UI Automation for modern apps
             var automationElement = FindUIAutomationElementAt(x, y);
             if (automationElement != null)
@@ -230,9 +230,9 @@ public class WindowsElementDetector : IElementDetector
                 var childInfo = GetWindowInfo(deepestChild, false);
                 if (childInfo != null)
                 {
-                    Log.Debug("Found child window: {Name} ({ClassName}) - IsUIElement: {IsUI}", 
+                    Log.Debug("Found child window: {Name} ({ClassName}) - IsUIElement: {IsUI}",
                         childInfo.Name, childInfo.ClassName, IsUIElement(childInfo));
-                    
+
                     if (IsUIElement(childInfo))
                     {
                         Log.Information("Found deep child element: {Name} ({ClassName})", childInfo.Name, childInfo.ClassName);
@@ -254,17 +254,17 @@ public class WindowsElementDetector : IElementDetector
             if (ScreenToClient(windowHandle, ref point))
             {
                 var realChild = RealChildWindowFromPoint(windowHandle, point);
-                Log.Debug("RealChildWindowFromPoint result: {Handle:X} (parent: {Parent:X})", 
+                Log.Debug("RealChildWindowFromPoint result: {Handle:X} (parent: {Parent:X})",
                     realChild.ToInt64(), windowHandle.ToInt64());
-                    
+
                 if (realChild != IntPtr.Zero && realChild != windowHandle)
                 {
                     var realChildInfo = GetWindowInfo(realChild, false);
                     if (realChildInfo != null)
                     {
-                        Log.Debug("RealChild info: {Name} ({ClassName}) - IsUIElement: {IsUI}", 
+                        Log.Debug("RealChild info: {Name} ({ClassName}) - IsUIElement: {IsUI}",
                             realChildInfo.Name, realChildInfo.ClassName, IsUIElement(realChildInfo));
-                            
+
                         if (IsUIElement(realChildInfo))
                         {
                             Log.Information("Found real child element: {Name} ({ClassName})", realChildInfo.Name, realChildInfo.ClassName);
@@ -303,7 +303,7 @@ public class WindowsElementDetector : IElementDetector
     private IntPtr FindDeepestChildAtMultipass(int x, int y, IntPtr parentWindow)
     {
         // Multi-pass approach for better element detection
-        
+
         // Pass 1: Standard ChildWindowFromPoint
         var child1 = FindDeepestChildAt(x, y, parentWindow);
         if (child1 != IntPtr.Zero && child1 != parentWindow && IsInteractiveElement(child1))
@@ -324,7 +324,7 @@ public class WindowsElementDetector : IElementDetector
     private IntPtr FindDeepestChildAt(int x, int y, IntPtr parentWindow)
     {
         var point = new POINT { X = x, Y = y };
-        
+
         // Convert to client coordinates of the parent window
         if (!ScreenToClient(parentWindow, ref point))
             return IntPtr.Zero;
@@ -367,25 +367,25 @@ public class WindowsElementDetector : IElementDetector
         string className = classBuilder.ToString().ToLower();
 
         // Extended list of interactive element class names
-        var interactiveClasses = new[] 
-        { 
+        var interactiveClasses = new[]
+        {
             "button", "edit", "static", "listbox", "combobox", "msctls_trackbar32",
             "msctls_updown32", "scrollbar", "richedit", "sys", "afx:", "atl:",
             "chrome_", "firefox", "webkit", "qt_", "tk", "tree", "list", "tab",
             "internet explorer_", "msctls_", "toolbarwindow32", "tooltips_class32"
         };
-        
+
         bool hasInteractiveClass = interactiveClasses.Any(cls => className.Contains(cls));
-        
+
         // If it has an interactive class name, it's likely interactive
         if (hasInteractiveClass)
             return true;
-            
+
         // Additional heuristics: check if it has text content (indicates UI element)
         var titleBuilder = new StringBuilder(256);
         GetWindowText(hwnd, titleBuilder, titleBuilder.Capacity);
         string title = titleBuilder.ToString();
-        
+
         // Small windows with text are likely UI elements
         return !string.IsNullOrEmpty(title) && width < 500 && height < 200;
     }
@@ -413,7 +413,7 @@ public class WindowsElementDetector : IElementDetector
                     // Convert child rect to parent client coordinates
                     var topLeft = new POINT { X = childRect.Left, Y = childRect.Top };
                     var bottomRight = new POINT { X = childRect.Right, Y = childRect.Bottom };
-                    
+
                     ScreenToClient(parentWindow, ref topLeft);
                     ScreenToClient(parentWindow, ref bottomRight);
 
@@ -456,16 +456,16 @@ public class WindowsElementDetector : IElementDetector
             return false;
 
         // Check for common UI element class names (more comprehensive list)
-        var uiElementClasses = new[] 
-        { 
+        var uiElementClasses = new[]
+        {
             "button", "edit", "static", "listbox", "combobox", "scrollbar", "toolbar", "statusbar",
             "msctls_", "richedit", "internet explorer_", "chrome_", "firefox", "webkit",
             "sys", "afx:", "atl:", "wtl:", "qt", "gtk", "tk",
             "tree", "list", "tab", "progress", "slider", "spin", "header"
         };
-        
+
         bool hasUIClassName = uiElementClasses.Any(ui => className.Contains(ui));
-        
+
         // If it has a clear UI class name, it's likely a UI element
         if (hasUIClassName)
             return true;
@@ -473,10 +473,10 @@ public class WindowsElementDetector : IElementDetector
         // For elements without obvious class names, use size heuristics
         // UI elements are typically smaller than full windows but large enough to be interactive
         bool reasonableSize = width < 800 && height < 600 && width >= 20 && height >= 15;
-        
+
         // Check if it has meaningful text content (good indicator of UI element)
         bool hasText = !string.IsNullOrEmpty(element.Name) && element.Name.Length > 0;
-        
+
         return reasonableSize && hasText;
     }
 
@@ -613,7 +613,7 @@ public class WindowsElementDetector : IElementDetector
         try
         {
             var method = element.GetType().GetMethod("GetCurrentPropertyValue");
-            var result = method?.Invoke(element, new object[] { UIA_NativeWindowHandlePropertyId});
+            var result = method?.Invoke(element, new object[] { UIA_NativeWindowHandlePropertyId });
             return result is int intValue ? new IntPtr(intValue) : IntPtr.Zero;
         }
         catch

@@ -59,11 +59,11 @@ public class ArrowAnnotation : AnnotationItemBase
             var minY = Math.Min(_startPoint.Y, _endPoint.Y);
             var maxX = Math.Max(_startPoint.X, _endPoint.X);
             var maxY = Math.Max(_startPoint.Y, _endPoint.Y);
-            
+
             // 扩展边界以包含箭头头部和描边宽度
             var headSize = Math.Max(Style.StrokeWidth * 7, 14);
             var padding = Math.Max(Style.StrokeWidth / 2, headSize / 2);
-            
+
             return new Rect(
                 minX - padding,
                 minY - padding,
@@ -83,10 +83,10 @@ public class ArrowAnnotation : AnnotationItemBase
     public override bool HitTest(Point point)
     {
         if (!IsVisible) return false;
-        
+
         // 检查是否在包围盒内
         if (!IsPointInRect(point, Bounds)) return false;
-        
+
         // 检查是否靠近箭头线段 - 增大选择阈值提高可选择性
         var threshold = Math.Max(Style.StrokeWidth * 3, 12);
         return DistanceToLineSegment(point, _startPoint, _endPoint) <= threshold;
@@ -110,14 +110,14 @@ public class ArrowAnnotation : AnnotationItemBase
     {
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
-        
+
         // 旋转起始点
         var startRelative = _startPoint - center;
         _startPoint = center + new Vector(
             startRelative.X * cos - startRelative.Y * sin,
             startRelative.X * sin + startRelative.Y * cos
         );
-        
+
         // 旋转结束点
         var endRelative = _endPoint - center;
         _endPoint = center + new Vector(
@@ -149,7 +149,7 @@ public class ArrowAnnotation : AnnotationItemBase
     public override void Deserialize(Dictionary<string, object> data)
     {
         base.Deserialize(data);
-        
+
         if (data.TryGetValue("StartPointX", out var startX) && data.TryGetValue("StartPointY", out var startY))
             _startPoint = new Point(Convert.ToDouble(startX), Convert.ToDouble(startY));
         if (data.TryGetValue("EndPointX", out var endX) && data.TryGetValue("EndPointY", out var endY))

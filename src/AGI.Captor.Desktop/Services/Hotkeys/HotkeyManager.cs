@@ -6,6 +6,7 @@ using Serilog;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Settings;
+using AGI.Captor.Desktop.Services.Update;
 using AGI.Captor.Desktop.Views;
 
 namespace AGI.Captor.Desktop.Services.Hotkeys;
@@ -28,7 +29,7 @@ public class HotkeyManager : IHotkeyManager
         _hotkeyProvider = hotkeyProvider ?? throw new ArgumentNullException(nameof(hotkeyProvider));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _overlayController = overlayController ?? throw new ArgumentNullException(nameof(overlayController));
-        
+
         Log.Debug("HotkeyManager constructor completed with provider: {Type}", _hotkeyProvider.GetType().Name);
     }
 
@@ -37,7 +38,7 @@ public class HotkeyManager : IHotkeyManager
         try
         {
             Log.Debug("Initializing hotkey manager...");
-            
+
             if (!_hotkeyProvider.IsSupported)
             {
                 Log.Warning("Hotkeys not supported on this platform");
@@ -46,25 +47,25 @@ public class HotkeyManager : IHotkeyManager
 
             // Delay permission check (macOS accessibility)
             await Task.Delay(500);
-            
+
             // Re-check permissions (macOS .app accessibility may need time)
             if (!_hotkeyProvider.HasPermissions)
             {
                 Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
                 Log.Warning("Retrying permission check in 2 seconds...");
-                
+
                 // Delay and retry
                 await Task.Delay(2000);
-                
+
                 if (!_hotkeyProvider.HasPermissions)
                 {
                     Log.Error("Still no permissions after retry. Please check accessibility settings.");
                     return;
                 }
-                
+
                 Log.Information("Permissions granted after retry");
             }
-            
+
             await ReloadHotkeysAsync();
             Log.Debug("Hotkey manager initialized successfully");
         }
@@ -89,14 +90,14 @@ public class HotkeyManager : IHotkeyManager
             RegisterCaptureRegionHotkey(settings.Hotkeys.CaptureRegion);
             RegisterOpenSettingsHotkey(settings.Hotkeys.OpenSettings);
 
-            Log.Debug("Hotkeys reloaded from settings: CaptureRegion={CaptureRegion}, OpenSettings={OpenSettings}", 
+            Log.Debug("Hotkeys reloaded from settings: CaptureRegion={CaptureRegion}, OpenSettings={OpenSettings}",
                 settings.Hotkeys.CaptureRegion, settings.Hotkeys.OpenSettings);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to reload hotkeys");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -114,7 +115,7 @@ public class HotkeyManager : IHotkeyManager
                     return;
                 }
                 _overlayController.ShowAll();
-                
+
                 RegisterEscapeHotkey();
             });
 
@@ -136,14 +137,14 @@ public class HotkeyManager : IHotkeyManager
             var success = _hotkeyProvider.RegisterHotkey("open_settings", modifiers, keyCode, () =>
             {
                 Log.Debug("Open settings hotkey triggered");
-                
+
                 // Check if overlay windows are currently active (screenshot in progress)
                 if (_overlayController.IsActive)
                 {
                     Log.Debug("Settings hotkey ignored - screenshot overlay is active");
                     return;
                 }
-                
+
                 ShowSettingsWindow();
             });
 
@@ -166,10 +167,11 @@ public class HotkeyManager : IHotkeyManager
             // Create proper service instances - avoid default constructor
             var settingsService = new SettingsService();
             var applicationController = App.Services?.GetService(typeof(IApplicationController)) as IApplicationController;
-            
-            var settingsWindow = new SettingsWindow(settingsService, applicationController);
+            var updateService = App.Services?.GetService(typeof(IUpdateService)) as IUpdateService;
+
+            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
             settingsWindow.Show();
-            
+
         }
         catch (Exception ex)
         {
@@ -318,7 +320,7 @@ public class HotkeyManager : IHotkeyManager
         {
             Log.Debug("ESC hotkey triggered, closing all overlays");
             _overlayController.CloseAll();
-            
+
             // Unregister ESC hotkey after closing overlays
             UnregisterEscapeHotkey();
         });

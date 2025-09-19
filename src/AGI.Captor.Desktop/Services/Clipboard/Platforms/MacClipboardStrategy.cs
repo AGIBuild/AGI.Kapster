@@ -17,7 +17,7 @@ public class MacClipboardStrategy : IClipboardStrategy
 {
     public bool SupportsMultipleFormats => true;
     public bool SupportsImages => true;
-    
+
     public async Task<bool> SetImageAsync(SKBitmap bitmap)
     {
         try
@@ -29,38 +29,38 @@ public class MacClipboardStrategy : IClipboardStrategy
                 Log.Warning("macOS: Failed to convert SKBitmap to Avalonia Bitmap");
                 return false;
             }
-            
+
             // Create DataObject with multiple formats for better compatibility
             var dataObject = new DataObject();
-            
+
             // Set as Avalonia Bitmap directly (primary format)
             dataObject.Set("image/png", avaloniaBitmap);
-            
+
             // Also convert to PNG byte array for additional compatibility
             using var stream = new System.IO.MemoryStream();
             avaloniaBitmap.Save(stream);
             stream.Position = 0;
             var pngData = stream.ToArray();
-            
+
             // Set multiple formats for maximum compatibility
             dataObject.Set("public.png", pngData); // macOS UTI format
             dataObject.Set("PNG", pngData);
             dataObject.Set("image/x-png", pngData);
             dataObject.Set("CF_DIB", pngData); // Windows compatibility
-            
+
             // Try to get clipboard from various sources
             var clipboardInfo = GetAvailableClipboardWithWindow();
-                
+
             if (clipboardInfo.clipboard != null)
             {
                 await clipboardInfo.clipboard.SetDataObjectAsync(dataObject);
                 Log.Debug("macOS: Successfully set image to clipboard");
-                
+
                 // If we created a temporary window, keep it alive briefly to ensure clipboard operation completes
                 if (clipboardInfo.tempWindow != null)
                 {
                     await Task.Delay(500); // Give clipboard time to fully process the data
-                    
+
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         try
@@ -74,10 +74,10 @@ public class MacClipboardStrategy : IClipboardStrategy
                         }
                     });
                 }
-                
+
                 return true;
             }
-            
+
             Log.Warning("macOS: No clipboard access available");
             return false;
         }
@@ -87,20 +87,20 @@ public class MacClipboardStrategy : IClipboardStrategy
             return false;
         }
     }
-    
+
     public async Task<bool> SetTextAsync(string text)
     {
         try
         {
             var clipboard = GetAvailableClipboard();
-                
+
             if (clipboard != null)
             {
                 await clipboard.SetTextAsync(text);
                 Log.Debug("macOS: Successfully set text to clipboard");
                 return true;
             }
-            
+
             Log.Warning("macOS: No clipboard access available");
             return false;
         }
@@ -110,25 +110,25 @@ public class MacClipboardStrategy : IClipboardStrategy
             return false;
         }
     }
-    
+
     public async Task<SKBitmap?> GetImageAsync()
     {
         // TODO: Implement native macOS clipboard access
         Log.Warning("macOS: GetImageAsync not yet implemented");
         return await Task.FromResult<SKBitmap?>(null);
     }
-    
+
     public async Task<string?> GetTextAsync()
     {
         try
         {
             var clipboard = GetAvailableClipboard();
-                
+
             if (clipboard != null)
             {
                 return await clipboard.GetTextAsync();
             }
-            
+
             Log.Warning("macOS: No clipboard access available");
             return null;
         }
@@ -138,20 +138,20 @@ public class MacClipboardStrategy : IClipboardStrategy
             return null;
         }
     }
-    
+
     public async Task<bool> ClearAsync()
     {
         try
         {
             var clipboard = GetAvailableClipboard();
-                
+
             if (clipboard != null)
             {
                 await clipboard.ClearAsync();
                 Log.Debug("macOS: Successfully cleared clipboard");
                 return true;
             }
-            
+
             Log.Warning("macOS: No clipboard access available");
             return false;
         }
@@ -161,20 +161,20 @@ public class MacClipboardStrategy : IClipboardStrategy
             return false;
         }
     }
-    
+
     /// <summary>
     /// Intelligently find an available clipboard instance
     /// </summary>
     private IClipboard? GetAvailableClipboard()
     {
         var clipboardInfo = GetAvailableClipboardWithWindow();
-        
+
         // If we created a temporary window for non-image operations, clean it up after a delay
         if (clipboardInfo.tempWindow != null)
         {
-            Task.Delay(100).ContinueWith(_ => 
+            Task.Delay(100).ContinueWith(_ =>
             {
-                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     try
                     {
@@ -188,10 +188,10 @@ public class MacClipboardStrategy : IClipboardStrategy
                 });
             });
         }
-        
+
         return clipboardInfo.clipboard;
     }
-    
+
     /// <summary>
     /// Find an available clipboard and optionally return the window it came from
     /// </summary>
@@ -215,7 +215,7 @@ public class MacClipboardStrategy : IClipboardStrategy
                     }
                 }
             }
-            
+
             // Try to get from TopLevel of any visible window
             if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktopApp)
             {
@@ -233,7 +233,7 @@ public class MacClipboardStrategy : IClipboardStrategy
                     }
                 }
             }
-            
+
             // As a last resort, create a temporary hidden window
             Log.Debug("macOS: Creating temporary window for clipboard access");
             var tempWindow = new Window
@@ -246,10 +246,10 @@ public class MacClipboardStrategy : IClipboardStrategy
                 Opacity = 0,
                 Title = "Clipboard Helper"
             };
-            
+
             tempWindow.Show();
             var clipboard = tempWindow.Clipboard;
-            
+
             // Return both clipboard and window so caller can manage lifecycle
             return (clipboard, tempWindow);
         }

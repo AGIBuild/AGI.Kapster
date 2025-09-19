@@ -12,15 +12,15 @@ public abstract class CommandBase : ICommand
         Description = description;
         Timestamp = DateTime.UtcNow;
     }
-    
+
     public abstract void Execute();
     public abstract void Undo();
-    
+
     public virtual bool CanUndo => true;
-    
+
     public string Description { get; }
-    
+
     public DateTime Timestamp { get; }
-    
+
     public override string ToString() => $"{Description} ({Timestamp:HH:mm:ss})";
 }

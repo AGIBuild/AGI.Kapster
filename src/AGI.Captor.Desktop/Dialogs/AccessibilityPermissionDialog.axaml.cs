@@ -13,11 +13,11 @@ namespace AGI.Captor.Desktop.Dialogs;
 public partial class AccessibilityPermissionDialog : Window
 {
     private readonly DispatcherTimer _statusTimer;
-    
+
     public AccessibilityPermissionDialog()
     {
         InitializeComponent();
-        
+
         // Display current application path
         try
         {
@@ -38,35 +38,35 @@ public partial class AccessibilityPermissionDialog : Window
         {
             Log.Error(ex, "Failed to get application path");
         }
-        
+
         // 创建定时器定期检查权限状态
         _statusTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(2)
         };
         _statusTimer.Tick += OnStatusTimerTick;
-        
+
         // 初始状态检查
         UpdatePermissionStatus();
-        
+
         // 开始定时检查
         _statusTimer.Start();
     }
-    
+
     private void OnStatusTimerTick(object? sender, EventArgs e)
     {
         UpdatePermissionStatus();
     }
-    
+
     private void UpdatePermissionStatus()
     {
         try
         {
             var hasPermission = MacHotkeyProvider.HasAccessibilityPermissions;
-            
+
             var statusIcon = this.FindControl<TextBlock>("PermissionStatusIcon");
             var statusText = this.FindControl<TextBlock>("PermissionStatusText");
-            
+
             if (statusIcon != null && statusText != null)
             {
                 if (hasPermission)
@@ -74,7 +74,7 @@ public partial class AccessibilityPermissionDialog : Window
                     statusIcon.Text = "✅";
                     statusText.Text = "Permission Status: Granted";
                     statusText.Foreground = Avalonia.Media.Brushes.Green;
-                    
+
                 }
                 else
                 {
@@ -89,12 +89,12 @@ public partial class AccessibilityPermissionDialog : Window
             Log.Error(ex, "Failed to check accessibility permissions");
         }
     }
-    
+
     private void RefreshPermissionStatus(object? sender, RoutedEventArgs e)
     {
         UpdatePermissionStatus();
     }
-    
+
     private void OpenSystemPreferences(object? sender, RoutedEventArgs e)
     {
         try
@@ -112,7 +112,7 @@ public partial class AccessibilityPermissionDialog : Window
                         CreateNoWindow = true
                     }
                 };
-                
+
                 process.Start();
                 Log.Debug("Opened system preferences for accessibility");
             }
@@ -120,7 +120,7 @@ public partial class AccessibilityPermissionDialog : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to open system preferences");
-            
+
             // 备用方案：打开通用系统设置
             try
             {
@@ -142,18 +142,18 @@ public partial class AccessibilityPermissionDialog : Window
             }
         }
     }
-    
+
     private void CloseDialog(object? sender, RoutedEventArgs e)
     {
         Close(false); // 返回false表示用户选择稍后设置
     }
-    
+
     protected override void OnClosed(EventArgs e)
     {
         _statusTimer?.Stop();
         base.OnClosed(e);
     }
-    
+
     /// <summary>
     /// 显示权限对话框并等待用户操作
     /// </summary>
@@ -167,7 +167,7 @@ public partial class AccessibilityPermissionDialog : Window
         }
 
         var dialog = new AccessibilityPermissionDialog();
-        
+
         return await dialog.ShowDialog<bool>(parent);
     }
 }

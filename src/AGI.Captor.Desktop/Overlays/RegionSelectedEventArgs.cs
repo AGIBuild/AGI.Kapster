@@ -14,28 +14,28 @@ public class RegionSelectedEventArgs : EventArgs
     /// Gets the selected region
     /// </summary>
     public Rect Region { get; }
-    
+
     /// <summary>
     /// Gets whether this is a full screen capture
     /// </summary>
     public bool IsFullScreen { get; }
-    
+
     /// <summary>
     /// Gets the detected element information if available
     /// </summary>
     public DetectedElement? DetectedElement { get; }
-    
+
     /// <summary>
     /// Gets whether this is an editable selection (for annotations)
     /// </summary>
     public bool IsEditableSelection { get; }
-    
+
     /// <summary>
     /// Gets the composite image with annotations (for platforms that need manual composition like macOS)
     /// </summary>
     public Bitmap? CompositeImage { get; }
-    
-    public RegionSelectedEventArgs(Rect region, bool isFullScreen = false, DetectedElement? detectedElement = null, 
+
+    public RegionSelectedEventArgs(Rect region, bool isFullScreen = false, DetectedElement? detectedElement = null,
         bool isEditableSelection = false, Bitmap? compositeImage = null)
     {
         Region = region;
@@ -55,7 +55,7 @@ public class OverlayCancelledEventArgs : EventArgs
     /// Gets the reason for cancellation
     /// </summary>
     public string? Reason { get; }
-    
+
     public OverlayCancelledEventArgs(string? reason = null)
     {
         Reason = reason;

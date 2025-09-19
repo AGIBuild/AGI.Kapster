@@ -127,27 +127,27 @@ public static class AnnotationFactory
     public static IAnnotationStyle CreateStyleVariant(IAnnotationStyle baseStyle, Color? color = null, double? strokeWidth = null, double? fontSize = null)
     {
         var newStyle = baseStyle.Clone();
-        
+
         if (color.HasValue)
         {
             newStyle.StrokeColor = color.Value;
             if (newStyle.FillMode != FillMode.None)
                 newStyle.FillColor = color.Value;
         }
-        
+
         if (strokeWidth.HasValue)
             newStyle.StrokeWidth = strokeWidth.Value;
-            
+
         if (fontSize.HasValue)
             newStyle.FontSize = fontSize.Value;
-        
+
         return newStyle;
     }
 
     /// <summary>
     /// 预定义的颜色调色板
     /// </summary>
-    public static readonly Color[] ColorPalette = 
+    public static readonly Color[] ColorPalette =
     {
         Color.FromRgb(255, 0, 0),     // Red
         Color.FromRgb(255, 165, 0),   // Orange

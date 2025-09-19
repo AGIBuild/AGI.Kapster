@@ -1,265 +1,201 @@
-name: CI/CD Pipeline
+name: Main CI/CD
 
+# 主开发分支CI - 持续集成和预发布构建
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
-  release:
-    types: [ published ]
 
 permissions:
-  contents: write
+  contents: read
+  id-token: write
+  packages: write
 
 env:
   DOTNET_VERSION: '9.0.x'
-  PROJECT_PATH: 'src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  test:
-    name: Test
+  build-info:
+    name: 📋 Build Information
     runs-on: ubuntu-latest
-    env:
-      DOTNET_ENVIRONMENT: Production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build-number: ${{ steps.version.outputs.build-number }}
       
-    - name: Setup .NET
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT_PATH }}
-      
-    - name: Build
-      run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration Release
-      
-    - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal
-      continue-on-error: true  # Continue even if no tests exist yet
-
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    needs: test
-    env:
-      DOTNET_ENVIRONMENT: Production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT_PATH }}
-      
-    - name: Build Windows x64
-      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/win-x64
-      
-    - name: Upload Windows artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: AGI.Captor-win-x64
-        path: ./dist/win-x64/
-        retention-days: 30
-
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    needs: test
-    env:
-      DOTNET_ENVIRONMENT: Production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT_PATH }}
-      
-    - name: Build macOS x64
-      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/osx-x64
-      
-    - name: Build macOS ARM64
-      run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./dist/osx-arm64
-      
-    - name: Create macOS App Bundle (x64)
+    - name: ⚙️ Configure Git for GitVersion
       run: |
-        mkdir -p "./dist/AGI Captor-x64.app/Contents/MacOS"
-        mkdir -p "./dist/AGI Captor-x64.app/Contents/Resources"
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
-        # Copy executable
-        cp ./dist/osx-x64/AGI.Captor.Desktop "./dist/AGI Captor-x64.app/Contents/MacOS/AGI Captor"
-        chmod +x "./dist/AGI Captor-x64.app/Contents/MacOS/AGI Captor"
-        
-        # Copy resources
-        cp ./src/AGI.Captor.Desktop/logo.ico "./dist/AGI Captor-x64.app/Contents/Resources/"
-        
-        # Create Info.plist
-        cat > "./dist/AGI Captor-x64.app/Contents/Info.plist" << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>AGI Captor</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.agibuild.captor</string>
-            <key>CFBundleName</key>
-            <string>AGI Captor</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleSignature</key>
-            <string>AGIC</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>10.15</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-            <key>NSRequiresAquaSystemAppearance</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
-        
-    - name: Create macOS App Bundle (ARM64)
-      run: |
-        mkdir -p "./dist/AGI Captor-arm64.app/Contents/MacOS"
-        mkdir -p "./dist/AGI Captor-arm64.app/Contents/Resources"
-        
-        # Copy executable
-        cp ./dist/osx-arm64/AGI.Captor.Desktop "./dist/AGI Captor-arm64.app/Contents/MacOS/AGI Captor"
-        chmod +x "./dist/AGI Captor-arm64.app/Contents/MacOS/AGI Captor"
-        
-        # Copy resources
-        cp ./src/AGI.Captor.Desktop/logo.ico "./dist/AGI Captor-arm64.app/Contents/Resources/"
-        
-        # Create Info.plist
-        cat > "./dist/AGI Captor-arm64.app/Contents/Info.plist" << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>AGI Captor</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.agibuild.captor</string>
-            <key>CFBundleName</key>
-            <string>AGI Captor</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleSignature</key>
-            <string>AGIC</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>10.15</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-            <key>NSRequiresAquaSystemAppearance</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
-        
-    - name: Create ZIP archives
-      run: |
-        cd dist
-        zip -r "AGI.Captor-osx-x64.zip" "AGI Captor-x64.app"
-        zip -r "AGI.Captor-osx-arm64.zip" "AGI Captor-arm64.app"
-        
-    - name: Upload macOS x64 artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: AGI.Captor-osx-x64
-        path: ./dist/AGI.Captor-osx-x64.zip
-        retention-days: 30
-        
-    - name: Upload macOS ARM64 artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: AGI.Captor-osx-arm64
-        path: ./dist/AGI.Captor-osx-arm64.zip
-        retention-days: 30
-
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [build-windows, build-macos]
-    # Run when a GitHub Release is published, or when a tag starting with 'v' and containing 'Release' in commit message is pushed
-    if: |
-      github.event_name == 'release' || 
-      (startsWith(github.ref, 'refs/tags/v') && 
-       contains(github.event.head_commit.message, 'Release'))
-    permissions:
-      contents: write
-    
-    steps:
-    - name: Download Windows artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: AGI.Captor-win-x64
-        path: ./artifacts/win-x64/
-        
-    - name: Download macOS x64 artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: AGI.Captor-osx-x64
-        path: ./artifacts/osx-x64/
-        
-    - name: Download macOS ARM64 artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: AGI.Captor-osx-arm64
-        path: ./artifacts/osx-arm64/
-        
-    - name: Extract version from tag
+    - name: 📊 Get build information
       id: version
+      shell: pwsh
       run: |
-        if [[ "${{ github.event_name }}" == "release" ]]; then
-          VERSION="${{ github.event.release.tag_name }}"
-        else
-          VERSION="${{ github.ref_name }}"
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Extracted version: $VERSION"
+        $buildNumber = "${{ github.run_number }}"
+        $shortSha = "${{ github.sha }}".Substring(0, 7)
         
-    - name: Create release archives
-      run: |
-        cd artifacts
-        zip -r "AGI.Captor-win-x64-${{ steps.version.outputs.version }}.zip" win-x64/
-        # Rename macOS archives to include version
-        cp osx-x64/AGI.Captor-osx-x64.zip "AGI.Captor-osx-x64-${{ steps.version.outputs.version }}.zip"
-        cp osx-arm64/AGI.Captor-osx-arm64.zip "AGI.Captor-osx-arm64-${{ steps.version.outputs.version }}.zip"
+        try {
+          ./build.ps1 Info
+          $version = "main-alpha.$buildNumber+$shortSha"
+        } catch {
+          Write-Warning "Build info failed, using fallback"
+          $version = "1.3.0-alpha.$buildNumber+$shortSha"
+        }
         
-    - name: Upload release assets
-      uses: softprops/action-gh-release@v2
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "build-number=$buildNumber" >> $env:GITHUB_OUTPUT
+        
+        Write-Host "🏗️ Build: $buildNumber"
+        Write-Host "🏷️ Version: $version"
+
+  test-and-quality:
+    name: 🧪 Test & Quality
+    runs-on: ubuntu-latest
+    needs: build-info
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
       with:
-        files: |
-          artifacts/AGI.Captor-win-x64-${{ steps.version.outputs.version }}.zip
-          artifacts/AGI.Captor-osx-x64-${{ steps.version.outputs.version }}.zip
-          artifacts/AGI.Captor-osx-arm64-${{ steps.version.outputs.version }}.zip
-        draft: false
-        prerelease: false
-        tag_name: ${{ steps.version.outputs.version }}
-        name: AGI.Captor.${{ steps.version.outputs.version }}
-        generate_release_notes: true
-        token: ${{ secrets.GH_PAT }}
+        fetch-depth: 0
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
+    - name: 🔨 Build and Test
+      shell: pwsh
+      run: |
+        ./build.ps1 Clean
+        ./build.ps1 Build Test --coverage
+        
+    - name: 📊 Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-ubuntu
+        path: |
+          artifacts/test-results/
+          artifacts/coverage/
+        retention-days: 7
+
+  build-preview:
+    name: 🚀 Build Preview (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    needs: [build-info, test-and-quality]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    strategy:
+      matrix:
+        include:
+          - platform: win-x64
+            os: windows-latest
+          - platform: linux-x64  
+            os: ubuntu-latest
+          - platform: osx-x64
+            os: macos-13
+          - platform: osx-arm64
+            os: macos-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
+    - name: 🔨 Build and Publish
+      shell: pwsh
+      run: |
+        ./build.ps1 Clean
+        ./build.ps1 Publish --rids ${{ matrix.platform }}
+        
+    - name: 📦 Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: preview-${{ matrix.platform }}
+        path: artifacts/publish/${{ matrix.platform }}/
+        retention-days: 7
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: build-info
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
+    - name: 🔍 Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        
+    - name: 🔨 Build for analysis
+      shell: pwsh
+      run: |
+        ./build.ps1 Build
+        
+    - name: 🔍 Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+  preview-summary:
+    name: 📋 Preview Summary
+    runs-on: ubuntu-latest
+    needs: [build-info, test-and-quality, build-preview, security-scan]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📊 Build Status Summary
+      shell: pwsh
+      run: |
+        Write-Host "🚀 Main Branch Preview Build Complete"
+        Write-Host "======================================="
+        Write-Host "Version: ${{ needs.build-info.outputs.version }}"
+        Write-Host "Build: ${{ needs.build-info.outputs.build-number }}"
+        Write-Host "Tests: ${{ needs.test-and-quality.result }}"
+        Write-Host "Security: ${{ needs.security-scan.result }}"
+        Write-Host "Preview Builds: ${{ needs.build-preview.result }}"
+        Write-Host ""
+        Write-Host "✅ Ready for release branch creation!"

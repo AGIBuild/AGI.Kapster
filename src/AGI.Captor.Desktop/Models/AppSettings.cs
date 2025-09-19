@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Media;
 using System.Text.Json.Serialization;
 
@@ -12,16 +13,21 @@ public class AppSettings
     /// General application settings
     /// </summary>
     public GeneralSettings General { get; set; } = new();
-    
+
     /// <summary>
     /// Hotkey configuration
     /// </summary>
     public HotkeySettings Hotkeys { get; set; } = new();
-    
+
     /// <summary>
     /// Default annotation styles
     /// </summary>
     public DefaultStyleSettings DefaultStyles { get; set; } = new();
+
+    /// <summary>
+    /// Auto-update settings
+    /// </summary>
+    public AutoUpdateSettings? AutoUpdate { get; set; } = new();
 }
 
 /// <summary>
@@ -33,32 +39,32 @@ public class GeneralSettings
     /// Start with Windows
     /// </summary>
     public bool StartWithWindows { get; set; } = true;
-    
+
     /// <summary>
     /// Minimize to system tray
     /// </summary>
     public bool MinimizeToTray { get; set; } = true;
-    
+
     /// <summary>
     /// Show notifications
     /// </summary>
     public bool ShowNotifications { get; set; } = true;
-    
+
     /// <summary>
     /// Default save format
     /// </summary>
     public string DefaultSaveFormat { get; set; } = "PNG";
-    
+
     /// <summary>
     /// Auto copy to clipboard after capture
     /// </summary>
     public bool AutoCopyToClipboard { get; set; } = false;
-    
+
     /// <summary>
     /// Play sound when capturing
     /// </summary>
     public bool PlaySoundOnCapture { get; set; } = true;
-    
+
 }
 
 /// <summary>
@@ -70,7 +76,7 @@ public class HotkeySettings
     /// Capture region hotkey
     /// </summary>
     public string CaptureRegion { get; set; } = "Alt+A";
-    
+
     /// <summary>
     /// Open settings hotkey
     /// </summary>
@@ -86,17 +92,17 @@ public class DefaultStyleSettings
     /// Text annotation settings
     /// </summary>
     public TextStyleSettings Text { get; set; } = new();
-    
+
     /// <summary>
     /// Shape annotation settings
     /// </summary>
     public ShapeStyleSettings Shape { get; set; } = new();
-    
+
     /// <summary>
     /// Export quality settings
     /// </summary>
     public ExportQualitySettings Export { get; set; } = new();
-    
+
     /// <summary>
     /// Advanced settings
     /// </summary>
@@ -112,18 +118,18 @@ public class TextStyleSettings
     /// Font size
     /// </summary>
     public int FontSize { get; set; } = 16;
-    
+
     /// <summary>
     /// Font family name
     /// </summary>
     public string FontFamily { get; set; } = "Segoe UI";
-    
+
     /// <summary>
     /// Text color (ARGB format)
     /// </summary>
     [JsonIgnore]
     public Color Color { get; set; } = Colors.Black;
-    
+
     /// <summary>
     /// Text color for JSON serialization
     /// </summary>
@@ -143,12 +149,12 @@ public class TextStyleSettings
             }
         }
     }
-    
+
     /// <summary>
     /// Font weight
     /// </summary>
     public string FontWeight { get; set; } = "Normal";
-    
+
     /// <summary>
     /// Font style
     /// </summary>
@@ -164,13 +170,13 @@ public class ShapeStyleSettings
     /// Stroke thickness
     /// </summary>
     public double StrokeThickness { get; set; } = 2;
-    
+
     /// <summary>
     /// Stroke color (ARGB format)
     /// </summary>
     [JsonIgnore]
     public Color StrokeColor { get; set; } = Colors.Red;
-    
+
     /// <summary>
     /// Stroke color for JSON serialization
     /// </summary>
@@ -190,18 +196,18 @@ public class ShapeStyleSettings
             }
         }
     }
-    
+
     /// <summary>
     /// Fill mode
     /// </summary>
     public string FillMode { get; set; } = "None";
-    
+
     /// <summary>
     /// Fill color (ARGB format)
     /// </summary>
     [JsonIgnore]
     public Color FillColor { get; set; } = Colors.Transparent;
-    
+
     /// <summary>
     /// Fill color for JSON serialization
     /// </summary>
@@ -232,7 +238,7 @@ public class ExportQualitySettings
     /// JPEG quality (10-100)
     /// </summary>
     public double JpegQuality { get; set; } = 90;
-    
+
     /// <summary>
     /// PNG compression level (0-9)
     /// </summary>
@@ -248,13 +254,13 @@ public class AdvancedSettings
     /// Performance settings
     /// </summary>
     public PerformanceSettings Performance { get; set; } = new();
-    
-    
+
+
     /// <summary>
     /// Security and privacy settings
     /// </summary>
     public SecuritySettings Security { get; set; } = new();
-    
+
 }
 
 /// <summary>
@@ -266,12 +272,12 @@ public class PerformanceSettings
     /// Enable hardware acceleration for rendering
     /// </summary>
     public bool EnableHardwareAcceleration { get; set; } = true;
-    
+
     /// <summary>
     /// Limit frame rate during annotation drawing
     /// </summary>
     public bool LimitFrameRate { get; set; } = true;
-    
+
     /// <summary>
     /// Render quality level (Low, Medium, High)
     /// </summary>
@@ -288,6 +294,41 @@ public class SecuritySettings
     /// Allow anonymous usage data collection
     /// </summary>
     public bool AllowTelemetry { get; set; } = false;
-    
+}
+
+/// <summary>
+/// Auto-update settings
+/// </summary>
+public class AutoUpdateSettings
+{
+    /// <summary>
+    /// Whether automatic updates are enabled
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Frequency of update checks in hours
+    /// </summary>
+    public int CheckFrequencyHours { get; set; } = 24;
+
+    /// <summary>
+    /// Whether to install updates automatically
+    /// </summary>
+    public bool InstallAutomatically { get; set; } = true;
+
+    /// <summary>
+    /// Whether to notify user before installing
+    /// </summary>
+    public bool NotifyBeforeInstall { get; set; } = false;
+
+    /// <summary>
+    /// Whether to include pre-release versions
+    /// </summary>
+    public bool UsePreReleases { get; set; } = false;
+
+    /// <summary>
+    /// Last successful update check time
+    /// </summary>
+    public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
 }
 

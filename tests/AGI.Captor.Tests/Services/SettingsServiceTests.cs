@@ -164,7 +164,7 @@ public class SettingsServiceTests : TestBase
         // Act & Assert
         var action = async () => await _settingsService.SaveAsync();
         await action.Should().NotThrowAsync();
-        
+
         // Verify the settings were saved to memory file system
         _fileSystemService.FileExists(_settingsService.GetSettingsFilePath()).Should().BeTrue();
     }
@@ -183,7 +183,7 @@ public class SettingsServiceTests : TestBase
         // Act & Assert
         var action = () => _settingsService.Settings.Hotkeys.CaptureRegion = "";
         action.Should().NotThrow();
-        
+
         _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be("");
     }
 
@@ -193,19 +193,19 @@ public class SettingsServiceTests : TestBase
         // Arrange
         var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
         var newHotkey = "Ctrl+Shift+S";
-        
+
         // Act - Change setting
         _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
         await _settingsService.SaveAsync();
-        
+
         // Create new service instance to test loading
         var newFileSystem = new MemoryFileSystemService();
         // Copy the saved data to the new file system
         var savedData = _fileSystemService.ReadAllText(_settingsService.GetSettingsFilePath());
         await newFileSystem.WriteAllTextAsync(_settingsService.GetSettingsFilePath(), savedData);
-        
+
         var newSettingsService = new SettingsService(newFileSystem);
-        
+
         // Assert
         newSettingsService.Settings.Hotkeys.CaptureRegion.Should().Be(newHotkey);
     }
