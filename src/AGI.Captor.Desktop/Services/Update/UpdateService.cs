@@ -34,11 +34,13 @@ public class UpdateService : IUpdateService, IDisposable
     public UpdateService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
-        _updateProvider = new GitHubUpdateProvider();
-        _httpClient = new HttpClient();
-
-        // Load current settings
+        
+        // Load current settings first
         _settings = LoadUpdateSettings();
+        
+        // Initialize GitHub update provider with configurable repository
+        _updateProvider = new GitHubUpdateProvider(_settings.GitHubRepository);
+        _httpClient = new HttpClient();
 
         // Setup timer for periodic checks
         _updateTimer = new Timer();
@@ -59,13 +61,21 @@ public class UpdateService : IUpdateService, IDisposable
 
     /// <summary>
     /// Check if running in debug/development mode
+    /// Can be overridden via settings for testing and configuration flexibility
     /// </summary>
-    private static bool IsDebugMode()
+    private bool IsDebugMode()
     {
+        // Check settings first for override capability
+        if (_settings?.EnableInDebugMode.HasValue == true)
+        {
+            return !_settings.EnableInDebugMode.Value; // Inverted logic: enable setting means NOT debug mode
+        }
+
+        // Default behavior based on build configuration
 #if DEBUG
         return true;
 #else
-        return false;
+        return Debugger.IsAttached;
 #endif
     }
 
@@ -238,8 +248,8 @@ public class UpdateService : IUpdateService, IDisposable
                 {
                     _logger.Information("macOS installation completed successfully");
 
-                    // Schedule application restart
-                    _ = Task.Delay(2000).ContinueWith(_ => RestartApplication());
+                    // Schedule application restart with proper error handling
+                    ScheduleApplicationRestart("macOS installation completed");
 
                     return true;
                 }
@@ -281,8 +291,8 @@ public class UpdateService : IUpdateService, IDisposable
             {
                 _logger.Information("Installation completed successfully");
 
-                // Schedule application restart
-                _ = Task.Delay(2000).ContinueWith(_ => RestartApplication());
+                // Schedule application restart with proper error handling
+                ScheduleApplicationRestart("Installation completed successfully");
 
                 return true;
             }
@@ -311,27 +321,8 @@ public class UpdateService : IUpdateService, IDisposable
         _logger.Information("Starting background update checking");
         _updateTimer.Start();
 
-        // Perform initial check after 5 seconds
-        _ = Task.Delay(5000).ContinueWith(async _ =>
-        {
-            var update = await CheckForUpdatesAsync();
-            if (update != null)
-            {
-                UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
-
-                if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
-                {
-                    await PerformAutomaticUpdateAsync(update);
-                }
-                else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
-                {
-                    // For platforms that don't support silent install (like macOS), notify user
-                    _logger.Information("Automatic installation not supported on {Platform}, user notification required",
-                        PlatformUpdateHelper.GetPlatformDisplayName());
-                    UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
-                }
-            }
-        });
+        // Perform initial check after 5 seconds with proper error handling
+        ScheduleDelayedUpdateCheck("Background update service started");
     }
 
     public void StopBackgroundChecking()
@@ -425,12 +416,85 @@ public class UpdateService : IUpdateService, IDisposable
                 });
             }
 
+            // Gracefully dispose resources before exiting
+            _logger.Information("Performing graceful shutdown before restart");
+            Dispose();
+
+            // Give a brief moment for cleanup to complete
+            Thread.Sleep(500);
+
             Environment.Exit(0);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Error restarting application");
+            // If restart fails, at least try to dispose cleanly
+            try
+            {
+                Dispose();
+            }
+            catch (Exception disposeEx)
+            {
+                _logger.Error(disposeEx, "Error during cleanup after failed restart");
+            }
         }
+    }
+
+    /// <summary>
+    /// Schedule application restart with proper error handling
+    /// </summary>
+    private void ScheduleApplicationRestart(string reason)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                _logger.Information("Scheduling application restart in 2 seconds. Reason: {Reason}", reason);
+                await Task.Delay(2000);
+                RestartApplication();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error during scheduled application restart");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Schedule delayed update check with proper error handling
+    /// </summary>
+    private void ScheduleDelayedUpdateCheck(string reason)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                _logger.Information("Scheduling delayed update check in 5 seconds. Reason: {Reason}", reason);
+                await Task.Delay(5000);
+                
+                var update = await CheckForUpdatesAsync();
+                if (update != null)
+                {
+                    UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
+
+                    if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
+                    {
+                        await PerformAutomaticUpdateAsync(update);
+                    }
+                    else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
+                    {
+                        // For platforms that don't support silent install (like macOS), notify user
+                        _logger.Information("Automatic installation not supported on {Platform}, user notification required",
+                            PlatformUpdateHelper.GetPlatformDisplayName());
+                        UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error during scheduled update check");
+            }
+        });
     }
 
     private Version GetCurrentVersion()

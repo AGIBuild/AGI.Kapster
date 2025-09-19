@@ -99,6 +99,21 @@ public class UpdateSettings
     /// Last successful update check time
     /// </summary>
     public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
+
+    /// <summary>
+    /// Override to enable updates in debug mode (for testing)
+    /// When null, uses default build configuration behavior
+    /// When true, enables updates even in debug builds
+    /// When false, disables updates (same as debug mode)
+    /// </summary>
+    public bool? EnableInDebugMode { get; set; } = null;
+
+    /// <summary>
+    /// GitHub repository URL for update checks
+    /// When null, uses default AGIBuild/AGI.Captor repository
+    /// Format: "owner/repository" or full API URL
+    /// </summary>
+    public string? GitHubRepository { get; set; } = null;
 }
 
 /// <summary>

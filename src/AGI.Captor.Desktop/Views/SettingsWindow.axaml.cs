@@ -1006,6 +1006,29 @@ public partial class SettingsWindow : Window
     {
         if (_updateService == null) return;
 
+        // Get button to check current state
+        var button = this.FindControl<Button>("CheckForUpdatesButton");
+        if (button == null) return;
+
+        // Check current button state to determine action
+        var buttonContent = button.Content?.ToString();
+        
+        if (buttonContent == "Download Update")
+        {
+            // Handle download update action
+            await HandleDownloadUpdate();
+        }
+        else
+        {
+            // Handle check for updates action
+            await HandleCheckForUpdates();
+        }
+    }
+
+    private async Task HandleCheckForUpdates()
+    {
+        if (_updateService == null) return;
+
         try
         {
             // Update UI state
@@ -1051,9 +1074,7 @@ public partial class SettingsWindow : Window
                 {
                     updateButton.Content = "Download Update";
                     updateButton.IsEnabled = true;
-                    // Change the click handler to download when update is available
-                    updateButton.Click -= OnCheckForUpdatesClick;
-                    updateButton.Click += OnDownloadUpdateClick;
+                    // No need to change event handlers - OnCheckForUpdatesClick handles both states
                 }
             }
             else
@@ -1096,7 +1117,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void OnDownloadUpdateClick(object? sender, RoutedEventArgs e)
+    private async Task HandleDownloadUpdate()
     {
         if (_updateService == null || _availableUpdate == null) return;
 

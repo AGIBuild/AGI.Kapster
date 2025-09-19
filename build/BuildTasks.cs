@@ -508,9 +508,39 @@ class BuildTasks : NukeBuild
                 wxsFile
             };
 
-            ProcessTasks.StartProcess("wix", string.Join(" ", compileArgs.Select(arg => 
-                arg.Contains(" ") || arg.Contains("\"") ? $"\"{arg.Replace("\"", "\"\"")}\"" : arg)))
-                .AssertZeroExitCode();
+            // Create ProcessStartInfo for safer argument handling
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "wix",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            // Add arguments safely without manual escaping
+            processInfo.ArgumentList.Add("build");
+            processInfo.ArgumentList.Add("-arch");
+            processInfo.ArgumentList.Add(rid == "win-arm64" ? "arm64" : "x64");
+            processInfo.ArgumentList.Add("-define");
+            processInfo.ArgumentList.Add($"SourceDir={publishPath}");
+            processInfo.ArgumentList.Add("-define");
+            processInfo.ArgumentList.Add($"ProductVersion={version.FileVersion}");
+            processInfo.ArgumentList.Add("-out");
+            processInfo.ArgumentList.Add(packagePath);
+            processInfo.ArgumentList.Add(wxsFile);
+
+            using var process = System.Diagnostics.Process.Start(processInfo);
+            if (process == null)
+                throw new InvalidOperationException("Failed to start WiX process");
+            
+            process.WaitForExit();
+            
+            if (process.ExitCode != 0)
+            {
+                var error = process.StandardError.ReadToEnd();
+                throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
+            }
 
             Console.WriteLine($"✅ Created: {packagePath}");
         }

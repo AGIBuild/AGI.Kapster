@@ -15,17 +15,34 @@ namespace AGI.Captor.Desktop.Services.Update;
 /// </summary>
 public class GitHubUpdateProvider
 {
-    private const string GitHubApiUrl = "https://api.github.com/repos/AGIBuild/AGI.Captor/releases";
+    private const string DefaultGitHubRepository = "AGIBuild/AGI.Captor";
     private const string UserAgent = "AGI.Captor-UpdateChecker/1.0";
 
     private readonly HttpClient _httpClient;
     private readonly ILogger _logger = Log.ForContext<GitHubUpdateProvider>();
+    private readonly string _gitHubApiUrl;
 
-    public GitHubUpdateProvider()
+    public GitHubUpdateProvider(string? gitHubRepository = null)
     {
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+
+        // Build API URL from repository setting
+        var repository = !string.IsNullOrWhiteSpace(gitHubRepository) ? gitHubRepository : DefaultGitHubRepository;
+        
+        // Check if it's already a full API URL or just owner/repo format
+        if (repository.StartsWith("https://api.github.com/"))
+        {
+            _gitHubApiUrl = repository;
+        }
+        else
+        {
+            // Assume it's owner/repo format
+            _gitHubApiUrl = $"https://api.github.com/repos/{repository}/releases";
+        }
+
+        _logger.Debug("GitHub update provider initialized with URL: {ApiUrl}", _gitHubApiUrl);
     }
 
     /// <summary>
@@ -39,7 +56,7 @@ public class GitHubUpdateProvider
         {
             _logger.Debug("Checking for updates from GitHub API");
 
-            var response = await _httpClient.GetAsync(GitHubApiUrl);
+            var response = await _httpClient.GetAsync(_gitHubApiUrl);
 
             if (!response.IsSuccessStatusCode)
             {

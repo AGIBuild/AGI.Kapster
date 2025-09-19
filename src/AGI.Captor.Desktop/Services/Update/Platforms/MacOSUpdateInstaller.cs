@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using System.Xml;
 using Serilog;
 
 namespace AGI.Captor.Desktop.Services.Update.Platforms;
@@ -181,18 +182,54 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
 
             if (process.ExitCode != 0) return null;
 
-            // Parse plist output to find mount point
-            // This is a simplified approach - in a real implementation you'd want proper plist parsing
-            var lines = output.Split('\n');
-            foreach (var line in lines)
+            // Parse plist output to find mount point using proper XML parsing
+            try
             {
-                if (line.Contains("/Volumes/"))
+                var xmlDoc = new XmlDocument();
+                xmlDoc.LoadXml(output);
+                
+                // Navigate through the plist structure to find mount points
+                var dictNodes = xmlDoc.SelectNodes("//dict");
+                if (dictNodes != null)
                 {
-                    var start = line.IndexOf("/Volumes/");
-                    var end = line.IndexOf("</string>", start);
-                    if (start >= 0 && end > start)
+                    foreach (XmlNode dict in dictNodes)
                     {
-                        return line.Substring(start, end - start);
+                        var keys = dict.SelectNodes("key");
+                        var strings = dict.SelectNodes("string");
+                        
+                        if (keys != null && strings != null)
+                        {
+                            for (int i = 0; i < keys.Count; i++)
+                            {
+                                if (keys[i]?.InnerText == "mount-point" && i < strings.Count && strings[i] != null)
+                                {
+                                    var mountPoint = strings[i]!.InnerText;
+                                    if (!string.IsNullOrEmpty(mountPoint) && mountPoint.StartsWith("/Volumes/"))
+                                    {
+                                        return mountPoint;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (XmlException xmlEx)
+            {
+                _logger.Warning(xmlEx, "Failed to parse plist XML output, falling back to string parsing");
+                
+                // Fallback to string parsing if XML parsing fails
+                var lines = output.Split('\n');
+                foreach (var line in lines)
+                {
+                    if (line.Contains("/Volumes/"))
+                    {
+                        var start = line.IndexOf("/Volumes/");
+                        var end = line.IndexOf("</string>", start);
+                        if (start >= 0 && end > start)
+                        {
+                            return line.Substring(start, end - start);
+                        }
                     }
                 }
             }
