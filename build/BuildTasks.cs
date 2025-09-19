@@ -105,29 +105,16 @@ class BuildTasks : NukeBuild
     }
 
     /// <summary>
-    /// Get version information with fallback for GitVersion failures
+    /// Get version information from GitVersion (fail fast approach)
     /// </summary>
     (string AssemblyVersion, string FileVersion, string InformationalVersion) GetVersionInfo()
     {
-        try
-        {
-            var gitVersion = GetGitVersionSafe();
-            return (
-                gitVersion?.AssemblySemVer ?? "1.0.0.0",
-                gitVersion?.AssemblySemFileVer ?? "1.0.0.0",
-                gitVersion?.InformationalVersion ?? "1.0.0+local"
-            );
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️ GitVersion failed: {ex.Message}. Using fallback version.");
-            var fallbackVersion = "1.0.0";
-            return (
-                $"{fallbackVersion}.0",
-                $"{fallbackVersion}.0",
-                $"{fallbackVersion}+local-{DateTime.Now:yyyyMMdd-HHmm}"
-            );
-        }
+        var gitVersion = GetGitVersionOrFail();
+        return (
+            gitVersion.AssemblySemVer ?? "1.0.0.0",
+            gitVersion.AssemblySemFileVer ?? "1.0.0.0",
+            gitVersion.InformationalVersion ?? "1.0.0+local"
+        );
     }
 
     /// <summary>
