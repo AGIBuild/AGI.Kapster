@@ -35,6 +35,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
     - name: 📦 Restore dependencies
       shell: pwsh
@@ -79,6 +84,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
     - name: 🔍 Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -114,12 +124,6 @@ jobs:
           outdated-packages.log
         retention-days: 30
 
-  # 注意: dependency-check 作业已移除
-  # 原因: actions/dependency-review-action 需要 GitHub Advanced Security (私有仓库付费功能)
-  # 如需依赖分析，可以在其他作业中使用 dotnet list package --vulnerable
-  #         dependency-report.md
-  #       retention-days: 30
-
   performance-test:
     name: ⚡ Performance Test
     runs-on: ubuntu-latest
@@ -133,8 +137,13 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
-    - name: 🔨 Build optimized version
+    - name: 🔨 Build for performance testing
       shell: pwsh
       run: |
         ./build.ps1 Clean
@@ -144,14 +153,13 @@ jobs:
     - name: ⚡ Run performance tests
       shell: pwsh
       run: |
-        # Run performance-related tests if they exist
-        if (Test-Path "tests/AGI.Captor.PerformanceTests") {
+        if (Test-Path "tests/") {
           ./build.ps1 Test --configuration Release --test-filter "Category=Performance"
         } else {
-          Write-Host "ℹ️ No performance tests found, skipping..."
+          Write-Host "⚠️ No performance tests found, skipping..."
         }
         
-    - name: 📊 Performance analysis
+    - name: 📊 Generate performance report
       shell: pwsh
       run: |
         # Basic performance metrics
@@ -168,18 +176,21 @@ jobs:
             Format-Table | Out-String | Tee-Object -Append -FilePath "performance-report.md"
         }
         
-    - name: 📤 Upload performance reports
+        # Build timing (if available)
+        Write-Host "## Build Performance" | Tee-Object -Append -FilePath "performance-report.md"
+        Write-Host "Build completed at: $(Get-Date)" | Tee-Object -Append -FilePath "performance-report.md"
+        
+    - name: 📊 Upload performance report
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: performance-reports
+        name: performance-report
         path: performance-report.md
         retention-days: 30
 
   quality-gate:
     name: 🎯 Quality Gate
     runs-on: ubuntu-latest
-    needs: [code-analysis, security-scan]  # 移除 dependency-check 依赖
+    needs: [code-analysis, security-scan]
     if: always()
     
     steps:
@@ -191,7 +202,6 @@ jobs:
         
         $codeAnalysisResult = "${{ needs.code-analysis.result }}"
         $securityScanResult = "${{ needs.security-scan.result }}"
-        # 依赖检查已禁用 - 需要GitHub Advanced Security
         
         Write-Host "Code Analysis: $codeAnalysisResult"
         Write-Host "Security Scan: $securityScanResult"
@@ -199,7 +209,6 @@ jobs:
         
         $allPassed = ($codeAnalysisResult -eq "success") -and 
                      ($securityScanResult -eq "success")
-                     # 移除依赖检查要求: ($dependencyCheckResult -eq "success")
         
         if ($allPassed) {
           Write-Host "✅ Quality gate PASSED - All checks successful!"
@@ -208,7 +217,5 @@ jobs:
           if ($env:GITHUB_EVENT_NAME -eq "pull_request") {
             Write-Host "::error::Quality gate failed. Please address the issues before merging."
             exit 1
-          } else {
-            Write-Host "::warning::Quality gate failed on $env:GITHUB_REF_NAME branch."
           }
         }

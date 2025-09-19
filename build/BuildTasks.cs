@@ -48,7 +48,36 @@ class BuildTasks : NukeBuild
     readonly bool Coverage;
 
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
-    [GitVersion(Framework = "net9.0", NoFetch = true)] readonly GitVersion GitVersion;
+    [GitVersion(NoFetch = true, NoCache = true)] GitVersion GitVersion;
+
+    // Fallback GitVersion - 在注入失败时使用
+    GitVersion GetGitVersionSafe()
+    {
+        try
+        {
+            // 如果注入的GitVersion为null，尝试手动调用
+            if (GitVersion == null)
+            {
+                Console.WriteLine("⚠️ GitVersion injection failed, attempting manual call...");
+                var targetFramework = GetTargetFramework();
+                Console.WriteLine($"🎯 Using target framework: {targetFramework}");
+                
+                var result = GitVersionTasks.GitVersion(s => s
+                    .SetFramework(targetFramework)
+                    .SetNoFetch(true)
+                    .SetNoCache(true)
+                    .SetProcessWorkingDirectory(RootDirectory));
+                return result.Result;
+            }
+            return GitVersion;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ GitVersion failed: {ex.Message}");
+            // 返回null，让调用方处理
+            return null;
+        }
+    }
 
     // Paths
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
@@ -85,7 +114,7 @@ class BuildTasks : NukeBuild
         {
             return MainProject?.GetProperty("TargetFramework") ?? 
                    MainProject?.GetProperty("TargetFrameworks")?.Split(';').First() ?? 
-                   "net9.0";
+                   "net9.0"; // 与主项目保持一致的默认值
         }
         catch (Exception ex)
         {
@@ -101,10 +130,11 @@ class BuildTasks : NukeBuild
     {
         try
         {
+            var gitVersion = GetGitVersionSafe();
             return (
-                GitVersion?.AssemblySemVer ?? "1.0.0.0",
-                GitVersion?.AssemblySemFileVer ?? "1.0.0.0", 
-                GitVersion?.InformationalVersion ?? "1.0.0+local"
+                gitVersion?.AssemblySemVer ?? "1.0.0.0",
+                gitVersion?.AssemblySemFileVer ?? "1.0.0.0", 
+                gitVersion?.InformationalVersion ?? "1.0.0+local"
             );
         }
         catch (Exception ex)

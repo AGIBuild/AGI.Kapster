@@ -36,6 +36,11 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
     - name: 📊 Get build information
       id: version
       shell: pwsh
@@ -72,6 +77,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
     - name: 🔨 Build and Test
       shell: pwsh
@@ -118,6 +128,11 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
     - name: 🔨 Build and Publish
       shell: pwsh
       run: |
@@ -146,6 +161,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: ⚙️ Configure Git for GitVersion
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
         
     - name: 🔍 Initialize CodeQL
       uses: github/codeql-action/init@v3
