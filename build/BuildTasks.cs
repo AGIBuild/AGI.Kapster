@@ -50,33 +50,14 @@ class BuildTasks : NukeBuild
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
     [GitVersion(NoFetch = true, NoCache = true)] GitVersion GitVersion;
 
-    // Fallback GitVersion - 在注入失败时使用
-    GitVersion GetGitVersionSafe()
+    // Ensure GitVersion is injected correctly; fail fast if not.
+    GitVersion GetGitVersionOrFail()
     {
-        try
+        if (GitVersion == null)
         {
-            // 如果注入的GitVersion为null，尝试手动调用
-            if (GitVersion == null)
-            {
-                Console.WriteLine("⚠️ GitVersion injection failed, attempting manual call...");
-                var targetFramework = GetTargetFramework();
-                Console.WriteLine($"🎯 Using target framework: {targetFramework}");
-
-                var result = GitVersionTasks.GitVersion(s => s
-                    .SetFramework(targetFramework)
-                    .SetNoFetch(true)
-                    .SetNoCache(true)
-                    .SetProcessWorkingDirectory(RootDirectory));
-                return result.Result;
-            }
-            return GitVersion;
+            throw new Exception("❌ GitVersion injection failed. Please ensure GitVersion is available and properly configured.");
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️ GitVersion failed: {ex.Message}");
-            // 返回null，让调用方处理
-            return null;
-        }
+        return GitVersion;
     }
 
     // Paths
