@@ -125,7 +125,8 @@ class BuildTasks : NukeBuild
         // Fallback version when GitVersion fails
         var fallbackVersion = "1.3.0";
         var buildNumber = Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0";
-        var sha = Environment.GetEnvironmentVariable("GITHUB_SHA")?.Substring(0, 7) ?? "local";
+        var shaEnv = Environment.GetEnvironmentVariable("GITHUB_SHA");
+        var sha = !string.IsNullOrEmpty(shaEnv) && shaEnv.Length >= 7 ? shaEnv.Substring(0, 7) : "local";
         
         Console.WriteLine($"📋 Using fallback version: {fallbackVersion}.{buildNumber}+{sha}");
         
@@ -553,11 +554,20 @@ class BuildTasks : NukeBuild
             if (process == null)
                 throw new InvalidOperationException("Failed to start WiX process");
             
+            // Read outputs to prevent deadlock
+            var outputBuilder = new System.Text.StringBuilder();
+            var errorBuilder = new System.Text.StringBuilder();
+            
+            process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
+            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
+            
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
             process.WaitForExit();
             
             if (process.ExitCode != 0)
             {
-                var error = process.StandardError.ReadToEnd();
+                var error = errorBuilder.ToString();
                 throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
             }
 
