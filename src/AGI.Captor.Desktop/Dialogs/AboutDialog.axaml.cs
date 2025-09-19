@@ -15,7 +15,7 @@ public partial class AboutDialog : Window
         InitializeComponent();
         SetupEventHandlers();
         LoadVersionInfo();
-        
+
         // Handle window closing
         Closing += (_, _) => Hide();
     }
@@ -32,7 +32,7 @@ public partial class AboutDialog : Window
         {
             closeButton.Click += OnCloseClick;
         }
-        
+
         // Handle Escape key
         KeyDown += (_, e) =>
         {
@@ -49,13 +49,13 @@ public partial class AboutDialog : Window
         {
             var assembly = Assembly.GetExecutingAssembly();
             var version = assembly.GetName().Version;
-            
+
             if (this.FindControl<TextBlock>("VersionText") is { } versionText)
             {
-                var versionString = version != null 
+                var versionString = version != null
                     ? $"Version {version.Major}.{version.Minor}.{version.Build}"
                     : "Version 1.0.0";
-                    
+
                 versionText.Text = versionString;
                 Log.Debug("About dialog loaded with version: {Version}", versionString);
             }
@@ -63,7 +63,7 @@ public partial class AboutDialog : Window
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to load version information for About dialog");
-            
+
             // Fallback to default version
             if (this.FindControl<TextBlock>("VersionText") is { } versionText)
             {
@@ -85,7 +85,7 @@ public partial class AboutDialog : Window
         try
         {
             var dialog = new AboutDialog();
-            
+
             if (owner != null)
             {
                 _ = dialog.ShowDialog(owner);
@@ -111,13 +111,13 @@ public partial class AboutDialog : Window
         {
             Log.Debug("Creating About dialog window");
             var dialog = new AboutDialog();
-            
+
             Log.Debug("Showing About dialog window");
             dialog.Show();
-            
+
             Log.Debug("Activating About dialog window");
             dialog.Activate();
-            
+
             Log.Debug("About dialog window shown successfully");
         }
         catch (Exception ex)

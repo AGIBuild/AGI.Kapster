@@ -17,7 +17,7 @@ public class GitHubUpdateProvider
 {
     private const string GitHubApiUrl = "https://api.github.com/repos/AGIBuild/AGI.Captor/releases";
     private const string UserAgent = "AGI.Captor-UpdateChecker/1.0";
-    
+
     private readonly HttpClient _httpClient;
     private readonly ILogger _logger = Log.ForContext<GitHubUpdateProvider>();
 
@@ -38,9 +38,9 @@ public class GitHubUpdateProvider
         try
         {
             _logger.Debug("Checking for updates from GitHub API");
-            
+
             var response = await _httpClient.GetAsync(GitHubApiUrl);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.Warning("Failed to fetch releases from GitHub: {StatusCode}", response.StatusCode);
@@ -75,12 +75,12 @@ public class GitHubUpdateProvider
             // Find appropriate asset for current platform
             var platformInfo = PlatformUpdateHelper.GetPlatformInfo();
             var asset = latestRelease.Assets
-                .FirstOrDefault(a => a.Name.EndsWith($".{platformInfo.Extension}", StringComparison.OrdinalIgnoreCase) && 
+                .FirstOrDefault(a => a.Name.EndsWith($".{platformInfo.Extension}", StringComparison.OrdinalIgnoreCase) &&
                                    a.Name.Contains(platformInfo.Identifier, StringComparison.OrdinalIgnoreCase));
 
             if (asset == null)
             {
-                _logger.Warning("No {Extension} installer found for platform {Platform} in release {Version}", 
+                _logger.Warning("No {Extension} installer found for platform {Platform} in release {Version}",
                     platformInfo.Extension, platformInfo.Identifier, latestRelease.TagName);
                 return null;
             }
@@ -97,7 +97,7 @@ public class GitHubUpdateProvider
                 ReleaseUrl = latestRelease.HtmlUrl
             };
 
-            _logger.Information("Found release: {Version} published at {PublishedAt}", 
+            _logger.Information("Found release: {Version} published at {PublishedAt}",
                 updateInfo.Version, updateInfo.PublishedAt);
 
             return updateInfo;

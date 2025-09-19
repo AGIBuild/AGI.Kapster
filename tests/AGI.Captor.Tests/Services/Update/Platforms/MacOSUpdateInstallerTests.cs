@@ -25,7 +25,7 @@ public class MacOSUpdateInstallerTests
     {
         // Act
         var installer = new MacOSUpdateInstaller();
-        
+
         // Assert
         installer.Should().NotBeNull();
     }
@@ -41,7 +41,7 @@ public class MacOSUpdateInstallerTests
 
         // Arrange
         var testPkgPath = "/tmp/test.pkg";
-        
+
         // Act & Assert - Method should not throw on macOS
         Func<Task> act = async () => await _installer.InstallUpdateAsync(testPkgPath);
         await act.Should().NotThrowAsync();
@@ -58,7 +58,7 @@ public class MacOSUpdateInstallerTests
 
         // Arrange
         var invalidPath = "/non/existent/path.pkg";
-        
+
         // Act & Assert
         Func<Task> act = async () => await _installer.InstallUpdateAsync(invalidPath);
         await act.Should().NotThrowAsync(); // The method handles this gracefully and returns false
@@ -69,7 +69,7 @@ public class MacOSUpdateInstallerTests
     {
         // Act
         var result = _installer.CanInstallUpdates();
-        
+
         // Assert
         (result == true || result == false).Should().BeTrue();
     }

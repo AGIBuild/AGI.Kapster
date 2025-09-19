@@ -14,7 +14,7 @@ public abstract class TestBase : IDisposable
     protected TestBase(ITestOutputHelper output)
     {
         Output = output;
-        
+
         // Create a simple logger factory for testing without external dependencies
         LoggerFactory = new LoggerFactory();
         LoggerFactory.AddProvider(new TestLoggerProvider(Output));
@@ -88,7 +88,7 @@ public class TestLogger : ILogger
 
         var message = formatter(state, exception);
         var logMessage = $"[{logLevel}] {_categoryName}: {message}";
-        
+
         if (exception != null)
         {
             logMessage += $"\nException: {exception}";

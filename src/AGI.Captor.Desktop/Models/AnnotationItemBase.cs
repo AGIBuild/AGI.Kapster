@@ -17,7 +17,7 @@ public abstract class AnnotationItemBase : IAnnotationItem
 
     public Guid Id { get; } = Guid.NewGuid();
     public abstract AnnotationType Type { get; }
-    
+
     public AnnotationState State
     {
         get => _state;
@@ -28,9 +28,9 @@ public abstract class AnnotationItemBase : IAnnotationItem
             OnStateChanged();
         }
     }
-    
+
     public abstract Rect Bounds { get; }
-    
+
     public int ZIndex
     {
         get => _zIndex;
@@ -40,7 +40,7 @@ public abstract class AnnotationItemBase : IAnnotationItem
             ModifiedAt = DateTime.Now;
         }
     }
-    
+
     public bool IsVisible
     {
         get => _isVisible;
@@ -50,7 +50,7 @@ public abstract class AnnotationItemBase : IAnnotationItem
             ModifiedAt = DateTime.Now;
         }
     }
-    
+
     public bool IsLocked
     {
         get => _isLocked;
@@ -60,10 +60,10 @@ public abstract class AnnotationItemBase : IAnnotationItem
             ModifiedAt = DateTime.Now;
         }
     }
-    
+
     public DateTime CreatedAt { get; } = DateTime.Now;
     public DateTime ModifiedAt { get; set; } = DateTime.Now;
-    
+
     public IAnnotationStyle Style
     {
         get => _style;
@@ -81,30 +81,30 @@ public abstract class AnnotationItemBase : IAnnotationItem
     }
 
     public abstract bool HitTest(Point point);
-    
+
     public virtual void Move(Vector offset)
     {
         if (IsLocked) return;
         OnMove(offset);
         ModifiedAt = DateTime.Now;
     }
-    
+
     public virtual void Scale(double scale, Point center)
     {
         if (IsLocked || scale <= 0) return;
         OnScale(scale, center);
         ModifiedAt = DateTime.Now;
     }
-    
+
     public virtual void Rotate(double angle, Point center)
     {
         if (IsLocked) return;
         OnRotate(angle, center);
         ModifiedAt = DateTime.Now;
     }
-    
+
     public abstract IAnnotationItem Clone();
-    
+
     public virtual Dictionary<string, object> Serialize()
     {
         return new Dictionary<string, object>
@@ -120,7 +120,7 @@ public abstract class AnnotationItemBase : IAnnotationItem
             ["Style"] = Style.Serialize()
         };
     }
-    
+
     public virtual void Deserialize(Dictionary<string, object> data)
     {
         if (data.TryGetValue("State", out var state))
@@ -141,27 +141,27 @@ public abstract class AnnotationItemBase : IAnnotationItem
     /// 子类实现具体的移动逻辑
     /// </summary>
     protected abstract void OnMove(Vector offset);
-    
+
     /// <summary>
     /// 子类实现具体的缩放逻辑
     /// </summary>
     protected abstract void OnScale(double scale, Point center);
-    
+
     /// <summary>
     /// 子类实现具体的旋转逻辑
     /// </summary>
     protected abstract void OnRotate(double angle, Point center);
-    
+
     /// <summary>
     /// 状态改变时的回调
     /// </summary>
     protected virtual void OnStateChanged() { }
-    
+
     /// <summary>
     /// 样式改变时的回调
     /// </summary>
     protected virtual void OnStyleChanged() { }
-    
+
     /// <summary>
     /// 检查点是否在矩形内
     /// </summary>
@@ -170,7 +170,7 @@ public abstract class AnnotationItemBase : IAnnotationItem
         return point.X >= rect.Left && point.X <= rect.Right &&
                point.Y >= rect.Top && point.Y <= rect.Bottom;
     }
-    
+
     /// <summary>
     /// 计算点到线段的距离
     /// </summary>
@@ -178,10 +178,10 @@ public abstract class AnnotationItemBase : IAnnotationItem
     {
         var line = lineEnd - lineStart;
         var lineLength = Math.Sqrt(line.X * line.X + line.Y * line.Y);
-        
+
         if (lineLength == 0)
             return Vector.Distance(point, lineStart);
-        
+
         var t = Math.Max(0, Math.Min(1, Vector.Dot(point - lineStart, line) / (lineLength * lineLength)));
         var projection = lineStart + t * line;
         return Vector.Distance(point, projection);

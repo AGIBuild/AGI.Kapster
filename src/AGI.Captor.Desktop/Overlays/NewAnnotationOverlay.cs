@@ -59,14 +59,14 @@ public sealed class NewAnnotationOverlay : Canvas
 
     // Selection rect for hit testing
     private Rect _selectionRect;
-    
-    
+
+
     // Event for double-click confirm
     public event Action<Rect>? ConfirmRequested;
-    
+
     // Events for export functionality
     public event Action? ExportRequested;
-    
+
     // Event for style changes (for toolbar updates)
     public event EventHandler<StyleChangedEventArgs>? StyleChanged;
     public Rect SelectionRect
@@ -92,7 +92,7 @@ public sealed class NewAnnotationOverlay : Canvas
         get => _annotationService.CurrentStyle;
         set => _annotationService.CurrentStyle = value;
     }
-    
+
     public CommandManager CommandManager => _commandManager;
 
     public NewAnnotationOverlay() : this(null)
@@ -105,16 +105,16 @@ public sealed class NewAnnotationOverlay : Canvas
         _renderer = new AnnotationRenderer();
         _commandManager = new CommandManager();
         _exportService = new ExportService();
-        
+
         Background = Brushes.Transparent;
         IsHitTestVisible = false; // Start as non-interactive
-        
+
         // Subscribe to annotation events
         _annotationService.Manager.ItemChanged += OnItemChanged;
         _annotationService.Manager.SelectionChanged += OnSelectionChanged;
         _annotationService.ToolChanged += OnToolChanged;
         _annotationService.StyleChanged += OnStyleChanged;
-        
+
         // Enable keyboard focus for shortcuts
         Focusable = true;
     }
@@ -187,11 +187,11 @@ public sealed class NewAnnotationOverlay : Canvas
                     {
                         Log.Debug("Enter key pressed - confirming selection and exiting selection state");
                         var currentSelection = _selectionRect;
-                        
+
                         // Clear selection state before confirming to prevent further drawing
                         _selectionRect = new Rect();
                         IsHitTestVisible = false;
-                        
+
                         // Trigger confirm event
                         ConfirmRequested?.Invoke(currentSelection);
                         e.Handled = true;
@@ -276,22 +276,22 @@ public sealed class NewAnnotationOverlay : Canvas
         try
         {
             base.OnPointerPressed(e);
-            
+
             var point = e.GetCurrentPoint(this).Position;
             var properties = e.GetCurrentPoint(this).Properties;
             var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
             var pointInSelection = hasSelection && _selectionRect.Contains(point);
-            
+
             // Handle right-click during text editing for quick completion
             if (properties.IsRightButtonPressed && _editingTextBox != null)
             {
                 // Check if click is outside the text editing area
                 var textBoxBounds = new Rect(
-                    Canvas.GetLeft(_editingTextBox), 
+                    Canvas.GetLeft(_editingTextBox),
                     Canvas.GetTop(_editingTextBox),
-                    _editingTextBox.Bounds.Width, 
+                    _editingTextBox.Bounds.Width,
                     _editingTextBox.Bounds.Height);
-                
+
                 if (!textBoxBounds.Contains(point))
                 {
                     // Right-click outside text box - complete editing and stay in text tool mode
@@ -303,7 +303,7 @@ public sealed class NewAnnotationOverlay : Canvas
                     return;
                 }
             }
-            
+
             if (properties.IsLeftButtonPressed)
             {
                 // Handle double-click for various actions
@@ -316,13 +316,13 @@ public sealed class NewAnnotationOverlay : Canvas
                         _annotationService.Manager.ClearSelection();
                         RefreshRender();
                     }
-                    
+
                     // Handle save to clipboard operation if there's a selection rect
                     if (hasSelection && !pointInSelection)
                     {
                         // Save current selection rect before clearing
                         var currentSelection = _selectionRect;
-                        
+
                         // Clear selection state before confirming to prevent further drawing
                         _selectionRect = new Rect();
                         IsHitTestVisible = false;
@@ -331,21 +331,21 @@ public sealed class NewAnnotationOverlay : Canvas
                         return;
                     }
                 }
-                
+
                 // If no selection exists, let SelectionOverlay handle it
                 if (!hasSelection)
                 {
                     e.Handled = false;
                     return;
                 }
-                
+
                 // If point is outside selection area, let SelectionOverlay handle it
                 if (!pointInSelection)
                 {
                     e.Handled = false;
                     return;
                 }
-                
+
                 // Point is inside selection area - handle annotation logic
                 if (CurrentTool == AnnotationToolType.None)
                 {
@@ -361,13 +361,13 @@ public sealed class NewAnnotationOverlay : Canvas
                                 _annotationService.Manager.ClearSelection();
                                 _annotationService.Manager.SelectItem(textItem);
                             }
-                            
+
                             StartTextEditing(textItem);
                             e.Handled = true;
                             return;
                         }
                     }
-                    
+
                     // Selection mode - for selecting/editing existing annotations
                     HandleSelectionPress(point, e.KeyModifiers.HasFlag(KeyModifiers.Control));
                 }
@@ -381,7 +381,7 @@ public sealed class NewAnnotationOverlay : Canvas
                         e.Pointer.Capture(this);
                     }
                 }
-                
+
                 e.Handled = true;
             }
         }
@@ -395,26 +395,26 @@ public sealed class NewAnnotationOverlay : Canvas
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        
+
         var point = e.GetCurrentPoint(this).Position;
-        
+
         // Handle drag and resize operations first
         if (_isDragging)
         {
             ProcessDrag(point);
             return;
         }
-        
+
         if (_isResizing)
         {
             ProcessResize(point);
             return;
         }
-        
+
         // Cursor logic based on tool and position
         var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
         var pointInSelection = hasSelection && _selectionRect.Contains(point);
-        
+
         if (!hasSelection || !pointInSelection)
         {
             // Outside selection or no selection - arrow cursor
@@ -449,7 +449,7 @@ public sealed class NewAnnotationOverlay : Canvas
                 }
             }
         }
-        
+
         if (_isCreating && _creatingItem != null)
         {
             var oldBounds = _creatingItem.Bounds;
@@ -470,11 +470,11 @@ public sealed class NewAnnotationOverlay : Canvas
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        
+
         var point = e.GetPosition(this);
         var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
         var pointInSelection = hasSelection && _selectionRect.Contains(point);
-        
+
         // End drag or resize operations
         if (_isDragging || _isResizing)
         {
@@ -510,14 +510,14 @@ public sealed class NewAnnotationOverlay : Canvas
             e.Handled = true;
             return;
         }
-        
+
         // If no selection or point outside selection, let SelectionOverlay handle it
         if (!hasSelection || !pointInSelection)
         {
             e.Handled = false;
             return;
         }
-        
+
         if (_isCreating && _creatingItem != null)
         {
             // Use command pattern for creating annotations
@@ -536,24 +536,24 @@ public sealed class NewAnnotationOverlay : Canvas
             {
                 Log.Error(ex, "Failed to create annotation");
             }
-            
+
             _creatingItem = null;
             _isCreating = false;
         }
-        
+
         e.Handled = true;
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        
+
         // End any ongoing transformation
         EndTransformation();
         // Ensure capture released
         e.Pointer.Capture(null);
         e.Pointer.Capture(null);
-        
+
         if (_isCreating && _creatingItem != null)
         {
             _annotationService.CancelCreate(_creatingItem);
@@ -577,7 +577,7 @@ public sealed class NewAnnotationOverlay : Canvas
         }
 
         var hitItem = _annotationService.HitTest(point);
-        
+
         if (hitItem != null)
         {
             if (addToSelection)
@@ -608,11 +608,11 @@ public sealed class NewAnnotationOverlay : Canvas
             if (CurrentTool == AnnotationToolType.Text)
             {
                 var textBoxBounds = new Rect(
-                    Canvas.GetLeft(_editingTextBox), 
+                    Canvas.GetLeft(_editingTextBox),
                     Canvas.GetTop(_editingTextBox),
-                    _editingTextBox.Bounds.Width, 
+                    _editingTextBox.Bounds.Width,
                     _editingTextBox.Bounds.Height);
-                
+
                 if (!textBoxBounds.Contains(point))
                 {
                     // Click outside text box - complete current editing
@@ -632,7 +632,7 @@ public sealed class NewAnnotationOverlay : Canvas
                 EndTextEditing();
             }
         }
-        
+
         // Special handling for text tool: create directly and enter editing state
         if (CurrentTool == AnnotationToolType.Text)
         {
@@ -641,18 +641,18 @@ public sealed class NewAnnotationOverlay : Canvas
                 var textItem = _annotationService.StartAnnotation(point) as TextAnnotation;
                 if (textItem != null)
                 {
-                // CRITICAL FIX: Remember the original selection rectangle
-                // This prevents selection bounds mismatch that causes text ghosting
-                textItem.SetOriginalSelectionRect(_selectionRect);
-                Log.Information("Text annotation created with original selection rect: {Rect}", _selectionRect);
-                
-                // For text tool, defer command execution until editing is completed
-                // This makes text creation + editing a single atomic operation for undo/redo
-                if (ValidateAnnotationForFinish(textItem))
-                {
-                    // Enter editing state immediately - command will be executed when editing ends
-                    StartTextEditing(textItem);
-                }
+                    // CRITICAL FIX: Remember the original selection rectangle
+                    // This prevents selection bounds mismatch that causes text ghosting
+                    textItem.SetOriginalSelectionRect(_selectionRect);
+                    Log.Information("Text annotation created with original selection rect: {Rect}", _selectionRect);
+
+                    // For text tool, defer command execution until editing is completed
+                    // This makes text creation + editing a single atomic operation for undo/redo
+                    if (ValidateAnnotationForFinish(textItem))
+                    {
+                        // Enter editing state immediately - command will be executed when editing ends
+                        StartTextEditing(textItem);
+                    }
                 }
             }
             catch (Exception ex)
@@ -677,7 +677,7 @@ public sealed class NewAnnotationOverlay : Canvas
                     {
                         emojiItem.Emoji = emojiText.Text ?? "😀";
                     }
-                    
+
                     // Complete creation immediately using command pattern
                     if (ValidateAnnotationForFinish(emojiItem))
                     {
@@ -693,13 +693,13 @@ public sealed class NewAnnotationOverlay : Canvas
             }
             return;
         }
-        
+
         // Normal creation flow for other tools
         try
         {
             _startPoint = point;
             _creatingItem = _annotationService.StartAnnotation(point);
-            
+
             if (_creatingItem != null)
             {
                 _isCreating = true;
@@ -731,7 +731,7 @@ public sealed class NewAnnotationOverlay : Canvas
         // This avoids conflicts between static tool-based cursor and dynamic position-based cursor
         Log.Debug("UpdateCursor called: CurrentTool={CurrentTool} (cursor will be set by OnPointerMoved)", CurrentTool);
     }
-    
+
 
     #region Selection and Transformation
 
@@ -746,8 +746,8 @@ public sealed class NewAnnotationOverlay : Canvas
         var item = selectedItems[0];
         // For text annotations, use actual text rendering bounds for precise handle hit testing
         // This must match the bounds used in AnnotationRenderer.RenderSelectionHandles
-        var bounds = item is TextAnnotation textAnnotation ? 
-            textAnnotation.GetTextRenderBounds() : 
+        var bounds = item is TextAnnotation textAnnotation ?
+            textAnnotation.GetTextRenderBounds() :
             item.Bounds;
         const double handleSize = 8;
         const double tolerance = 6; // Increased tolerance for better precision
@@ -766,7 +766,7 @@ public sealed class NewAnnotationOverlay : Canvas
         };
 
         // Use distance-based hit testing for more precise control
-        const double maxDistance = handleSize/2 + tolerance;
+        const double maxDistance = handleSize / 2 + tolerance;
         foreach (var (handle, handlePos) in handlePositions)
         {
             var distance = Math.Sqrt(Math.Pow(point.X - handlePos.X, 2) + Math.Pow(point.Y - handlePos.Y, 2));
@@ -972,7 +972,7 @@ public sealed class NewAnnotationOverlay : Canvas
             _ => ResizeHandle.BottomRight
         };
     }
-    
+
     // Arrow resize state
     private bool _resizeMoveStart;
     private Point _resizeFixedEndpoint;
@@ -1090,7 +1090,7 @@ public sealed class NewAnnotationOverlay : Canvas
         // Calculate scale factors
         var scaleX = newBounds.Width / originalBounds.Width;
         var scaleY = newBounds.Height / originalBounds.Height;
-        
+
         // Calculate translation
         var translation = newBounds.TopLeft - originalBounds.TopLeft;
 
@@ -1130,11 +1130,11 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         // Update position to match new bounds
         text.Position = newBounds.TopLeft;
-        
+
         // Use the new SetTargetSize method for precise size control
         text.SetTargetSize(new Size(newBounds.Width, newBounds.Height));
-        
-        Log.Debug("Applied text transformation: Position={Position}, NewBounds={NewBounds}", 
+
+        Log.Debug("Applied text transformation: Position={Position}, NewBounds={NewBounds}",
                  newBounds.TopLeft, newBounds);
     }
 
@@ -1165,7 +1165,7 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         RefreshRenderThrottled(false);
     }
-    
+
     /// <summary>
     /// Refresh rendering with throttling for performance
     /// </summary>
@@ -1175,7 +1175,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             var now = DateTime.UtcNow;
             var timeSinceLastRender = (now - _lastRenderTime).TotalMilliseconds;
-            
+
             // Check if we should skip this update for performance
             if (!force && timeSinceLastRender < MinRenderInterval)
             {
@@ -1191,11 +1191,11 @@ public sealed class NewAnnotationOverlay : Canvas
                 }
                 return;
             }
-            
+
             _lastRenderTime = now;
-            
+
             var items = _annotationService.Manager.Items;
-            
+
             // Add creating item temporarily for rendering
             if (_creatingItem != null)
             {
@@ -1252,7 +1252,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             // Force cursor update when tool changes
             Log.Information("OnToolChanged: {OldTool} -> {NewTool}, forcing cursor update", e.OldTool, e.NewTool);
-            
+
             // If we are in drawing mode and have a valid screenshot selection,
             // immediately clear any annotation selection (resize anchors) and set cross cursor
             var hasSelection = _selectionRect.Width >= 2 && _selectionRect.Height >= 2;
@@ -1268,7 +1268,7 @@ public sealed class NewAnnotationOverlay : Canvas
                 Cursor = new Cursor(StandardCursorType.Arrow);
                 Log.Information("OnToolChanged: FORCED Arrow cursor for None tool");
             }
-            
+
             // Cancel any ongoing creation when tool changes
             if (_isCreating && _creatingItem != null)
             {
@@ -1277,9 +1277,9 @@ public sealed class NewAnnotationOverlay : Canvas
                 _isCreating = false;
                 RefreshRender();
             }
-            
+
             // (moved) selection clearing handled above when entering drawing mode
-            
+
             // Note: ESC key handling is done at OverlayWindow level
         }
         catch (Exception ex)
@@ -1340,14 +1340,14 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         var allItems = _annotationService.Manager.Items.ToList();
         if (allItems.Count == 0) return;
-        
+
         // Create a composite command to remove all annotations
-        var removeCommands = allItems.Select(item => 
+        var removeCommands = allItems.Select(item =>
             new RemoveAnnotationCommand(_annotationService.Manager, _renderer, item, this)).ToList();
-        
+
         var clearCommand = new CompositeCommand("Clear All Annotations", removeCommands);
         _commandManager.ExecuteCommand(clearCommand);
-        
+
         RefreshRender();
         Log.Information("Cleared {Count} annotations using command pattern", allItems.Count);
     }
@@ -1359,11 +1359,11 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         var selectedItems = _annotationService.Manager.SelectedItems.ToList();
         if (selectedItems.Count == 0) return;
-        
+
         // Create commands for each selected item
-        var removeCommands = selectedItems.Select(item => 
+        var removeCommands = selectedItems.Select(item =>
             new RemoveAnnotationCommand(_annotationService.Manager, _renderer, item, this)).ToList();
-        
+
         if (removeCommands.Count == 1)
         {
             // Single item - execute single command
@@ -1375,7 +1375,7 @@ public sealed class NewAnnotationOverlay : Canvas
             var deleteCommand = new CompositeCommand("Delete Selected Annotations", removeCommands);
             _commandManager.ExecuteCommand(deleteCommand);
         }
-        
+
         RefreshRender();
         Log.Information("Deleted {Count} selected annotations using command pattern", selectedItems.Count);
     }
@@ -1406,12 +1406,12 @@ public sealed class NewAnnotationOverlay : Canvas
             EndTextEditing();
 
             _editingTextItem = textItem;
-            
+
             // CRITICAL FIX: Force remove existing text render before entering edit mode
             // This prevents ghosting during text editing
             _renderer.RemoveRender(this, textItem);
             Log.Information("Removed existing render for text annotation {Id} before entering edit mode", textItem.Id);
-            
+
             textItem.StartEditing();
 
             // CRITICAL FIX: Immediately refresh render to remove original text display
@@ -1422,7 +1422,7 @@ public sealed class NewAnnotationOverlay : Canvas
             var bounds = textItem.Bounds; // This returns the editing boundary of the selection state
             var actualWidth = bounds.Width;
             var actualHeight = bounds.Height;
-            
+
             // Create text editing box - precisely match TextBlock rendering position and size
             _editingTextBox = new TextBox
             {
@@ -1466,13 +1466,13 @@ public sealed class NewAnnotationOverlay : Canvas
             // Focus and select all text
             _editingTextBox.Focus();
             _editingTextBox.SelectAll();
-            
+
             Log.Information("Started text editing for annotation {Id}", textItem.Id);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to start text editing for annotation {Id}", textItem.Id);
-            
+
             // Clean up state
             _editingTextBox = null;
             _editingTextItem = null;
@@ -1494,7 +1494,7 @@ public sealed class NewAnnotationOverlay : Canvas
                 _editingTextBox.Text ?? "",
                 System.Globalization.CultureInfo.CurrentCulture,
                 Avalonia.Media.FlowDirection.LeftToRight,
-                new Avalonia.Media.Typeface(_editingTextItem.Style.FontFamily, 
+                new Avalonia.Media.Typeface(_editingTextItem.Style.FontFamily,
                                             (Avalonia.Media.FontStyle)_editingTextItem.Style.FontStyle,
                                             (Avalonia.Media.FontWeight)_editingTextItem.Style.FontWeight),
                 _editingTextItem.Style.FontSize,
@@ -1508,7 +1508,7 @@ public sealed class NewAnnotationOverlay : Canvas
             _editingTextBox.Width = newWidth;
             _editingTextBox.Height = newHeight;
 
-            Log.Debug("Auto-expanded text box to {Width}x{Height} for text: {Text}", 
+            Log.Debug("Auto-expanded text box to {Width}x{Height} for text: {Text}",
                      newWidth, newHeight, _editingTextBox.Text?.Substring(0, Math.Min(20, _editingTextBox.Text?.Length ?? 0)));
         }
         catch (Exception ex)
@@ -1529,20 +1529,20 @@ public sealed class NewAnnotationOverlay : Canvas
             // Update text content
             var finalText = _editingTextBox.Text ?? string.Empty;
             _editingTextItem.Text = finalText;
-            
+
             // Remove editing box
             Children.Remove(_editingTextBox);
             _editingTextBox.LostFocus -= OnTextEditingLostFocus;
             _editingTextBox.KeyDown -= OnTextEditingKeyDown;
             _editingTextBox.TextChanged -= OnTextEditingTextChanged;
-            
+
             // CRITICAL FIX: Clear any existing rendering before changing state
             // This prevents blurring/ghosting effects
             _renderer.RemoveRender(this, _editingTextItem);
-            
+
             // End editing state AFTER removing old renders
             _editingTextItem.EndEditing();
-            
+
             // CRITICAL FIX: Execute add command when text editing is completed
             // This ensures the text annotation is properly added to the undo/redo stack
             if (!string.IsNullOrWhiteSpace(finalText))
@@ -1556,7 +1556,7 @@ public sealed class NewAnnotationOverlay : Canvas
                 // If text is empty, don't add it to the annotation manager
                 Log.Information("Empty text annotation discarded: {Id}", _editingTextItem.Id);
             }
-            
+
             // CRITICAL FIX: Ensure focus returns to overlay for keyboard shortcuts to work
             // This allows immediate undo/redo without clicking on canvas first
             try
@@ -1637,7 +1637,7 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     #endregion
-    
+
     /// <summary>
     /// Validate annotation before finishing creation
     /// </summary>
@@ -1654,7 +1654,7 @@ public sealed class NewAnnotationOverlay : Canvas
         }
         else if (item is ArrowAnnotation arrow)
         {
-            var length = Math.Sqrt(Math.Pow(arrow.EndPoint.X - arrow.StartPoint.X, 2) + 
+            var length = Math.Sqrt(Math.Pow(arrow.EndPoint.X - arrow.StartPoint.X, 2) +
                                  Math.Pow(arrow.EndPoint.Y - arrow.StartPoint.Y, 2));
             return length >= 5;
         }
@@ -1662,7 +1662,7 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             return freehand.Points.Count >= 2;
         }
-        
+
         // Text and Emoji don't need size validation
         return true;
     }

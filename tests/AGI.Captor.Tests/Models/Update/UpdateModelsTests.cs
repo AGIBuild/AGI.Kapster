@@ -25,10 +25,10 @@ public class UpdateModelsTests
             ReleaseUrl = "https://example.com/release"
         };
         var currentVersion = new System.Version("1.2.0");
-        
+
         // Act
         var result = updateInfo.IsNewerThan(currentVersion);
-        
+
         // Assert
         result.Should().BeTrue();
     }
@@ -48,10 +48,10 @@ public class UpdateModelsTests
             ReleaseUrl = "https://example.com/release"
         };
         var currentVersion = new System.Version("1.2.0");
-        
+
         // Act
         var result = updateInfo.IsNewerThan(currentVersion);
-        
+
         // Assert
         result.Should().BeFalse();
     }
@@ -71,10 +71,10 @@ public class UpdateModelsTests
             ReleaseUrl = "https://example.com/release"
         };
         var currentVersion = new System.Version("1.2.0");
-        
+
         // Act
         var result = updateInfo.IsNewerThan(currentVersion);
-        
+
         // Assert
         result.Should().BeFalse();
     }
@@ -94,10 +94,10 @@ public class UpdateModelsTests
             ReleaseUrl = "https://example.com/release"
         };
         var currentVersion = new System.Version("1.2.0");
-        
+
         // Act
         var result = updateInfo.IsNewerThan(currentVersion);
-        
+
         // Assert
         result.Should().BeFalse();
     }
@@ -115,10 +115,10 @@ public class UpdateModelsTests
         // Arrange
         var updateInfo = new UpdateInfo { Version = updateVersion };
         var current = new System.Version(currentVersion);
-        
+
         // Act
         var result = updateInfo.IsNewerThan(current);
-        
+
         // Assert
         result.Should().Be(expected);
     }
@@ -128,7 +128,7 @@ public class UpdateModelsTests
     {
         // Act
         var settings = new UpdateSettings();
-        
+
         // Assert
         settings.Enabled.Should().BeTrue();
         settings.CheckFrequencyHours.Should().Be(24);
@@ -147,10 +147,10 @@ public class UpdateModelsTests
             TotalBytes = 1000,
             DownloadedBytes = 250
         };
-        
+
         // Act
         var percent = progress.PercentComplete;
-        
+
         // Assert
         percent.Should().Be(25);
     }
@@ -164,10 +164,10 @@ public class UpdateModelsTests
             TotalBytes = 0,
             DownloadedBytes = 100
         };
-        
+
         // Act
         var percent = progress.PercentComplete;
-        
+
         // Assert
         percent.Should().Be(0);
     }
@@ -181,10 +181,10 @@ public class UpdateModelsTests
             TotalBytes = 1000,
             DownloadedBytes = 1000
         };
-        
+
         // Act
         var percent = progress.PercentComplete;
-        
+
         // Assert
         percent.Should().Be(100);
     }
@@ -195,10 +195,10 @@ public class UpdateModelsTests
         // Arrange
         var updateInfo = new UpdateInfo { Version = "1.3.0" };
         var isAutomatic = true;
-        
+
         // Act
         var eventArgs = new UpdateAvailableEventArgs(updateInfo, isAutomatic);
-        
+
         // Assert
         eventArgs.UpdateInfo.Should().Be(updateInfo);
         eventArgs.IsAutomatic.Should().Be(isAutomatic);
@@ -211,10 +211,10 @@ public class UpdateModelsTests
         var success = true;
         var updateInfo = new UpdateInfo { Version = "1.3.0" };
         var errorMessage = "Test error";
-        
+
         // Act
         var eventArgs = new UpdateCompletedEventArgs(success, updateInfo, errorMessage);
-        
+
         // Assert
         eventArgs.Success.Should().Be(success);
         eventArgs.UpdateInfo.Should().Be(updateInfo);
@@ -226,7 +226,7 @@ public class UpdateModelsTests
     {
         // Act
         var eventArgs = new UpdateCompletedEventArgs(true);
-        
+
         // Assert
         eventArgs.Success.Should().BeTrue();
         eventArgs.UpdateInfo.Should().BeNull();

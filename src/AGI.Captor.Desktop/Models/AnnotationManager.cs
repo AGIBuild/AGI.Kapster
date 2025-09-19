@@ -51,10 +51,10 @@ public class AnnotationManager
     public void AddItem(IAnnotationItem item)
     {
         if (item == null) throw new ArgumentNullException(nameof(item));
-        
+
         item.ZIndex = _nextZIndex++;
         _items.Add(item);
-        
+
         ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Added, item));
     }
 
@@ -75,17 +75,17 @@ public class AnnotationManager
     public bool RemoveItem(IAnnotationItem item)
     {
         if (item == null) return false;
-        
+
         var removed = _items.Remove(item);
         if (removed)
         {
             _selectedItems.Remove(item);
             ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Removed, item));
-            
+
             if (_selectedItems.Count == 0)
                 SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(new IAnnotationItem[0], new IAnnotationItem[0]));
         }
-        
+
         return removed;
     }
 
@@ -108,18 +108,18 @@ public class AnnotationManager
     {
         var oldItems = _items.ToList();
         _items.Clear();
-        
+
         var oldSelection = _selectedItems.ToList();
         _selectedItems.Clear();
-        
+
         foreach (var item in oldItems)
         {
             ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Removed, item));
         }
-        
+
         if (oldSelection.Count > 0)
             SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, new IAnnotationItem[0]));
-            
+
         _nextZIndex = 1;
     }
 
@@ -151,9 +151,9 @@ public class AnnotationManager
     public void SelectItem(IAnnotationItem item, bool addToSelection = false)
     {
         if (item == null) return;
-        
+
         var oldSelection = _selectedItems.ToList();
-        
+
         if (!addToSelection)
         {
             // 清除旧选择
@@ -163,13 +163,13 @@ public class AnnotationManager
             }
             _selectedItems.Clear();
         }
-        
+
         if (!_selectedItems.Contains(item))
         {
             _selectedItems.Add(item);
             item.State = AnnotationState.Selected;
         }
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, _selectedItems));
     }
 
@@ -180,9 +180,9 @@ public class AnnotationManager
     {
         var itemsToSelect = items.ToList();
         if (itemsToSelect.Count == 0) return;
-        
+
         var oldSelection = _selectedItems.ToList();
-        
+
         if (!addToSelection)
         {
             // 清除旧选择
@@ -192,7 +192,7 @@ public class AnnotationManager
             }
             _selectedItems.Clear();
         }
-        
+
         foreach (var item in itemsToSelect)
         {
             if (!_selectedItems.Contains(item))
@@ -201,7 +201,7 @@ public class AnnotationManager
                 item.State = AnnotationState.Selected;
             }
         }
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, _selectedItems));
     }
 
@@ -211,15 +211,15 @@ public class AnnotationManager
     public void ClearSelection()
     {
         if (_selectedItems.Count == 0) return;
-        
+
         var oldSelection = _selectedItems.ToList();
-        
+
         foreach (var item in _selectedItems)
         {
             item.State = AnnotationState.Normal;
         }
         _selectedItems.Clear();
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, new IAnnotationItem[0]));
     }
 
@@ -229,12 +229,12 @@ public class AnnotationManager
     public void DeselectItem(IAnnotationItem item)
     {
         if (item == null || !_selectedItems.Contains(item)) return;
-        
+
         var oldSelection = _selectedItems.ToList();
-        
+
         _selectedItems.Remove(item);
         item.State = AnnotationState.Normal;
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, _selectedItems));
     }
 
@@ -244,9 +244,9 @@ public class AnnotationManager
     public void SelectAll()
     {
         if (_items.Count == 0) return;
-        
+
         var oldSelection = _selectedItems.ToList();
-        
+
         // Add all items to selection
         foreach (var item in _items)
         {
@@ -256,7 +256,7 @@ public class AnnotationManager
                 item.State = AnnotationState.Selected;
             }
         }
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(oldSelection, _selectedItems));
     }
 
@@ -275,7 +275,7 @@ public class AnnotationManager
             _selectedItems.Add(item);
             item.State = AnnotationState.Selected;
         }
-        
+
         SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(_selectedItems, _selectedItems));
     }
 
@@ -285,14 +285,14 @@ public class AnnotationManager
     public void BringSelectedToFront()
     {
         if (_selectedItems.Count == 0) return;
-        
+
         var maxZ = _items.Max(item => item.ZIndex);
         foreach (var item in _selectedItems.OrderBy(item => item.ZIndex))
         {
             item.ZIndex = ++maxZ;
         }
         _nextZIndex = maxZ + 1;
-        
+
         foreach (var item in _selectedItems)
         {
             ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Modified, item));
@@ -305,13 +305,13 @@ public class AnnotationManager
     public void SendSelectedToBack()
     {
         if (_selectedItems.Count == 0) return;
-        
+
         var minZ = _items.Min(item => item.ZIndex);
         foreach (var item in _selectedItems.OrderByDescending(item => item.ZIndex))
         {
             item.ZIndex = --minZ;
         }
-        
+
         foreach (var item in _selectedItems)
         {
             ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Modified, item));
@@ -349,7 +349,7 @@ public class AnnotationManager
     public void LoadFromData(List<Dictionary<string, object>> data)
     {
         Clear();
-        
+
         foreach (var itemData in data)
         {
             var item = AnnotationFactory.CreateFromData(itemData);
@@ -359,7 +359,7 @@ public class AnnotationManager
                 _nextZIndex = Math.Max(_nextZIndex, item.ZIndex + 1);
             }
         }
-        
+
         foreach (var item in _items)
         {
             ItemChanged?.Invoke(this, new AnnotationChangedEventArgs(AnnotationChangeType.Added, item));

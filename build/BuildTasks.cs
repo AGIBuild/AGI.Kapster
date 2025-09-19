@@ -61,7 +61,7 @@ class BuildTasks : NukeBuild
                 Console.WriteLine("⚠️ GitVersion injection failed, attempting manual call...");
                 var targetFramework = GetTargetFramework();
                 Console.WriteLine($"🎯 Using target framework: {targetFramework}");
-                
+
                 var result = GitVersionTasks.GitVersion(s => s
                     .SetFramework(targetFramework)
                     .SetNoFetch(true)
@@ -91,12 +91,12 @@ class BuildTasks : NukeBuild
 
     // Runtime detection
     string CurrentRuntimeIdentifier => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win-x64" :
-        RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 
+        RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ?
             (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "osx-arm64" : "osx-x64") :
-        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux-x64" : 
+        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux-x64" :
         throw new PlatformNotSupportedException("Unsupported platform");
 
-    string[] PublishRuntimeIdentifiers => 
+    string[] PublishRuntimeIdentifiers =>
         string.IsNullOrWhiteSpace(Rids) ? new[] { CurrentRuntimeIdentifier } :
         Rids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
@@ -109,11 +109,11 @@ class BuildTasks : NukeBuild
     {
         if (!string.IsNullOrWhiteSpace(Framework))
             return Framework;
-            
+
         try
         {
-            return MainProject?.GetProperty("TargetFramework") ?? 
-                   MainProject?.GetProperty("TargetFrameworks")?.Split(';').First() ?? 
+            return MainProject?.GetProperty("TargetFramework") ??
+                   MainProject?.GetProperty("TargetFrameworks")?.Split(';').First() ??
                    "net9.0"; // 与主项目保持一致的默认值
         }
         catch (Exception ex)
@@ -133,7 +133,7 @@ class BuildTasks : NukeBuild
             var gitVersion = GetGitVersionSafe();
             return (
                 gitVersion?.AssemblySemVer ?? "1.0.0.0",
-                gitVersion?.AssemblySemFileVer ?? "1.0.0.0", 
+                gitVersion?.AssemblySemFileVer ?? "1.0.0.0",
                 gitVersion?.InformationalVersion ?? "1.0.0+local"
             );
         }
@@ -185,7 +185,7 @@ class BuildTasks : NukeBuild
         .Executes(() =>
         {
             var version = GetVersionInfo();
-            
+
             DotNetBuild(s => s
                 .SetProjectFile(Solution)
                 .SetConfiguration(Configuration)
@@ -193,7 +193,7 @@ class BuildTasks : NukeBuild
                 .SetFileVersion(version.FileVersion)
                 .SetInformationalVersion(version.InformationalVersion)
                 .EnableNoRestore());
-                
+
             Console.WriteLine($"✅ Build completed - Version: {version.InformationalVersion}");
         });
 
@@ -226,7 +226,7 @@ class BuildTasks : NukeBuild
                 }
 
                 DotNetTest(testSettings);
-                
+
                 Console.WriteLine("✅ All tests passed successfully!");
             }
             catch (Exception ex)
@@ -266,20 +266,20 @@ class BuildTasks : NukeBuild
             }
 
             var version = GetVersionInfo();
-            
+
             foreach (var rid in PublishRuntimeIdentifiers)
             {
                 var outputDir = PublishDirectory / rid;
                 outputDir.CreateOrCleanDirectory();
 
                 Console.WriteLine($"📦 Publishing for {rid}...");
-                
+
                 try
                 {
                     // 检查项目是否启用了AOT编译
                     var publishAot = MainProject?.GetProperty("PublishAot")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
                     var effectiveTrim = publishAot || Trim; // AOT编译时必须启用Trim
-                    
+
                     if (publishAot && !Trim)
                     {
                         Console.WriteLine($"⚠️  AOT compilation enabled, trimming will be automatically enabled for {rid}");
@@ -298,7 +298,7 @@ class BuildTasks : NukeBuild
                         .SetFileVersion(version.FileVersion)
                         .SetInformationalVersion(version.InformationalVersion)
                         .EnableNoRestore());
-                        
+
                     Console.WriteLine($"✅ Published {rid} to: {outputDir}");
                 }
                 catch (Exception ex)
@@ -307,7 +307,7 @@ class BuildTasks : NukeBuild
                     throw;
                 }
             }
-            
+
             Console.WriteLine($"🎉 All publishing completed successfully! Check: {PublishDirectory}");
         });
 
@@ -319,7 +319,7 @@ class BuildTasks : NukeBuild
         {
             Console.WriteLine("🔍 Build Environment Information");
             Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            
+
             Console.WriteLine($"Configuration: {Configuration}");
             Console.WriteLine($"Current Platform: {CurrentRuntimeIdentifier}");
             Console.WriteLine($"Target Framework: {GetTargetFramework()}");
@@ -328,28 +328,28 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"Trim: {Trim}");
             Console.WriteLine($"Skip Tests: {SkipTests}");
             Console.WriteLine($"Coverage: {Coverage}");
-            
+
             if (!string.IsNullOrWhiteSpace(TestFilter))
                 Console.WriteLine($"Test Filter: {TestFilter}");
-                
+
             if (!string.IsNullOrWhiteSpace(Rids))
                 Console.WriteLine($"Target Runtimes: {Rids}");
-            else 
+            else
                 Console.WriteLine($"Default Runtime: {CurrentRuntimeIdentifier}");
-            
+
             Console.WriteLine();
             Console.WriteLine("📁 Paths:");
             Console.WriteLine($"Root: {RootDirectory}");
             Console.WriteLine($"Artifacts: {ArtifactsDirectory}");
             Console.WriteLine($"Publish: {PublishDirectory}");
             Console.WriteLine($"Test Results: {TestResultsDirectory}");
-            
+
             if (MainProject != null)
             {
                 Console.WriteLine();
                 Console.WriteLine("📋 Projects:");
                 Console.WriteLine($"Main: {MainProject.Name} ({MainProject.Path})");
-                
+
                 if (TestProjects.Any())
                 {
                     Console.WriteLine("Test Projects:");
@@ -357,14 +357,14 @@ class BuildTasks : NukeBuild
                         Console.WriteLine($"  - {test.Name}");
                 }
             }
-            
+
             var version = GetVersionInfo();
             Console.WriteLine();
             Console.WriteLine("🏷️ Version Information:");
             Console.WriteLine($"Assembly: {version.AssemblyVersion}");
             Console.WriteLine($"File: {version.FileVersion}");
             Console.WriteLine($"Informational: {version.InformationalVersion}");
-            
+
             Console.WriteLine();
             Console.WriteLine("✅ Environment check completed!");
         });
@@ -408,7 +408,7 @@ class BuildTasks : NukeBuild
             if (Directory.Exists(PackageOutputDirectory))
                 Directory.Delete(PackageOutputDirectory, true);
             Directory.CreateDirectory(PackageOutputDirectory);
-            
+
             foreach (var rid in PublishRuntimeIdentifiers)
             {
                 var publishPath = PublishDirectory / rid;
@@ -419,30 +419,30 @@ class BuildTasks : NukeBuild
                 }
 
                 Console.WriteLine($"📦 Creating package for {rid}...");
-                
+
                 switch (rid)
                 {
                     case "win-x64":
                     case "win-arm64":
                         CreateWindowsPackage(publishPath, rid);
                         break;
-                        
+
                     case "osx-x64":
                     case "osx-arm64":
                         CreateMacPackage(publishPath, rid);
                         break;
-                        
+
                     case "linux-x64":
                     case "linux-arm64":
                         CreateLinuxPackage(publishPath, rid);
                         break;
-                        
+
                     default:
                         Console.WriteLine($"⚠️ No packaging strategy for {rid}");
                         break;
                 }
             }
-            
+
             Console.WriteLine("✅ Package creation completed!");
         });
 
@@ -451,14 +451,14 @@ class BuildTasks : NukeBuild
     /// </summary>
     void CreateWindowsPackage(AbsolutePath publishPath, string rid)
     {
-        try 
+        try
         {
             var version = GetVersionInfo();
             var packageName = $"AGI.Captor-{version.FileVersion}-{rid}.msi";
             var packagePath = PackageOutputDirectory / packageName;
-            
+
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
-            
+
             // Check if WiX v4+ is available
             string wixPath = null;
             try
@@ -473,7 +473,7 @@ class BuildTasks : NukeBuild
                 try
                 {
                     // Fallback to older WiX toolset
-                    wixPath = ToolPathResolver.GetPathExecutable("heat") ?? 
+                    wixPath = ToolPathResolver.GetPathExecutable("heat") ??
                              ToolPathResolver.GetPathExecutable("candle");
                 }
                 catch
@@ -481,14 +481,14 @@ class BuildTasks : NukeBuild
                     // WiX not available
                 }
             }
-            
+
             if (wixPath == null)
             {
                 Console.WriteLine("⚠️ WiX Toolset not found. Creating portable ZIP instead...");
                 CreatePortableZip(publishPath, rid, version.FileVersion);
                 return;
             }
-            
+
             // Use WiX v4+ syntax
             if (wixPath == "wix")
             {
@@ -516,7 +516,7 @@ class BuildTasks : NukeBuild
     {
         var wxsFile = WindowsPackagingDirectory / "AGI.Captor.v4.wxs";
         var wixobjFile = WindowsPackagingDirectory / "AGI.Captor.wixobj";
-        
+
         // Ensure WXS file exists
         if (!File.Exists(wxsFile))
         {
@@ -524,11 +524,11 @@ class BuildTasks : NukeBuild
             CreatePortableZip(publishPath, rid, version.FileVersion);
             return;
         }
-        
+
         try
         {
             Console.WriteLine($"🔨 Compiling WiX source...");
-            
+
             // Step 1: Compile .wxs to .wixobj
             var compileArgs = new List<string>
             {
@@ -539,10 +539,10 @@ class BuildTasks : NukeBuild
                 "-out", packagePath,
                 wxsFile
             };
-            
-            ProcessTasks.StartProcess("wix", string.Join(" ", compileArgs.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)))
+
+            ProcessTasks.StartProcess("wix", $"{string.Join(" ", compileArgs)}")
                 .AssertZeroExitCode();
-                
+
             Console.WriteLine($"✅ Created: {packagePath}");
         }
         catch (Exception ex)
@@ -559,18 +559,18 @@ class BuildTasks : NukeBuild
     {
         var zipName = $"AGI.Captor-{version}-{rid}-portable.zip";
         var zipPath = PackageOutputDirectory / zipName;
-        
+
         Console.WriteLine($"📁 Creating portable ZIP: {zipName}");
-        
+
         if (File.Exists(zipPath))
             File.Delete(zipPath);
-            
+
         System.IO.Compression.ZipFile.CreateFromDirectory(
-            publishPath, 
-            zipPath, 
-            System.IO.Compression.CompressionLevel.Optimal, 
+            publishPath,
+            zipPath,
+            System.IO.Compression.CompressionLevel.Optimal,
             false);
-            
+
         Console.WriteLine($"✅ Created: {zipPath}");
     }
 
@@ -585,7 +585,7 @@ class BuildTasks : NukeBuild
             var requestedFormats = MacOSFormats?.Split(',')
                 .Select(f => f.Trim().ToUpperInvariant())
                 .ToArray() ?? new[] { "PKG", "DMG" };
-            
+
             Console.WriteLine($"🍎 Creating macOS packages for {rid}...");
             Console.WriteLine($"   Requested formats: {string.Join(", ", requestedFormats)}");
 
@@ -596,18 +596,18 @@ class BuildTasks : NukeBuild
                 if (File.Exists(standardScript))
                 {
                     Console.WriteLine("📦 Creating standard PKG and DMG packages...");
-                    
+
                     var args = $"{publishPath} {version.FileVersion}";
                     if (!string.IsNullOrWhiteSpace(MacSigningIdentity))
                         args += $" \"{MacSigningIdentity}\"";
 
                     using var process = ProcessTasks.StartProcess(
-                        "bash", 
+                        "bash",
                         $"{standardScript} {args}",
                         MacPackagingDirectory);
-                    
+
                     process.AssertZeroExitCode();
-                    
+
                     // Move packages to output directory
                     if (requestedFormats.Contains("PKG"))
                     {
@@ -619,7 +619,7 @@ class BuildTasks : NukeBuild
                             Console.WriteLine($"✅ Created: {targetPath}");
                         }
                     }
-                    
+
                     if (requestedFormats.Contains("DMG"))
                     {
                         var dmgPattern = $"AGI.Captor-{version.FileVersion}.dmg";
@@ -650,16 +650,16 @@ class BuildTasks : NukeBuild
                     else
                     {
                         Console.WriteLine("🏪 Creating App Store package...");
-                        
+
                         var args = $"{publishPath} {version.FileVersion} \"{MacSigningIdentity}\"";
 
                         using var process = ProcessTasks.StartProcess(
-                            "bash", 
+                            "bash",
                             $"{appStoreScript} {args}",
                             MacPackagingDirectory);
-                        
+
                         process.AssertZeroExitCode();
-                        
+
                         // Move App Store package to output directory
                         var appStorePkgPattern = $"AGI.Captor-{version.FileVersion}-AppStore.pkg";
                         foreach (var file in Directory.GetFiles(MacPackagingDirectory, appStorePkgPattern))
@@ -677,8 +677,8 @@ class BuildTasks : NukeBuild
             }
 
             // Run notarization if credentials provided and not App Store only
-            if (!string.IsNullOrWhiteSpace(AppleId) && 
-                !string.IsNullOrWhiteSpace(AppPassword) && 
+            if (!string.IsNullOrWhiteSpace(AppleId) &&
+                !string.IsNullOrWhiteSpace(AppPassword) &&
                 !string.IsNullOrWhiteSpace(TeamId) &&
                 (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG")))
             {
@@ -710,12 +710,12 @@ class BuildTasks : NukeBuild
         if (File.Exists(pkgFile))
         {
             var args = $"{pkgFile} {AppleId} {AppPassword} {TeamId}";
-            
+
             using var process = ProcessTasks.StartProcess(
                 "bash",
                 $"{scriptPath} {args}",
                 MacPackagingDirectory);
-                
+
             process.AssertZeroExitCode();
         }
     }
@@ -729,9 +729,9 @@ class BuildTasks : NukeBuild
         {
             var version = GetVersionInfo();
             var arch = rid.Contains("arm") ? "arm64" : "amd64";
-            
+
             Console.WriteLine($"🐧 Creating Linux packages for {rid}...");
-            
+
             // Create DEB package
             var debScript = LinuxPackagingDirectory / "create-deb.sh";
             if (File.Exists(debScript))
@@ -740,9 +740,9 @@ class BuildTasks : NukeBuild
                     "bash",
                     $"{debScript} {publishPath} {version.FileVersion} {arch}",
                     LinuxPackagingDirectory);
-                    
+
                 debProcess.AssertZeroExitCode();
-                
+
                 // Move DEB to output directory
                 var debPattern = $"agi-captor_{version.FileVersion}_{arch}.deb";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, debPattern))
@@ -752,20 +752,20 @@ class BuildTasks : NukeBuild
                     Console.WriteLine($"✅ Created: {targetPath}");
                 }
             }
-            
+
             // Create RPM package  
             var rpmScript = LinuxPackagingDirectory / "create-rpm.sh";
             if (File.Exists(rpmScript))
             {
                 var rpmArch = rid.Contains("arm") ? "aarch64" : "x86_64";
-                
+
                 using var rpmProcess = ProcessTasks.StartProcess(
                     "bash",
                     $"{rpmScript} {publishPath} {version.FileVersion} {rpmArch}",
                     LinuxPackagingDirectory);
-                    
+
                 rpmProcess.AssertZeroExitCode();
-                
+
                 // Move RPM to output directory
                 var rpmPattern = $"agi-captor-{version.FileVersion}-1.{rpmArch}.rpm";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, rpmPattern))

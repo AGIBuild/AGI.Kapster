@@ -19,11 +19,11 @@ public class OverlayManagerTests : TestBase
     {
         _overlayWindow = Substitute.For<IOverlayWindow>();
         _overlayWindow.IsVisible.Returns(false);
-        
+
         var services = new ServiceCollection();
         services.AddSingleton(_overlayWindow);
         _serviceProvider = services.BuildServiceProvider();
-        
+
         _overlayManager = new SimplifiedOverlayManager(_serviceProvider);
     }
 

@@ -21,7 +21,7 @@ public class AnnotationServiceTests : TestBase
     public AnnotationServiceTests(ITestOutputHelper output) : base(output)
     {
         _settingsService = Substitute.For<ISettingsService>();
-        
+
         // Setup mock settings
         var mockSettings = new AppSettings
         {
@@ -41,7 +41,7 @@ public class AnnotationServiceTests : TestBase
                 }
             }
         };
-        
+
         _settingsService.Settings.Returns(mockSettings);
         _annotationService = new AnnotationService(_settingsService);
     }
@@ -202,7 +202,7 @@ public class AnnotationServiceTests : TestBase
         _annotationService.CurrentTool = AnnotationToolType.Rectangle;
         var startPoint = new Avalonia.Point(10, 20);
         var endPoint = new Avalonia.Point(50, 60);
-        
+
         var annotation = _annotationService.StartAnnotation(startPoint) as RectangleAnnotation;
 
         // Act
@@ -219,7 +219,7 @@ public class AnnotationServiceTests : TestBase
         _annotationService.CurrentTool = AnnotationToolType.Ellipse;
         var startPoint = new Avalonia.Point(5, 10);
         var endPoint = new Avalonia.Point(25, 35);
-        
+
         var annotation = _annotationService.StartAnnotation(startPoint) as EllipseAnnotation;
 
         // Act
@@ -236,7 +236,7 @@ public class AnnotationServiceTests : TestBase
         _annotationService.CurrentTool = AnnotationToolType.Arrow;
         var startPoint = new Avalonia.Point(0, 0);
         var endPoint = new Avalonia.Point(100, 100);
-        
+
         var annotation = _annotationService.StartAnnotation(startPoint) as ArrowAnnotation;
 
         // Act
@@ -253,7 +253,7 @@ public class AnnotationServiceTests : TestBase
         _annotationService.CurrentTool = AnnotationToolType.Freehand;
         var startPoint = new Avalonia.Point(10, 20);
         var additionalPoint = new Avalonia.Point(30, 40);
-        
+
         var annotation = _annotationService.StartAnnotation(startPoint) as FreehandAnnotation;
         var initialPointCount = annotation!.Points.Count;
 

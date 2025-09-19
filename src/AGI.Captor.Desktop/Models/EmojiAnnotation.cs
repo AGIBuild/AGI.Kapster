@@ -85,12 +85,12 @@ public class EmojiAnnotation : AnnotationItemBase
     public override bool HitTest(Point point)
     {
         if (!IsVisible) return false;
-        
+
         // Use circular hit test for emoji
         var center = _position;
         var radius = ActualSize / 2;
         var distance = Math.Sqrt(Math.Pow(point.X - center.X, 2) + Math.Pow(point.Y - center.Y, 2));
-        
+
         return distance <= radius;
     }
 
@@ -104,7 +104,7 @@ public class EmojiAnnotation : AnnotationItemBase
         // Scale position relative to center
         var relative = _position - center;
         _position = center + relative * scale;
-        
+
         // Scale the emoji size
         _scale *= scale;
         _scale = Math.Max(0.1, Math.Min(5.0, _scale)); // Keep within bounds
@@ -116,7 +116,7 @@ public class EmojiAnnotation : AnnotationItemBase
         var relative = _position - center;
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
-        
+
         _position = center + new Vector(
             relative.X * cos - relative.Y * sin,
             relative.X * sin + relative.Y * cos);
@@ -146,13 +146,13 @@ public class EmojiAnnotation : AnnotationItemBase
     public override void Deserialize(Dictionary<string, object> data)
     {
         base.Deserialize(data);
-        
+
         if (data.TryGetValue("PositionX", out var posX) && data.TryGetValue("PositionY", out var posY))
             _position = new Point(Convert.ToDouble(posX), Convert.ToDouble(posY));
-            
+
         if (data.TryGetValue("Emoji", out var emoji))
             _emoji = emoji.ToString() ?? "😀";
-            
+
         if (data.TryGetValue("Scale", out var scale))
             _scale = Math.Max(0.1, Math.Min(5.0, Convert.ToDouble(scale)));
     }

@@ -19,7 +19,7 @@ public class ApplicationController : IApplicationController
 {
     private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private const string AppName = "AGI.Captor";
-    
+
     private readonly ISettingsService _settingsService;
     private readonly IUpdateService _updateService;
 
@@ -34,18 +34,18 @@ public class ApplicationController : IApplicationController
         try
         {
             // Settings are loaded in constructor now
-            
+
             // No main window needed - application runs in background
-            
+
             // Apply startup settings
             var shouldStartWithWindows = _settingsService.Settings.General.StartWithWindows;
             var currentlyEnabled = await IsStartupWithWindowsEnabledAsync();
-            
+
             if (shouldStartWithWindows != currentlyEnabled)
             {
                 await SetStartupWithWindowsAsync(shouldStartWithWindows);
             }
-            
+
             // Initialize update service if enabled
             if (_settingsService.Settings.AutoUpdate?.Enabled == true)
             {
@@ -56,7 +56,7 @@ public class ApplicationController : IApplicationController
             {
                 Log.Debug("Auto-update service disabled in settings");
             }
-            
+
             Log.Debug("Application controller initialized. Startup with Windows: {StartupEnabled}", shouldStartWithWindows);
         }
         catch (Exception ex)
@@ -129,7 +129,7 @@ public class ApplicationController : IApplicationController
             using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, false);
             var value = key?.GetValue(AppName) as string;
             var isEnabled = !string.IsNullOrEmpty(value);
-            
+
             Log.Debug("Startup with Windows status checked: {Enabled}", isEnabled);
             return Task.FromResult(isEnabled);
         }
@@ -153,9 +153,9 @@ public class ApplicationController : IApplicationController
                     FileName = exePath,
                     UseShellExecute = true
                 });
-                
+
                 ExitApplication();
-                
+
                 Log.Information("Application restart initiated");
             }
             else
@@ -174,7 +174,7 @@ public class ApplicationController : IApplicationController
         try
         {
             Log.Information("Application exit initiated");
-            
+
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.TryShutdown();

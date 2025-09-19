@@ -36,21 +36,21 @@ public class UpdateService : IUpdateService, IDisposable
         _settingsService = settingsService;
         _updateProvider = new GitHubUpdateProvider();
         _httpClient = new HttpClient();
-        
+
         // Load current settings
         _settings = LoadUpdateSettings();
-        
+
         // Setup timer for periodic checks
         _updateTimer = new Timer();
         _updateTimer.Elapsed += OnTimerElapsed;
         _updateTimer.AutoReset = true;
-        
+
         UpdateTimerInterval();
-        
+
         _logger.Information("Update service initialized. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
     }
 
-    public bool IsAutoUpdateEnabled => 
+    public bool IsAutoUpdateEnabled =>
         !IsDebugMode() && _settings.Enabled;
 
     public event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
@@ -63,9 +63,9 @@ public class UpdateService : IUpdateService, IDisposable
     private static bool IsDebugMode()
     {
 #if DEBUG
-        return false;
+        return true;
 #else
-        return Debugger.IsAttached;
+        return false;
 #endif
     }
 
@@ -89,7 +89,7 @@ public class UpdateService : IUpdateService, IDisposable
             _logger.Information("Checking for updates...");
 
             var updateInfo = await _updateProvider.GetLatestReleaseAsync(_settings.UsePreReleases);
-            
+
             if (updateInfo == null)
             {
                 _logger.Information("No updates available");
@@ -101,16 +101,16 @@ public class UpdateService : IUpdateService, IDisposable
             var currentVersion = GetCurrentVersion();
             if (!updateInfo.IsNewerThan(currentVersion))
             {
-                _logger.Information("Current version {Current} is up to date (latest: {Latest})", 
+                _logger.Information("Current version {Current} is up to date (latest: {Latest})",
                     currentVersion, updateInfo.Version);
                 _settings.LastCheckTime = DateTime.UtcNow;
                 await SaveUpdateSettingsAsync();
                 return null;
             }
 
-            _logger.Information("Update available: {Version} (current: {Current})", 
+            _logger.Information("Update available: {Version} (current: {Current})",
                 updateInfo.Version, currentVersion);
-            
+
             _settings.LastCheckTime = DateTime.UtcNow;
             await SaveUpdateSettingsAsync();
 
@@ -186,7 +186,7 @@ public class UpdateService : IUpdateService, IDisposable
             var fileInfo = new FileInfo(filePath);
             if (updateInfo.FileSize > 0 && fileInfo.Length != updateInfo.FileSize)
             {
-                _logger.Warning("Downloaded file size mismatch. Expected: {Expected}, Actual: {Actual}", 
+                _logger.Warning("Downloaded file size mismatch. Expected: {Expected}, Actual: {Actual}",
                     updateInfo.FileSize, fileInfo.Length);
                 File.Delete(filePath);
                 return false;
@@ -233,14 +233,14 @@ public class UpdateService : IUpdateService, IDisposable
                 // Use specialized macOS installer
                 var macInstaller = new MacOSUpdateInstaller();
                 var installResult = await macInstaller.InstallUpdateAsync(installerPath);
-                
+
                 if (installResult)
                 {
                     _logger.Information("macOS installation completed successfully");
-                    
+
                     // Schedule application restart
                     _ = Task.Delay(2000).ContinueWith(_ => RestartApplication());
-                    
+
                     return true;
                 }
                 else
@@ -280,10 +280,10 @@ public class UpdateService : IUpdateService, IDisposable
             if (process.ExitCode == 0)
             {
                 _logger.Information("Installation completed successfully");
-                
+
                 // Schedule application restart
                 _ = Task.Delay(2000).ContinueWith(_ => RestartApplication());
-                
+
                 return true;
             }
             else
@@ -310,7 +310,7 @@ public class UpdateService : IUpdateService, IDisposable
 
         _logger.Information("Starting background update checking");
         _updateTimer.Start();
-        
+
         // Perform initial check after 5 seconds
         _ = Task.Delay(5000).ContinueWith(async _ =>
         {
@@ -318,7 +318,7 @@ public class UpdateService : IUpdateService, IDisposable
             if (update != null)
             {
                 UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
-                
+
                 if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
                 {
                     await PerformAutomaticUpdateAsync(update);
@@ -326,7 +326,7 @@ public class UpdateService : IUpdateService, IDisposable
                 else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
                 {
                     // For platforms that don't support silent install (like macOS), notify user
-                    _logger.Information("Automatic installation not supported on {Platform}, user notification required", 
+                    _logger.Information("Automatic installation not supported on {Platform}, user notification required",
                         PlatformUpdateHelper.GetPlatformDisplayName());
                     UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
                 }
@@ -347,7 +347,7 @@ public class UpdateService : IUpdateService, IDisposable
         _settings = settings;
         await SaveUpdateSettingsAsync();
         UpdateTimerInterval();
-        
+
         _logger.Information("Update settings saved. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
     }
 
@@ -359,7 +359,7 @@ public class UpdateService : IUpdateService, IDisposable
             if (update != null)
             {
                 UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
-                
+
                 if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
                 {
                     await PerformAutomaticUpdateAsync(update);
@@ -367,7 +367,7 @@ public class UpdateService : IUpdateService, IDisposable
                 else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
                 {
                     // For platforms that don't support silent install (like macOS), notify user
-                    _logger.Information("Automatic installation not supported on {Platform}, user notification required", 
+                    _logger.Information("Automatic installation not supported on {Platform}, user notification required",
                         PlatformUpdateHelper.GetPlatformDisplayName());
                     UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
                 }
@@ -384,7 +384,7 @@ public class UpdateService : IUpdateService, IDisposable
         try
         {
             _logger.Information("Performing automatic update to version {Version}", updateInfo.Version);
-            
+
             var downloadSuccess = await DownloadUpdateAsync(updateInfo);
             if (!downloadSuccess)
             {
@@ -393,10 +393,11 @@ public class UpdateService : IUpdateService, IDisposable
             }
 
             var tempDir = Path.Combine(Path.GetTempPath(), "AGI.Captor", "Updates");
-            var installerPath = Path.Combine(tempDir, $"AGI.Captor-{updateInfo.Version}-win-x64.msi");
-            
+            var platformInfo = PlatformUpdateHelper.GetPlatformInfo();
+            var installerPath = Path.Combine(tempDir, $"AGI.Captor-{updateInfo.Version}-{platformInfo.Identifier}.{platformInfo.Extension}");
+
             var installSuccess = await InstallUpdateAsync(installerPath);
-            UpdateCompleted?.Invoke(this, new UpdateCompletedEventArgs(installSuccess, updateInfo, 
+            UpdateCompleted?.Invoke(this, new UpdateCompletedEventArgs(installSuccess, updateInfo,
                 installSuccess ? null : "Installation failed"));
         }
         catch (Exception ex)
@@ -412,7 +413,7 @@ public class UpdateService : IUpdateService, IDisposable
         {
             var currentProcess = Process.GetCurrentProcess();
             var executablePath = currentProcess.MainModule?.FileName ?? Assembly.GetEntryAssembly()?.Location;
-            
+
             if (!string.IsNullOrEmpty(executablePath))
             {
                 _logger.Information("Restarting application: {Path}", executablePath);
@@ -479,7 +480,7 @@ public class UpdateService : IUpdateService, IDisposable
                 UsePreReleases = _settings.UsePreReleases,
                 LastCheckTime = _settings.LastCheckTime
             };
-            
+
             await _settingsService.UpdateSettingsAsync(settings);
         }
         catch (Exception ex)
@@ -491,12 +492,12 @@ public class UpdateService : IUpdateService, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _updateTimer?.Stop();
         _updateTimer?.Dispose();
         _updateProvider?.Dispose();
         _httpClient?.Dispose();
-        
+
         _disposed = true;
         _logger.Debug("Update service disposed");
     }

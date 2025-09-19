@@ -60,7 +60,7 @@ public class UpdateInfo
     {
         if (!System.Version.TryParse(Version, out var updateVersion))
             return false;
-            
+
         return updateVersion > currentVersion;
     }
 }

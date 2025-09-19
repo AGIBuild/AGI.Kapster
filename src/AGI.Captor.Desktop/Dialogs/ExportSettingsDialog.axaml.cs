@@ -15,7 +15,7 @@ public partial class ExportSettingsDialog : Window
 {
     private ExportSettings _settings;
     private Avalonia.Size _imageSize;
-    
+
     public ExportSettings Settings => _settings;
     public bool? DialogResult { get; private set; }
 
@@ -26,7 +26,7 @@ public partial class ExportSettingsDialog : Window
         SetupUI();
         SetupEventHandlers();
         UpdatePreview();
-        
+
         // Handle window closing event
         Closing += (_, e) =>
         {
@@ -44,7 +44,7 @@ public partial class ExportSettingsDialog : Window
         SetupEventHandlers();
         LoadSettings();
         UpdatePreview();
-        
+
         // Handle window closing event
         Closing += (_, e) =>
         {
@@ -62,7 +62,7 @@ public partial class ExportSettingsDialog : Window
         SetupEventHandlers();
         LoadSettings();
         UpdatePreview();
-        
+
         // Handle window closing event
         Closing += (_, e) =>
         {
@@ -83,13 +83,13 @@ public partial class ExportSettingsDialog : Window
         if (formatCombo != null)
         {
             var formats = Enum.GetValues<ExportFormat>()
-                .Select(f => new ComboBoxItem 
-                { 
-                    Content = GetFormatDescription(f), 
-                    Tag = f 
+                .Select(f => new ComboBoxItem
+                {
+                    Content = GetFormatDescription(f),
+                    Tag = f
                 })
                 .ToArray();
-            
+
             formatCombo.ItemsSource = formats;
             formatCombo.SelectedIndex = 0;
         }
@@ -134,8 +134,8 @@ public partial class ExportSettingsDialog : Window
         {
             dpiCombo.SelectionChanged += (_, e) =>
             {
-                if (dpiCombo.SelectedItem is ComboBoxItem item && 
-                    item.Tag is string dpiValue && 
+                if (dpiCombo.SelectedItem is ComboBoxItem item &&
+                    item.Tag is string dpiValue &&
                     int.TryParse(dpiValue, out int dpi))
                 {
                     _settings.DPI = dpi;
@@ -173,8 +173,8 @@ public partial class ExportSettingsDialog : Window
         {
             for (int i = 0; i < formatCombo.ItemCount; i++)
             {
-                if (formatCombo.Items[i] is ComboBoxItem item && 
-                    item.Tag is ExportFormat format && 
+                if (formatCombo.Items[i] is ComboBoxItem item &&
+                    item.Tag is ExportFormat format &&
                     format == _settings.Format)
                 {
                     formatCombo.SelectedIndex = i;
@@ -204,9 +204,9 @@ public partial class ExportSettingsDialog : Window
         {
             for (int i = 0; i < dpiCombo.ItemCount; i++)
             {
-                if (dpiCombo.Items[i] is ComboBoxItem item && 
-                    item.Tag is string dpiValue && 
-                    int.TryParse(dpiValue, out int dpi) && 
+                if (dpiCombo.Items[i] is ComboBoxItem item &&
+                    item.Tag is string dpiValue &&
+                    int.TryParse(dpiValue, out int dpi) &&
                     dpi == _settings.DPI)
                 {
                     dpiCombo.SelectedIndex = i;
@@ -227,8 +227,8 @@ public partial class ExportSettingsDialog : Window
 
     private void OnFormatChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
     {
-        if (sender is ComboBox combo && 
-            combo.SelectedItem is ComboBoxItem item && 
+        if (sender is ComboBox combo &&
+            combo.SelectedItem is ComboBoxItem item &&
             item.Tag is ExportFormat format)
         {
             _settings.Format = format;
@@ -262,10 +262,10 @@ public partial class ExportSettingsDialog : Window
             var quality = _settings.SupportsQuality() ? $", Quality: {_settings.Quality}%" : "";
             var compression = _settings.SupportsCompression() ? $", Compression: {_settings.Compression}" : "";
             var transparency = _settings.SupportsTransparency() && _settings.PreserveTransparency ? ", With Transparency" : "";
-            
+
             previewText.Text = $"Format: {format}{quality}{compression}, DPI: {_settings.DPI}{transparency}";
         }
-        
+
         UpdateFileSizeEstimation();
     }
 
@@ -275,19 +275,19 @@ public partial class ExportSettingsDialog : Window
         {
             var estimatedSize = CalculateEstimatedFileSize();
             var sizeText = FormatFileSize(estimatedSize);
-            
+
             // Update file size text
             if (this.FindControl<TextBlock>("FileSizeText") is { } fileSizeText)
             {
                 fileSizeText.Text = $"~{sizeText}";
             }
-            
+
             // Update image dimensions
             if (this.FindControl<TextBlock>("ImageDimensionsText") is { } dimensionsText)
             {
                 dimensionsText.Text = $"{(int)_imageSize.Width}×{(int)_imageSize.Height}";
             }
-            
+
             // Update compression info based on format
             if (this.FindControl<TextBlock>("CompressionInfoText") is { } compressionText)
             {
@@ -314,7 +314,7 @@ public partial class ExportSettingsDialog : Window
         var width = (int)_imageSize.Width;
         var height = (int)_imageSize.Height;
         var pixelCount = width * height;
-        
+
         // Base size calculation in bytes
         long estimatedBytes = _settings.Format switch
         {
@@ -326,17 +326,17 @@ public partial class ExportSettingsDialog : Window
             ExportFormat.GIF => EstimateGifSize(pixelCount),
             _ => pixelCount * 3 // Default RGB estimation
         };
-        
+
         return Math.Max(estimatedBytes, 1024); // Minimum 1KB
     }
-    
+
     private long EstimatePngSize(int pixelCount)
     {
         // PNG compression for screenshots with annotations
         // Screenshots typically have large uniform areas (better compression)
         // But annotations add complexity (worse compression)
         var baseSize = pixelCount * 4; // RGBA for transparency support
-        
+
         // Adjusted PNG compression ratios based on feedback (increase by ~2.5x)
         var compressionRatio = _settings.Compression switch
         {
@@ -346,18 +346,18 @@ public partial class ExportSettingsDialog : Window
             >= 2 => 0.20, // Low compression - complex images
             _ => 0.30      // Minimal compression
         };
-        
+
         // Add overhead for PNG headers and metadata
         var overhead = Math.Min(pixelCount / 1000, 2048); // 0.1% overhead, max 2KB
         return (long)(baseSize * compressionRatio) + overhead;
     }
-    
+
     private long EstimateJpegSize(int pixelCount, int quality)
     {
         // JPEG size estimation for screenshots
         // Screenshots compress differently than photos due to sharp edges and text
         var baseSize = pixelCount * 3; // RGB 24-bit
-        
+
         // Much more conservative compression ratios to match actual JPEG file sizes
         var compressionRatio = quality switch
         {
@@ -369,22 +369,22 @@ public partial class ExportSettingsDialog : Window
             >= 50 => 0.02, // Low quality - heavy compression
             _ => 0.015     // Very low quality - maximum compression
         };
-        
+
         // Screenshots with text and UI elements don't compress as well as photos
         var screenshotFactor = 1.0; // Remove screenshot penalty for more accurate estimation
-        
+
         // Add JPEG headers and metadata overhead
         var overhead = Math.Min(pixelCount / 2000, 1024); // 0.05% overhead, max 1KB
-        
+
         return (long)(baseSize * compressionRatio * screenshotFactor) + overhead;
     }
-    
+
     private long EstimateWebpSize(int pixelCount, int quality)
     {
         // WebP compression for screenshots
         // WebP is more efficient than JPEG for screenshots due to better lossless compression
         var baseSize = pixelCount * 3; // RGB 24-bit
-        
+
         // WebP quality-based compression (extremely conservative to match reality)
         var compressionRatio = quality switch
         {
@@ -396,61 +396,61 @@ public partial class ExportSettingsDialog : Window
             >= 50 => 0.015, // Low quality
             _ => 0.01      // Very low quality
         };
-        
+
         // WebP handles screenshots better than JPEG
         var screenshotFactor = 1.0; // No penalty for more accurate estimation
-        
+
         // Add WebP headers overhead
         var overhead = Math.Min(pixelCount / 3000, 512); // Smaller overhead than JPEG
-        
+
         return (long)(baseSize * compressionRatio * screenshotFactor) + overhead;
     }
-    
+
     private long EstimateTiffSize(int pixelCount)
     {
         // TIFF with LZW compression for screenshots
         var baseSize = pixelCount * 4; // RGBA with transparency support
-        
+
         // TIFF compression is similar to PNG but with more overhead
         var compressionRatio = 0.05; // Much more conservative estimate for screenshot content
-        
+
         // TIFF has significant metadata overhead
         var overhead = Math.Min(pixelCount / 500, 4096); // 0.2% overhead, max 4KB
-        
+
         return (long)(baseSize * compressionRatio) + overhead;
     }
-    
+
     private long EstimateGifSize(int pixelCount)
     {
         // GIF with 256 color palette and LZW compression
         // Screenshots often exceed 256 colors, so quality will be reduced
         var baseSize = pixelCount; // 8-bit per pixel after color reduction
-        
+
         // GIF compression ratio depends on color complexity
         var compressionRatio = 0.1; // Much more conservative estimate for GIF compression
-        
+
         // GIF has palette and metadata overhead
         var paletteSize = 256 * 3; // 256 colors * 3 bytes (RGB)
         var overhead = paletteSize + 256; // Palette + headers (reduced)
-        
+
         return (long)(baseSize * compressionRatio) + overhead;
     }
-    
+
     private long EstimateBmpSize(int pixelCount)
     {
         // BMP is uncompressed format
         var width = (int)_imageSize.Width;
         var height = (int)_imageSize.Height;
-        
+
         // BMP header overhead
         var bmpHeaderSize = 54; // Standard BMP header
-        
+
         // Row padding - BMP rows must be aligned to 4-byte boundaries
         var bytesPerRow = width * 3; // 3 bytes per pixel (RGB)
         var paddingPerRow = (4 - (bytesPerRow % 4)) % 4; // Padding to align to 4 bytes
         var totalRowSize = bytesPerRow + paddingPerRow;
         var imageDataSize = totalRowSize * height;
-        
+
         return imageDataSize + bmpHeaderSize;
     }
 
@@ -477,7 +477,7 @@ public partial class ExportSettingsDialog : Window
     private static string GetFormatDescription(ExportFormat format)
     {
         var field = typeof(ExportFormat).GetField(format.ToString());
-        if (field?.GetCustomAttributes(typeof(DescriptionAttribute), false) is DescriptionAttribute[] attributes && 
+        if (field?.GetCustomAttributes(typeof(DescriptionAttribute), false) is DescriptionAttribute[] attributes &&
             attributes.Length > 0)
         {
             return attributes[0].Description;

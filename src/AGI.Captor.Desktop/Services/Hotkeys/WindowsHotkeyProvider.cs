@@ -40,7 +40,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
             _hook = new TaskPoolGlobalHook();
             _hook.KeyPressed += OnKeyPressed;
             _hook.KeyReleased += OnKeyReleased;
-            
+
             // Start the global hook
             Task.Run(async () =>
             {
@@ -90,7 +90,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
             {
                 modifiers = _currentModifiers;
             }
-            
+
             lock (_lockObject)
             {
                 foreach (var (id, (registeredModifiers, registeredKeyCode, callback)) in _registeredHotkeys)
@@ -98,7 +98,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
                     if (vk == registeredKeyCode && modifiers == registeredModifiers)
                     {
                         Log.Debug("Hotkey matched: {Id} -> {Modifiers}+{KeyCode}", id, modifiers, vk);
-                        
+
                         // Execute callback on UI thread
                         Dispatcher.UIThread.InvokeAsync(() =>
                         {
@@ -111,7 +111,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
                                 Log.Error(ex, "Error executing hotkey callback: {Id}", id);
                             }
                         });
-                        
+
                         break;
                     }
                 }
@@ -317,9 +317,9 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
-        
+
         try
         {
             // 注销所有热键
@@ -333,7 +333,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
                 _hook = null;
                 Log.Debug("SharpHook disposed");
             }
-            
+
             Log.Debug("WindowsHotkeyProvider disposed");
         }
         catch (Exception ex)

@@ -23,7 +23,7 @@ public class GitHubUpdateProviderTests : IDisposable
     {
         // Act
         var provider = new GitHubUpdateProvider();
-        
+
         // Assert
         provider.Should().NotBeNull();
     }

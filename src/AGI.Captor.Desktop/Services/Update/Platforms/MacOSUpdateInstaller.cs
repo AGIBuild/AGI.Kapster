@@ -20,7 +20,7 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
             // Check if we can write to /Applications directory (for app bundle replacement)
             var applicationsDir = "/Applications";
             var testFile = Path.Combine(applicationsDir, $".test_{Guid.NewGuid()}");
-            
+
             try
             {
                 File.WriteAllText(testFile, "test");
@@ -142,7 +142,7 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
                 }
 
                 await CopyDirectoryAsync(sourceApp, targetApp);
-                
+
                 _logger.Information("Application replaced successfully: {TargetApp}", targetApp);
                 return true;
             }

@@ -22,11 +22,11 @@ public class UpdateServiceTests : IDisposable
     public UpdateServiceTests()
     {
         _mockSettingsService = Substitute.For<ISettingsService>();
-        
+
         // Setup default settings
         var settings = TestDataFactory.CreateDefaultAppSettings();
         _mockSettingsService.Settings.Returns(settings);
-        
+
         _updateService = new UpdateService(_mockSettingsService);
     }
 
@@ -35,7 +35,7 @@ public class UpdateServiceTests : IDisposable
     {
         // Arrange & Act
         var service = new UpdateService(_mockSettingsService);
-        
+
         // Assert
         service.Should().NotBeNull();
     }
@@ -62,7 +62,7 @@ public class UpdateServiceTests : IDisposable
     {
         // Arrange
         _updateService.StartBackgroundChecking();
-        
+
         // Act & Assert
         Action act = () => _updateService.StopBackgroundChecking();
         act.Should().NotThrow();
@@ -78,10 +78,10 @@ public class UpdateServiceTests : IDisposable
             CheckFrequencyHours = 48,
             InstallAutomatically = false
         };
-        
+
         // Act
         await _updateService.UpdateSettingsAsync(newSettings);
-        
+
         // Assert
         var currentSettings = _updateService.GetSettings();
         currentSettings.Enabled.Should().Be(newSettings.Enabled);
@@ -94,7 +94,7 @@ public class UpdateServiceTests : IDisposable
     {
         // Act
         var settings = _updateService.GetSettings();
-        
+
         // Assert
         settings.Should().NotBeNull();
     }
@@ -104,7 +104,7 @@ public class UpdateServiceTests : IDisposable
     {
         // Arrange
         var updateInfo = TestDataFactory.CreateUpdateInfo("1.3.0");
-        
+
         // Act & Assert - Method should complete without throwing
         Func<Task> act = async () => await _updateService.DownloadUpdateAsync(updateInfo);
         await act.Should().NotThrowAsync();
@@ -118,7 +118,7 @@ public class UpdateServiceTests : IDisposable
         try
         {
             await File.WriteAllTextAsync(testPath, "test content");
-            
+
             // Act & Assert - Method should complete without throwing
             Func<Task> act = async () => await _updateService.InstallUpdateAsync(testPath);
             await act.Should().NotThrowAsync();
@@ -128,6 +128,41 @@ public class UpdateServiceTests : IDisposable
             if (File.Exists(testPath))
                 File.Delete(testPath);
         }
+    }
+
+    [Fact]
+    public void IsAutoUpdateEnabled_ShouldRespectDebugMode()
+    {
+        // Arrange
+        var settings = TestDataFactory.CreateDefaultAppSettings();
+        settings.AutoUpdate!.Enabled = true;
+        _mockSettingsService.Settings.Returns(settings);
+
+        var service = new UpdateService(_mockSettingsService);
+
+        // Act & Assert
+#if DEBUG
+        // In debug mode, auto-update should be disabled regardless of settings
+        service.IsAutoUpdateEnabled.Should().BeFalse();
+#else
+        // In release mode, auto-update should follow settings
+        service.IsAutoUpdateEnabled.Should().BeTrue();
+#endif
+    }
+
+    [Fact]
+    public void IsAutoUpdateEnabled_ShouldRespectSettingsWhenNotDebugMode()
+    {
+        // Arrange
+        var settings = TestDataFactory.CreateDefaultAppSettings();
+        settings.AutoUpdate!.Enabled = false;
+        _mockSettingsService.Settings.Returns(settings);
+
+        var service = new UpdateService(_mockSettingsService);
+
+        // Act & Assert
+        // When auto-update is disabled in settings, it should always be false
+        service.IsAutoUpdateEnabled.Should().BeFalse();
     }
 
     public void Dispose()

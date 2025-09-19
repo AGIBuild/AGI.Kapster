@@ -12,37 +12,37 @@ public interface IOverlayRenderer
     /// Renders a selection box
     /// </summary>
     void RenderSelectionBox(SKCanvas canvas, Rect bounds, bool isActive = true);
-    
+
     /// <summary>
     /// Renders element highlight
     /// </summary>
     void RenderElementHighlight(SKCanvas canvas, IElementInfo element);
-    
+
     /// <summary>
     /// Renders crosshair at the specified position
     /// </summary>
     void RenderCrosshair(SKCanvas canvas, Point position, double canvasWidth, double canvasHeight);
-    
+
     /// <summary>
     /// Renders magnifier at the specified position
     /// </summary>
     void RenderMagnifier(SKCanvas canvas, Point position, SKBitmap source, double zoomLevel = 2.0);
-    
+
     /// <summary>
     /// Renders dimension labels for a selection
     /// </summary>
     void RenderDimensionLabels(SKCanvas canvas, Rect bounds);
-    
+
     /// <summary>
     /// Renders pixel color information
     /// </summary>
     void RenderPixelInfo(SKCanvas canvas, Point position, SKColor pixelColor);
-    
+
     /// <summary>
     /// Renders capture mode indicator
     /// </summary>
     void RenderCaptureMode(SKCanvas canvas, CaptureMode mode, Rect canvasBounds);
-    
+
     /// <summary>
     /// Gets or sets the theme for rendering
     /// </summary>

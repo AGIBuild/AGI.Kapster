@@ -11,22 +11,22 @@ public interface IHotkeyProvider : IDisposable
     /// 当前平台是否支持热键
     /// </summary>
     bool IsSupported { get; }
-    
+
     /// <summary>
     /// 是否有必要的权限
     /// </summary>
     bool HasPermissions { get; }
-    
+
     /// <summary>
     /// 注册热键
     /// </summary>
     bool RegisterHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback);
-    
+
     /// <summary>
     /// 注销热键
     /// </summary>
     bool UnregisterHotkey(string id);
-    
+
     /// <summary>
     /// 注销所有热键
     /// </summary>

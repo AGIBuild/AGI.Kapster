@@ -9,19 +9,19 @@ public enum ExportFormat
 {
     [Description("PNG - Portable Network Graphics")]
     PNG,
-    
+
     [Description("JPEG - Joint Photographic Experts Group")]
     JPEG,
-    
+
     [Description("BMP - Windows Bitmap")]
     BMP,
-    
+
     [Description("TIFF - Tagged Image File Format")]
     TIFF,
-    
+
     [Description("WebP - Web Picture Format")]
     WebP,
-    
+
     [Description("GIF - Graphics Interchange Format")]
     GIF
 }
@@ -35,28 +35,28 @@ public class ExportSettings
     /// Export format
     /// </summary>
     public ExportFormat Format { get; set; } = ExportFormat.PNG;
-    
+
     /// <summary>
     /// Quality level (0-100, applies to JPEG, WebP)
     /// </summary>
     public int Quality { get; set; } = 90;
-    
+
     /// <summary>
     /// Compression level (0-9, applies to PNG, TIFF)
     /// </summary>
     public int Compression { get; set; } = 6;
-    
+
     /// <summary>
     /// DPI setting for the exported image
     /// </summary>
     public int DPI { get; set; } = 96;
-    
+
     /// <summary>
     /// Whether to preserve transparency (PNG, WebP, TIFF)
     /// </summary>
     public bool PreserveTransparency { get; set; } = true;
-    
-    
+
+
     /// <summary>
     /// Get file extension for the current format
     /// </summary>
@@ -73,7 +73,7 @@ public class ExportSettings
             _ => ".png"
         };
     }
-    
+
     /// <summary>
     /// Get MIME type for the current format
     /// </summary>
@@ -90,7 +90,7 @@ public class ExportSettings
             _ => "image/png"
         };
     }
-    
+
     /// <summary>
     /// Check if the format supports quality setting
     /// </summary>
@@ -98,7 +98,7 @@ public class ExportSettings
     {
         return Format == ExportFormat.JPEG || Format == ExportFormat.WebP;
     }
-    
+
     /// <summary>
     /// Check if the format supports compression setting
     /// </summary>
@@ -106,13 +106,13 @@ public class ExportSettings
     {
         return Format == ExportFormat.PNG || Format == ExportFormat.TIFF;
     }
-    
+
     /// <summary>
     /// Check if the format supports transparency
     /// </summary>
     public bool SupportsTransparency()
     {
-        return Format == ExportFormat.PNG || Format == ExportFormat.WebP || 
+        return Format == ExportFormat.PNG || Format == ExportFormat.WebP ||
                Format == ExportFormat.TIFF || Format == ExportFormat.GIF;
     }
 }

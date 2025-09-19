@@ -237,7 +237,7 @@ public class AnnotationTests : TestBase
             new Avalonia.Point(10, 20),
             new Avalonia.Point(110, 70),
             new AnnotationStyle());
-        
+
         manager.AddItem(annotation);
         manager.Items.Should().HaveCount(1);
 
@@ -257,7 +257,7 @@ public class AnnotationTests : TestBase
             new Avalonia.Point(10, 20),
             new Avalonia.Point(110, 70),
             new AnnotationStyle());
-        
+
         manager.AddItem(annotation);
 
         // Act
@@ -277,7 +277,7 @@ public class AnnotationTests : TestBase
             new Avalonia.Point(10, 20),
             new Avalonia.Point(110, 70),
             new AnnotationStyle());
-        
+
         manager.AddItem(annotation);
         manager.SelectItem(annotation);
         manager.SelectedItems.Should().HaveCount(1);
@@ -301,7 +301,7 @@ public class AnnotationTests : TestBase
         var annotation2 = new EllipseAnnotation(
             new Avalonia.Rect(30, 40, 80, 60),
             new AnnotationStyle());
-        
+
         manager.AddItem(annotation1);
         manager.AddItem(annotation2);
         manager.SelectItem(annotation1);
@@ -329,7 +329,7 @@ public class AnnotationTests : TestBase
         var annotation2 = new EllipseAnnotation(
             new Avalonia.Rect(30, 40, 80, 60),
             new AnnotationStyle());
-        
+
         manager.AddItem(annotation1);
         manager.AddItem(annotation2);
         manager.Items.Should().HaveCount(2);

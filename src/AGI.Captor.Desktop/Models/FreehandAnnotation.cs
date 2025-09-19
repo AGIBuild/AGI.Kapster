@@ -77,7 +77,7 @@ public class FreehandAnnotation : AnnotationItemBase
         {
             _smoothedPoints = new List<Point>(_points);
         }
-        
+
         UpdateBounds();
         ModifiedAt = DateTime.Now;
     }
@@ -92,31 +92,31 @@ public class FreehandAnnotation : AnnotationItemBase
 
         var smoothed = new List<Point>();
         const double smoothingFactor = 0.8;
-        
+
         // 保留起点
         smoothed.Add(originalPoints[0]);
-        
+
         // 对中间点进行平滑
         for (int i = 1; i < originalPoints.Count - 1; i++)
         {
             var prev = originalPoints[i - 1];
             var curr = originalPoints[i];
             var next = originalPoints[i + 1];
-            
+
             // 简单的三点平均
             var smoothedX = prev.X * 0.25 + curr.X * 0.5 + next.X * 0.25;
             var smoothedY = prev.Y * 0.25 + curr.Y * 0.5 + next.Y * 0.25;
-            
+
             // 与原点混合
             var finalX = curr.X * (1 - smoothingFactor) + smoothedX * smoothingFactor;
             var finalY = curr.Y * (1 - smoothingFactor) + smoothedY * smoothingFactor;
-            
+
             smoothed.Add(new Point(finalX, finalY));
         }
-        
+
         // 保留终点
         smoothed.Add(originalPoints[originalPoints.Count - 1]);
-        
+
         return smoothed;
     }
 
@@ -126,7 +126,7 @@ public class FreehandAnnotation : AnnotationItemBase
     public void SimplifyPath(double tolerance = 2.0)
     {
         if (_points.Count <= 2) return;
-        
+
         _points = DouglasPeucker(_points, tolerance);
         _boundingRect = default; // Force recalculation
         ModifiedAt = DateTime.Now;
@@ -142,7 +142,7 @@ public class FreehandAnnotation : AnnotationItemBase
 
         var maxDistance = 0.0;
         var maxIndex = 0;
-        
+
         for (int i = 1; i < points.Count - 1; i++)
         {
             var distance = PerpendicularDistance(points[i], points[0], points[points.Count - 1]);
@@ -152,12 +152,12 @@ public class FreehandAnnotation : AnnotationItemBase
                 maxIndex = i;
             }
         }
-        
+
         if (maxDistance > tolerance)
         {
             var left = DouglasPeucker(points.Take(maxIndex + 1).ToList(), tolerance);
             var right = DouglasPeucker(points.Skip(maxIndex).ToList(), tolerance);
-            
+
             var result = new List<Point>(left);
             result.AddRange(right.Skip(1)); // Skip duplicate point
             return result;
@@ -175,18 +175,18 @@ public class FreehandAnnotation : AnnotationItemBase
     {
         var dx = lineEnd.X - lineStart.X;
         var dy = lineEnd.Y - lineStart.Y;
-        
+
         if (Math.Abs(dx) < 1e-10 && Math.Abs(dy) < 1e-10)
         {
             return Math.Sqrt(Math.Pow(point.X - lineStart.X, 2) + Math.Pow(point.Y - lineStart.Y, 2));
         }
-        
+
         var t = ((point.X - lineStart.X) * dx + (point.Y - lineStart.Y) * dy) / (dx * dx + dy * dy);
         t = Math.Max(0, Math.Min(1, t));
-        
+
         var projX = lineStart.X + t * dx;
         var projY = lineStart.Y + t * dy;
-        
+
         return Math.Sqrt(Math.Pow(point.X - projX, 2) + Math.Pow(point.Y - projY, 2));
     }
 
@@ -220,7 +220,7 @@ public class FreehandAnnotation : AnnotationItemBase
         if (!IsVisible || _points.Count < 2) return false;
 
         var tolerance = Math.Max(Style.StrokeWidth, 8); // Minimum 8px hit area
-        
+
         // Check if point is near any line segment
         for (int i = 0; i < _points.Count - 1; i++)
         {
@@ -228,7 +228,7 @@ public class FreehandAnnotation : AnnotationItemBase
             if (distance <= tolerance)
                 return true;
         }
-        
+
         return false;
     }
 
@@ -238,12 +238,12 @@ public class FreehandAnnotation : AnnotationItemBase
         {
             _points[i] += offset;
         }
-        
+
         for (int i = 0; i < _smoothedPoints.Count; i++)
         {
             _smoothedPoints[i] += offset;
         }
-        
+
         _boundingRect = default; // Force recalculation
     }
 
@@ -254,13 +254,13 @@ public class FreehandAnnotation : AnnotationItemBase
             var relative = _points[i] - center;
             _points[i] = center + relative * scale;
         }
-        
+
         for (int i = 0; i < _smoothedPoints.Count; i++)
         {
             var relative = _smoothedPoints[i] - center;
             _smoothedPoints[i] = center + relative * scale;
         }
-        
+
         _boundingRect = default; // Force recalculation
     }
 
@@ -268,7 +268,7 @@ public class FreehandAnnotation : AnnotationItemBase
     {
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
-        
+
         for (int i = 0; i < _points.Count; i++)
         {
             var relative = _points[i] - center;
@@ -276,7 +276,7 @@ public class FreehandAnnotation : AnnotationItemBase
                 relative.X * cos - relative.Y * sin,
                 relative.X * sin + relative.Y * cos);
         }
-        
+
         for (int i = 0; i < _smoothedPoints.Count; i++)
         {
             var relative = _smoothedPoints[i] - center;
@@ -284,7 +284,7 @@ public class FreehandAnnotation : AnnotationItemBase
                 relative.X * cos - relative.Y * sin,
                 relative.X * sin + relative.Y * cos);
         }
-        
+
         _boundingRect = default; // Force recalculation
     }
 
@@ -296,32 +296,32 @@ public class FreehandAnnotation : AnnotationItemBase
             IsVisible = IsVisible,
             IsLocked = IsLocked
         };
-        
+
         clone._points = new List<Point>(_points);
         clone._smoothedPoints = new List<Point>(_smoothedPoints);
         clone._boundingRect = _boundingRect;
-        
+
         return clone;
     }
 
     public override Dictionary<string, object> Serialize()
     {
         var data = base.Serialize();
-        
+
         // Serialize points
         var pointsData = _points.Select(p => new { X = p.X, Y = p.Y }).ToArray();
         data["Points"] = pointsData;
-        
+
         var smoothedPointsData = _smoothedPoints.Select(p => new { X = p.X, Y = p.Y }).ToArray();
         data["SmoothedPoints"] = smoothedPointsData;
-        
+
         return data;
     }
 
     public override void Deserialize(Dictionary<string, object> data)
     {
         base.Deserialize(data);
-        
+
         // Deserialize points
         if (data.TryGetValue("Points", out var pointsObj))
         {
@@ -330,7 +330,7 @@ public class FreehandAnnotation : AnnotationItemBase
             _points.Clear();
             // TODO: Implement proper point deserialization based on your serialization format
         }
-        
+
         UpdateBounds();
     }
 }

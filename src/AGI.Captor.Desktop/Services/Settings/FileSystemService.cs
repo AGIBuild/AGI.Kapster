@@ -13,27 +13,27 @@ public class FileSystemService : IFileSystemService
     {
         return File.Exists(path);
     }
-    
+
     public async Task<string> ReadAllTextAsync(string path)
     {
         return await File.ReadAllTextAsync(path);
     }
-    
+
     public async Task WriteAllTextAsync(string path, string content)
     {
         await File.WriteAllTextAsync(path, content);
     }
-    
+
     public string ReadAllText(string path)
     {
         return File.ReadAllText(path);
     }
-    
+
     public void EnsureDirectoryExists(string path)
     {
         Directory.CreateDirectory(path);
     }
-    
+
     public string GetApplicationDataPath()
     {
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

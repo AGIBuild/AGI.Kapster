@@ -20,7 +20,7 @@ public class TestApplication : Application
         {
             // No main window needed for testing
         }
-        
+
         base.OnFrameworkInitializationCompleted();
     }
 }

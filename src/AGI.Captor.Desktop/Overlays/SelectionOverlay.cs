@@ -23,7 +23,7 @@ public sealed class SelectionOverlay : Canvas
     private readonly SelectionInfoOverlay _infoOverlay;
     private bool _pendingCreate;
     private const double DragThreshold = 0.5; // Reduced from 2.0 to 0.5 pixels for better responsiveness
-    
+
     private const double HandleSize = 8;
     private const double HandleHit = 10;
 
@@ -64,7 +64,7 @@ public sealed class SelectionOverlay : Canvas
     {
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
         var isActiveWindow = GlobalSelectionState.ActiveSelectionWindow == parentWindow;
-        
+
         // Update cursor based on selection state
         if (hasSelection && !isActiveWindow)
         {
@@ -134,7 +134,7 @@ public sealed class SelectionOverlay : Canvas
     {
         base.OnPointerMoved(e);
         var p = e.GetPosition(this);
-        
+
         // Handle different interaction modes
         if (HandleDragCreation(p))
         {
@@ -153,7 +153,7 @@ public sealed class SelectionOverlay : Canvas
             // Handle cursor updates and info overlay for hover state
             HandleHoverState(p);
         }
-        
+
         e.Handled = true;
     }
 
@@ -173,7 +173,7 @@ public sealed class SelectionOverlay : Canvas
             // Ensure info overlay is visible and update with current mouse position
             _infoOverlay.Show();
             UpdateInfoOverlay(e.GetPosition(this));
-            
+
             SelectionFinished?.Invoke(SelectionRect);
         }
         else
@@ -238,14 +238,14 @@ public sealed class SelectionOverlay : Canvas
     {
         SelectionRect = rect;
         UpdateVisuals(); // Force update for programmatic changes
-        
+
         // Set global selection state
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
         if (parentWindow != null)
         {
             GlobalSelectionState.SetSelection(parentWindow);
         }
-        
+
         // Fire events
         SelectionFinished?.Invoke(SelectionRect);
         Log.Information("SelectionOverlay: Selection set programmatically to {Rect}", rect);
@@ -366,7 +366,7 @@ public sealed class SelectionOverlay : Canvas
     {
         _isDraggingCreate = true;
         SelectionRect = new Rect(_dragStart, _dragStart);
-        
+
         // Set global selection state when drag starts
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
         if (parentWindow != null)
@@ -421,7 +421,7 @@ public sealed class SelectionOverlay : Canvas
     {
         var handle = HitTestHandle(p);
         var hasSel = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
-        
+
         if (handle != HandleKind.None)
         {
             Cursor = handle switch

@@ -88,16 +88,16 @@ public class RectangleAnnotation : AnnotationItemBase
     public override bool HitTest(Point point)
     {
         if (!IsVisible) return false;
-        
+
         // 如果有填充，检查是否在矩形内部
         if (Style.FillMode != FillMode.None && IsPointInRect(point, _rectangle))
             return true;
-        
+
         // 检查是否在描边附近 - 增大选择区域提高可选择性
         var strokeHalf = Math.Max(Style.StrokeWidth / 2, 6); // 最小6px选择区域
         var outerRect = _rectangle.Inflate(strokeHalf);
         var innerRect = _rectangle.Deflate(strokeHalf);
-        
+
         return IsPointInRect(point, outerRect) && !IsPointInRect(point, innerRect);
     }
 
@@ -110,10 +110,10 @@ public class RectangleAnnotation : AnnotationItemBase
     {
         var topLeft = _rectangle.TopLeft;
         var bottomRight = _rectangle.BottomRight;
-        
+
         var newTopLeft = center + (topLeft - center) * scale;
         var newBottomRight = center + (bottomRight - center) * scale;
-        
+
         _rectangle = new Rect(newTopLeft, newBottomRight);
     }
 
@@ -123,7 +123,7 @@ public class RectangleAnnotation : AnnotationItemBase
         // 实际应用中可能需要将矩形转换为自由多边形标注
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
-        
+
         var corners = new[]
         {
             _rectangle.TopLeft,
@@ -131,7 +131,7 @@ public class RectangleAnnotation : AnnotationItemBase
             _rectangle.BottomRight,
             _rectangle.BottomLeft
         };
-        
+
         for (int i = 0; i < corners.Length; i++)
         {
             var relative = corners[i] - center;
@@ -140,13 +140,13 @@ public class RectangleAnnotation : AnnotationItemBase
                 relative.X * sin + relative.Y * cos
             );
         }
-        
+
         // 计算旋转后的包围盒
         var minX = corners.Min(p => p.X);
         var minY = corners.Min(p => p.Y);
         var maxX = corners.Max(p => p.X);
         var maxY = corners.Max(p => p.Y);
-        
+
         _rectangle = new Rect(minX, minY, maxX - minX, maxY - minY);
     }
 
@@ -173,12 +173,12 @@ public class RectangleAnnotation : AnnotationItemBase
     public override void Deserialize(Dictionary<string, object> data)
     {
         base.Deserialize(data);
-        
+
         var x = data.TryGetValue("X", out var xVal) ? Convert.ToDouble(xVal) : 0;
         var y = data.TryGetValue("Y", out var yVal) ? Convert.ToDouble(yVal) : 0;
         var width = data.TryGetValue("Width", out var wVal) ? Convert.ToDouble(wVal) : 0;
         var height = data.TryGetValue("Height", out var hVal) ? Convert.ToDouble(hVal) : 0;
-        
+
         _rectangle = new Rect(x, y, width, height);
     }
 }

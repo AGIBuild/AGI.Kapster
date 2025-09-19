@@ -25,7 +25,7 @@ public class MacHotkeyProvider : IHotkeyProvider
     private const int kCGEventTapOptionListenOnly = 1; // Listen only, don't intercept
     private const int kCGKeyboardEventKeycode = 9;
     private const uint kCFStringEncodingUTF8 = 0x08000100;
-    
+
     // Modifier key masks - consistent with example code
     private const ulong FLAG_SHIFT = 0x20000;
     private const ulong FLAG_CONTROL = 0x40000;
@@ -80,7 +80,7 @@ public class MacHotkeyProvider : IHotkeyProvider
         {
             var appPath = System.AppContext.BaseDirectory;
             var bundlePath = Environment.GetEnvironmentVariable("CFBundleExecutablePath") ?? "Not set";
-            
+
             // 尝试获取进程路径，但不依赖可能缺失的程序集
             string processPath = "Unknown";
             try
@@ -92,7 +92,7 @@ public class MacHotkeyProvider : IHotkeyProvider
             {
                 processPath = "Process info unavailable";
             }
-            
+
             return $"Process: {processPath}\nAppContext: {appPath}\nBundle: {bundlePath}";
         }
         catch (Exception ex)
@@ -110,20 +110,20 @@ public class MacHotkeyProvider : IHotkeyProvider
         }
 
         _eventTapCallback = EventTapCallbackMethod;
-        
+
         // 详细的权限调试信息
         var hasPermissions = AXIsProcessTrusted();
         var appPath = System.AppContext.BaseDirectory;
-        
-        Log.Debug("MacHotkeyProvider created - HasPermissions: {HasPermissions}, AppPath: {AppPath}", 
+
+        Log.Debug("MacHotkeyProvider created - HasPermissions: {HasPermissions}, AppPath: {AppPath}",
             hasPermissions, appPath);
-        
+
         if (!hasPermissions)
         {
             Log.Warning("⚠️ Accessibility permissions not granted for app at: {AppPath}", appPath);
             Log.Warning("Please add this application to System Preferences > Security & Privacy > Accessibility");
         }
-        
+
         // 延迟初始化CGEventTap，避免在构造函数中阻塞
     }
 
@@ -186,10 +186,10 @@ public class MacHotkeyProvider : IHotkeyProvider
             {
                 var currentRunLoop = CFRunLoopGetCurrent(); // 在UI线程中获取当前RunLoop
                 var defaultMode = CFStringCreateWithCString(IntPtr.Zero, "kCFRunLoopDefaultMode", kCFStringEncodingUTF8);
-                
+
                 CFRunLoopAddSource(currentRunLoop, _runLoopSource, defaultMode);
                 CGEventTapEnable(_eventTap, true);
-                
+
                 Log.Debug("CGEventTap enabled and added to UI thread RunLoop");
             }
             catch (Exception ex)
@@ -238,7 +238,7 @@ public class MacHotkeyProvider : IHotkeyProvider
             }
 
             _registeredHotkeys[id] = (macKeyCode, modifiers, callback);
-            Log.Debug("macOS hotkey registered: {Id} -> {Modifiers}+{KeyCode} (mac: {MacKeyCode})", 
+            Log.Debug("macOS hotkey registered: {Id} -> {Modifiers}+{KeyCode} (mac: {MacKeyCode})",
                 id, modifiers, keyCode, macKeyCode);
             return true;
         }
@@ -280,11 +280,11 @@ public class MacHotkeyProvider : IHotkeyProvider
                 foreach (var (id, (registeredKeyCode, registeredModifiers, callback)) in _registeredHotkeys)
                 {
                     var requiredFlags = ConvertHotkeyModifiersToFlags(registeredModifiers);
-                    
+
                     if (keyCode == registeredKeyCode && normalizedFlags == requiredFlags)
                     {
                         Log.Information("Hotkey triggered: {Id}", id);
-                        
+
                         // Execute callback on UI thread
                         Dispatcher.UIThread.InvokeAsync(() =>
                         {
@@ -316,12 +316,12 @@ public class MacHotkeyProvider : IHotkeyProvider
     private static ulong ConvertHotkeyModifiersToFlags(HotkeyModifiers modifiers)
     {
         ulong flags = 0;
-        
+
         if ((modifiers & HotkeyModifiers.Control) != 0) flags |= FLAG_CONTROL;
         if ((modifiers & HotkeyModifiers.Alt) != 0) flags |= FLAG_OPTION;
         if ((modifiers & HotkeyModifiers.Shift) != 0) flags |= FLAG_SHIFT;
         if ((modifiers & HotkeyModifiers.Win) != 0) flags |= FLAG_COMMAND;
-        
+
         return flags;
     }
 
@@ -331,12 +331,12 @@ public class MacHotkeyProvider : IHotkeyProvider
     private static HotkeyModifiers ConvertCGEventFlagsToHotkeyModifiers(ulong flags)
     {
         var modifiers = HotkeyModifiers.None;
-        
+
         if ((flags & FLAG_CONTROL) != 0) modifiers |= HotkeyModifiers.Control;
         if ((flags & FLAG_OPTION) != 0) modifiers |= HotkeyModifiers.Alt;
         if ((flags & FLAG_SHIFT) != 0) modifiers |= HotkeyModifiers.Shift;
         if ((flags & FLAG_COMMAND) != 0) modifiers |= HotkeyModifiers.Win;
-        
+
         return modifiers;
     }
 

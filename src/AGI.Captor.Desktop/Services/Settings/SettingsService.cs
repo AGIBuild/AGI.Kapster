@@ -19,34 +19,34 @@ public class SettingsService : ISettingsService
     private readonly IFileSystemService _fileSystemService;
     private readonly IConfiguration? _configuration;
     private AppSettings _settings;
-    
+
     private static readonly JsonSerializerOptions JsonOptions = AppJsonContext.Default.Options;
-    
+
     public AppSettings Settings => _settings;
-    
+
     public SettingsService() : this(new FileSystemService(), null)
     {
     }
-    
+
     public SettingsService(IFileSystemService fileSystemService, IConfiguration? configuration = null)
     {
         _fileSystemService = fileSystemService ?? throw new ArgumentNullException(nameof(fileSystemService));
         _configuration = configuration;
-        
+
         var appFolder = _fileSystemService.GetApplicationDataPath();
-        
+
         // Ensure application folder exists
         _fileSystemService.EnsureDirectoryExists(appFolder);
-        
+
         _settingsFilePath = Path.Combine(appFolder, "settings.json");
         _settings = new AppSettings();
-        
+
         // Load settings immediately in constructor
         LoadSettings();
-        
+
         Log.Debug("SettingsService initialized with settings file: {FilePath}", _settingsFilePath);
     }
-    
+
     private void LoadSettings()
     {
         try
@@ -55,7 +55,7 @@ public class SettingsService : ISettingsService
             {
                 var json = _fileSystemService.ReadAllText(_settingsFilePath);
                 var loadedSettings = JsonSerializer.Deserialize(json, AppJsonContext.Default.AppSettings);
-                
+
                 if (loadedSettings != null)
                 {
                     _settings = loadedSettings;
@@ -83,15 +83,15 @@ public class SettingsService : ISettingsService
             _settings = CreateDefaultSettings();
         }
     }
-    
+
     public async Task SaveAsync()
     {
         try
         {
             var json = JsonSerializer.Serialize(_settings, AppJsonContext.Default.AppSettings);
-            
+
             await _fileSystemService.WriteAllTextAsync(_settingsFilePath, json);
-            
+
             Log.Information("Settings saved successfully to {FilePath}", _settingsFilePath);
         }
         catch (Exception ex)
@@ -100,25 +100,25 @@ public class SettingsService : ISettingsService
             throw;
         }
     }
-    
+
     public void ResetToDefaults()
     {
         _settings = new AppSettings();
         Log.Information("Settings reset to defaults");
     }
-    
+
     public async Task UpdateSettingsAsync(AppSettings newSettings)
     {
         if (newSettings == null)
             throw new ArgumentNullException(nameof(newSettings));
-        
-        
+
+
         _settings = newSettings;
         await SaveAsync();
-        
+
         Log.Debug("Settings updated and saved");
     }
-    
+
     public string GetSettingsFilePath()
     {
         return _settingsFilePath;
@@ -127,7 +127,7 @@ public class SettingsService : ISettingsService
     private AppSettings CreateDefaultSettings()
     {
         var defaultSettings = new AppSettings();
-        
+
         // Load AutoUpdate defaults from configuration if available
         if (_configuration != null)
         {
@@ -145,14 +145,14 @@ public class SettingsService : ISettingsService
                 };
             }
         }
-        
+
         return defaultSettings;
     }
 
     private void MergeWithConfigurationDefaults()
     {
         if (_configuration == null) return;
-        
+
         // If AutoUpdate settings don't exist in user settings, use configuration defaults
         if (_settings.AutoUpdate == null)
         {

@@ -10,16 +10,16 @@ namespace AGI.Captor.Desktop.Services.Overlay;
 /// </summary>
 public sealed class GlobalElementHighlightState
 {
-    private static readonly Lazy<GlobalElementHighlightState> _instance = 
+    private static readonly Lazy<GlobalElementHighlightState> _instance =
         new(() => new GlobalElementHighlightState());
-    
+
     public static GlobalElementHighlightState Instance => _instance.Value;
-    
+
     private DetectedElement? _currentElement;
     private object? _currentHighlightOwner;
-    
+
     private GlobalElementHighlightState() { }
-    
+
     /// <summary>
     /// Updates the current global highlighted element
     /// Only allows one highlight across all overlay windows
@@ -41,37 +41,37 @@ public sealed class GlobalElementHighlightState
             }
             return false; // No change needed for non-owners
         }
-        
+
         // Check if this is the same element (avoid unnecessary updates)
         if (_currentElement != null && AreElementsEqual(_currentElement, element))
         {
             // Same element, but check if this is a different owner trying to highlight
             if (_currentHighlightOwner != owner)
             {
-                Log.Debug("Different overlay tried to highlight same element - blocking. Current owner: {Current}, New owner: {New}", 
+                Log.Debug("Different overlay tried to highlight same element - blocking. Current owner: {Current}, New owner: {New}",
                     _currentHighlightOwner?.GetHashCode(), owner.GetHashCode());
                 return false; // Block this owner from showing highlight
             }
             return true; // Same owner, same element - continue showing
         }
-        
+
         // New element - check if someone else owns the highlight
         if (_currentHighlightOwner != null && _currentHighlightOwner != owner)
         {
-            Log.Debug("New element from different owner - taking over highlight. Previous: {Previous}, New: {New}", 
+            Log.Debug("New element from different owner - taking over highlight. Previous: {Previous}, New: {New}",
                 _currentHighlightOwner.GetHashCode(), owner.GetHashCode());
         }
-        
+
         // Update global state
         _currentElement = element;
         _currentHighlightOwner = owner;
-        
-        Log.Debug("Updated global element highlight: {Name} ({ClassName}) by owner {Owner}", 
+
+        Log.Debug("Updated global element highlight: {Name} ({ClassName}) by owner {Owner}",
             element.Name, element.ClassName, owner.GetHashCode());
-            
+
         return true; // This owner should show the highlight
     }
-    
+
     /// <summary>
     /// Checks if the given owner currently owns the highlight
     /// </summary>
@@ -79,12 +79,12 @@ public sealed class GlobalElementHighlightState
     {
         return _currentHighlightOwner == owner;
     }
-    
+
     /// <summary>
     /// Gets the current highlighted element
     /// </summary>
     public DetectedElement? CurrentElement => _currentElement;
-    
+
     /// <summary>
     /// Clears any highlight owned by the specified owner
     /// </summary>
@@ -97,7 +97,7 @@ public sealed class GlobalElementHighlightState
             Log.Debug("Cleared highlight owner: {Owner}", owner.GetHashCode());
         }
     }
-    
+
     /// <summary>
     /// Forces clear of all highlights (for debugging/reset)
     /// </summary>
@@ -107,7 +107,7 @@ public sealed class GlobalElementHighlightState
         _currentHighlightOwner = null;
         Log.Debug("Force cleared all highlights");
     }
-    
+
     private static bool AreElementsEqual(DetectedElement a, DetectedElement b)
     {
         return a.WindowHandle == b.WindowHandle &&

@@ -17,7 +17,7 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
     public bool SupportsWindowCapture => true;
     public bool SupportsElementCapture => false; // Not implemented yet
     public bool IsHardwareAccelerated => true; // macOS uses Core Graphics
-    
+
     public async Task<SKBitmap?> CaptureFullScreenAsync(Screen screen)
     {
         // TODO: Implement using CGWindowListCreateImage
@@ -25,21 +25,21 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
         Log.Warning("macOS screen capture not yet implemented");
         return await Task.FromResult<SKBitmap?>(null);
     }
-    
+
     public async Task<SKBitmap?> CaptureWindowAsync(IntPtr windowHandle)
     {
         // TODO: Implement using CGWindowListCreateImage with specific window ID
         Log.Warning("macOS window capture not yet implemented");
         return await Task.FromResult<SKBitmap?>(null);
     }
-    
+
     public async Task<SKBitmap?> CaptureRegionAsync(PixelRect region)
     {
         try
         {
             // Create temporary file for screenshot
             var tempFile = System.IO.Path.GetTempFileName() + ".png";
-            
+
             // Use screencapture command to capture region
             var process = new System.Diagnostics.Process
             {
@@ -81,14 +81,14 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
             return null;
         }
     }
-    
+
     public async Task<SKBitmap?> CaptureElementAsync(IElementInfo element)
     {
         // Element capture not supported on macOS yet
         Log.Warning("macOS element capture not supported");
         return await Task.FromResult<SKBitmap?>(null);
     }
-    
+
     public async Task<SKBitmap?> CaptureWindowRegionAsync(Avalonia.Rect windowRect, Avalonia.Visual window)
     {
         try
@@ -98,13 +98,13 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
             {
                 var p1 = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
                 var p2 = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
-                
+
                 var screenRect = new PixelRect(
                     Math.Min(p1.X, p2.X),
                     Math.Min(p1.Y, p2.Y),
                     Math.Max(1, Math.Abs(p2.X - p1.X)),
                     Math.Max(1, Math.Abs(p2.Y - p1.Y)));
-                
+
                 return await CaptureRegionAsync(screenRect);
             }
             else

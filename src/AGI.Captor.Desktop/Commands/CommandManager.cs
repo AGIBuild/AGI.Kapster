@@ -13,12 +13,12 @@ public class CommandManager
     private readonly Stack<ICommand> _undoStack = new();
     private readonly Stack<ICommand> _redoStack = new();
     private readonly int _maxUndoLevels;
-    
+
     public CommandManager(int maxUndoLevels = 50)
     {
         _maxUndoLevels = maxUndoLevels;
     }
-    
+
     /// <summary>
     /// Execute a command and add it to the undo stack
     /// </summary>
@@ -29,33 +29,33 @@ public class CommandManager
         try
         {
             command.Execute();
-            
+
             // Add to undo stack
             _undoStack.Push(command);
-            
+
             // Clear redo stack when new command is executed
             _redoStack.Clear();
-            
+
             // Limit undo stack size
             while (_undoStack.Count > _maxUndoLevels)
             {
                 var oldest = _undoStack.ToArray().Last();
                 var temp = new Stack<ICommand>();
-                
+
                 // Remove the oldest command
                 while (_undoStack.Count > 1)
                 {
                     temp.Push(_undoStack.Pop());
                 }
                 _undoStack.Pop(); // Remove oldest
-                
+
                 // Restore stack
                 while (temp.Count > 0)
                 {
                     _undoStack.Push(temp.Pop());
                 }
             }
-            
+
             Log.Debug("Executed command: {Command}", command.Description);
             OnStackChanged();
         }
@@ -65,7 +65,7 @@ public class CommandManager
             throw;
         }
     }
-    
+
     /// <summary>
     /// Undo the last command
     /// </summary>
@@ -73,13 +73,13 @@ public class CommandManager
     {
         if (!CanUndo)
             return false;
-            
+
         try
         {
             var command = _undoStack.Pop();
             command.Undo();
             _redoStack.Push(command);
-            
+
             Log.Debug("Undone command: {Command}", command.Description);
             OnStackChanged();
             return true;
@@ -90,7 +90,7 @@ public class CommandManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// Redo the last undone command
     /// </summary>
@@ -98,13 +98,13 @@ public class CommandManager
     {
         if (!CanRedo)
             return false;
-            
+
         try
         {
             var command = _redoStack.Pop();
             command.Execute();
             _undoStack.Push(command);
-            
+
             Log.Debug("Redone command: {Command}", command.Description);
             OnStackChanged();
             return true;
@@ -115,27 +115,27 @@ public class CommandManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// Check if undo is available
     /// </summary>
     public bool CanUndo => _undoStack.Count > 0 && _undoStack.Peek().CanUndo;
-    
+
     /// <summary>
     /// Check if redo is available
     /// </summary>
     public bool CanRedo => _redoStack.Count > 0;
-    
+
     /// <summary>
     /// Get the description of the next undo command
     /// </summary>
     public string? UndoDescription => CanUndo ? _undoStack.Peek().Description : null;
-    
+
     /// <summary>
     /// Get the description of the next redo command
     /// </summary>
     public string? RedoDescription => CanRedo ? _redoStack.Peek().Description : null;
-    
+
     /// <summary>
     /// Clear all commands
     /// </summary>
@@ -151,21 +151,21 @@ public class CommandManager
     /// Clear all commands (alias for Clear method)
     /// </summary>
     public void ClearHistory() => Clear();
-    
+
     /// <summary>
     /// Get undo history for debugging
     /// </summary>
     public IEnumerable<string> GetUndoHistory() => _undoStack.Select(c => c.Description);
-    
+
     /// <summary>
     /// Get redo history for debugging
     /// </summary>
     public IEnumerable<string> GetRedoHistory() => _redoStack.Select(c => c.Description);
-    
+
     /// <summary>
     /// Event fired when the command stacks change
     /// </summary>
     public event Action? StackChanged;
-    
+
     private void OnStackChanged() => StackChanged?.Invoke();
 }

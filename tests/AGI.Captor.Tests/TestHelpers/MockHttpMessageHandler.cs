@@ -29,7 +29,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request, 
+        HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         if (_exception != null)
@@ -38,7 +38,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
         }
 
         var response = new HttpResponseMessage(_statusCode);
-        
+
         if (_responseContent != null)
         {
             response.Content = new StringContent(_responseContent);
@@ -46,7 +46,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
 
         // Simulate async operation
         await Task.Delay(1, cancellationToken);
-        
+
         return response;
     }
 }

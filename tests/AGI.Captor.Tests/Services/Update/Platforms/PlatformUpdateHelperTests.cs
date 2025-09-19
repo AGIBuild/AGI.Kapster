@@ -16,10 +16,10 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var extension = PlatformUpdateHelper.GetPackageExtension();
-        
+
         // Assert
         extension.Should().NotBeNullOrEmpty();
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             extension.Should().Be("msi");
@@ -39,10 +39,10 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var identifier = PlatformUpdateHelper.GetPlatformIdentifier();
-        
+
         // Assert
         identifier.Should().NotBeNullOrEmpty();
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             identifier.Should().StartWith("win-");
@@ -55,7 +55,7 @@ public class PlatformUpdateHelperTests
         {
             identifier.Should().StartWith("linux-");
         }
-        
+
         // Should include architecture
         identifier.Should().Match(s => s.EndsWith("-x64") || s.EndsWith("-arm64"));
     }
@@ -65,11 +65,11 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var (identifier, extension) = PlatformUpdateHelper.GetPlatformInfo();
-        
+
         // Assert
         identifier.Should().NotBeNullOrEmpty();
         extension.Should().NotBeNullOrEmpty();
-        
+
         // Verify consistency with individual methods
         identifier.Should().Be(PlatformUpdateHelper.GetPlatformIdentifier());
         extension.Should().Be(PlatformUpdateHelper.GetPackageExtension());
@@ -80,9 +80,9 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var supportsSilent = PlatformUpdateHelper.SupportsSilentInstall();
-        
+
         // Assert
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||
             RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             supportsSilent.Should().BeTrue();
@@ -98,10 +98,10 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var notes = PlatformUpdateHelper.GetInstallationNotes();
-        
+
         // Assert
         notes.Should().NotBeNullOrEmpty();
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             notes.Should().Contain("silently");
@@ -121,11 +121,11 @@ public class PlatformUpdateHelperTests
     {
         // Act
         var displayName = PlatformUpdateHelper.GetPlatformDisplayName();
-        
+
         // Assert
         displayName.Should().NotBeNullOrEmpty();
         displayName.Should().BeOneOf("Windows", "macOS", "Linux", "Unknown Platform");
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             displayName.Should().Be("Windows");
@@ -147,10 +147,10 @@ public class PlatformUpdateHelperTests
     {
         // This test verifies the logic but can't change the actual runtime architecture
         // So we test the expected behavior based on current architecture
-        
+
         // Act
         var identifier = PlatformUpdateHelper.GetPlatformIdentifier();
-        
+
         // Assert
         if (RuntimeInformation.ProcessArchitecture == arch)
         {

@@ -29,7 +29,7 @@ public static class PlatformUpdateHelper
     public static string GetPlatformIdentifier()
     {
         var arch = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "arm64" : "x64";
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return $"win-{arch}";
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -55,7 +55,7 @@ public static class PlatformUpdateHelper
     {
         // Windows MSI and Linux DEB support silent installation
         // macOS PKG requires user interaction for security
-        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || 
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||
                RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
     }
 

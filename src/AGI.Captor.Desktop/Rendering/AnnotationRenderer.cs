@@ -22,11 +22,11 @@ public class AnnotationRenderer : IAnnotationRenderer
     // Geometry cache to avoid rebuilding complex figures repeatedly
     private readonly Dictionary<Guid, (Geometry geometry, Rect bounds, long version)> _geometryCache = new();
     private readonly Dictionary<Guid, (PathGeometry geometry, Rect bounds, long version)> _freehandCache = new();
-    
+
     // Path instance pool to reduce allocations
     private readonly Stack<Path> _pathPool = new();
     private readonly SolidColorBrush _arrowShadowBrush = new SolidColorBrush(Colors.Black, 0.08);
-    
+
     // Geometry pools for shapes with reusable local coordinates
     private readonly Dictionary<(int w, int h), RectangleGeometry> _rectGeomPool = new();
     private readonly Dictionary<(int w, int h), EllipseGeometry> _ellipseGeomPool = new();
@@ -93,14 +93,14 @@ public class AnnotationRenderer : IAnnotationRenderer
     public void RenderAll(Canvas canvas, IEnumerable<IAnnotationItem> items)
     {
         Clear(canvas);
-        
+
         // Render items sorted by Z-index
         foreach (var item in items.OrderBy(i => i.ZIndex))
         {
             Render(canvas, item);
         }
     }
-    
+
     public void RenderChanged(Canvas canvas, IEnumerable<IAnnotationItem> items, Rect dirtyRect)
     {
         if (IsEmptyRect(dirtyRect))
@@ -109,7 +109,7 @@ public class AnnotationRenderer : IAnnotationRenderer
             RenderAll(canvas, items);
             return;
         }
-        
+
         foreach (var item in items)
         {
             // Use cached bounds when available for looser intersection test; fallback to item.Bounds
@@ -125,10 +125,10 @@ public class AnnotationRenderer : IAnnotationRenderer
                     itemBounds = cached.bounds;
                 }
             }
-            
+
             if (!itemBounds.Intersects(dirtyRect))
                 continue;
-            
+
             // Re-render this item only
             Render(canvas, item);
         }
@@ -219,7 +219,7 @@ public class AnnotationRenderer : IAnnotationRenderer
             }
             _renderCache.Remove(item.Id);
         }
-        
+
         // Drop geometry cache for this item to force rebuild next time
         _geometryCache.Remove(item.Id);
         _freehandCache.Remove(item.Id);
@@ -233,15 +233,15 @@ public class AnnotationRenderer : IAnnotationRenderer
                 .OfType<TextBlock>()
                 .Where(tb => tb.Name == targetName)
                 .ToList();
-            
+
             foreach (var textBlock in toRemove)
             {
                 canvas.Children.Remove(textBlock);
             }
-            
+
             if (toRemove.Count > 0)
             {
-                Log.Warning("Removed {Count} additional TextBlock controls for annotation {Id} to prevent ghosting", 
+                Log.Warning("Removed {Count} additional TextBlock controls for annotation {Id} to prevent ghosting",
                     toRemove.Count, item.Id);
             }
         }
@@ -253,7 +253,7 @@ public class AnnotationRenderer : IAnnotationRenderer
     private void RenderArrow(Canvas canvas, ArrowAnnotation arrow, List<Control> controls)
     {
         var arrowCanvas = new Canvas();
-        
+
         // Create shadow and body paths
         var shadowPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
         shadowPath.Fill = _arrowShadowBrush;
@@ -261,10 +261,10 @@ public class AnnotationRenderer : IAnnotationRenderer
         shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
         var bodyPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
         bodyPath.Stroke = null;
-        
+
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
-        
+
         // Build or reuse geometry
         var version = ComputeArrowVersion(arrow);
         Geometry geom;
@@ -282,7 +282,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         bodyPath.Data = geom;
         shadowPath.Data = geom;
         ApplyArrowFillAndShadow(bodyPath, shadowPath, arrow);
-        
+
         canvas.Children.Add(arrowCanvas);
         controls.Add(arrowCanvas);
     }
@@ -382,12 +382,12 @@ public class AnnotationRenderer : IAnnotationRenderer
     private void RenderText(Canvas canvas, TextAnnotation text, List<Control> controls)
     {
         // 不渲染正在编辑的文本（由TextBox替代）
-        if (text.IsEditing) 
+        if (text.IsEditing)
         {
             Log.Debug("Skipping render for text annotation {Id} in editing state", text.Id);
             return;
         }
-        
+
         if (string.IsNullOrEmpty(text.Text)) return;
 
         // Ensure we don't have duplicate text renders for the same annotation
@@ -415,11 +415,11 @@ public class AnnotationRenderer : IAnnotationRenderer
         // This prevents selection bounds mismatch that causes text ghosting
         textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var actualSize = textBlock.DesiredSize;
-        
+
         // Sync the measured size back to the text annotation to ensure bounds consistency
         text.SyncActualSize(actualSize);
-        
-        Log.Debug("TextBlock measured size: {Width}x{Height} for annotation {Id}", 
+
+        Log.Debug("TextBlock measured size: {Width}x{Height} for annotation {Id}",
             actualSize.Width, actualSize.Height, text.Id);
     }
 
@@ -429,10 +429,10 @@ public class AnnotationRenderer : IAnnotationRenderer
     private void RenderSelectionHandles(Canvas canvas, IAnnotationItem item, List<Control> controls)
     {
         // For text annotations, use actual text rendering bounds for precise handle positioning
-        var bounds = item is TextAnnotation textAnnotation ? 
-            textAnnotation.GetTextRenderBounds() : 
+        var bounds = item is TextAnnotation textAnnotation ?
+            textAnnotation.GetTextRenderBounds() :
             item.Bounds;
-            
+
         var handleSize = _options.HandleSize;
         var halfHandle = handleSize / 2;
 
@@ -515,11 +515,11 @@ public class AnnotationRenderer : IAnnotationRenderer
     {
         var a = arrow.StartPoint;
         var b = arrow.EndPoint;
-        
+
         var dx = b.X - a.X; var dy = b.Y - a.Y;
         var len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
         if (len < 5) return;
-        
+
         var ux = dx / len; var uy = dy / len;
         var px = -uy; var py = ux;
 
@@ -528,17 +528,17 @@ public class AnnotationRenderer : IAnnotationRenderer
         var headWidth = Math.Max(14, arrow.Style.StrokeWidth * 7.0);
         var tailWidth = Math.Max(arrow.Style.StrokeWidth * 3.5, 12.0);
         var baseWidth = Math.Max(arrow.Style.StrokeWidth * 0.8, 2.5);
-        
+
         // Arrow curve configuration
         const double CurveIntensityFactor = 0.12;
         const double MaxCurveAmount = 25;
         const double StraightAngleThreshold = 15;
-        
+
         var midPoint = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
         var angle = Math.Atan2(Math.Abs(dy), Math.Abs(dx)) * 180 / Math.PI;
         var isHorizontal = angle < StraightAngleThreshold;
         var isVertical = angle > (90 - StraightAngleThreshold);
-        
+
         Point curveControl;
         if (isHorizontal || isVertical)
         {
@@ -548,7 +548,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         {
             var curveAmount = Math.Min(len * CurveIntensityFactor, MaxCurveAmount);
             double curveOffsetX = 0, curveOffsetY = 0;
-            
+
             if (dx > 0 && dy < 0)
             {
                 curveOffsetX = -curveAmount;
@@ -569,7 +569,7 @@ public class AnnotationRenderer : IAnnotationRenderer
                 curveOffsetX = curveAmount;
                 curveOffsetY = curveAmount;
             }
-            
+
             curveControl = new Point(midPoint.X + curveOffsetX, midPoint.Y + curveOffsetY);
         }
 
@@ -578,54 +578,54 @@ public class AnnotationRenderer : IAnnotationRenderer
         int steps = Math.Max(24, (int)(len / 4));
         var leftPoints = new List<Point>(steps + 1);
         var rightPoints = new List<Point>(steps + 1);
-        
+
         var headBase = new Point(b.X - ux * headLen, b.Y - uy * headLen);
-        
+
         for (int i = 0; i <= steps; i++)
         {
             double t = (double)i / steps;
             double omt = 1 - t;
-            
+
             var centerX = omt * omt * a.X + 2 * omt * t * curveControl.X + t * t * headBase.X;
             var centerY = omt * omt * a.Y + 2 * omt * t * curveControl.Y + t * t * headBase.Y;
-            
+
             var tangentX = 2 * omt * (curveControl.X - a.X) + 2 * t * (headBase.X - curveControl.X);
             var tangentY = 2 * omt * (curveControl.Y - a.Y) + 2 * t * (headBase.Y - curveControl.Y);
             var tangentLen = Math.Max(1e-6, Math.Sqrt(tangentX * tangentX + tangentY * tangentY));
             var normalX = -tangentY / tangentLen;
             var normalY = tangentX / tangentLen;
-            
+
             var easedT = t * t * (3 - 2 * t);
             var width = tailWidth + (baseWidth - tailWidth) * easedT;
             var halfWidth = width / 2;
-            
+
             leftPoints.Add(new Point(centerX + normalX * halfWidth, centerY + normalY * halfWidth));
             rightPoints.Add(new Point(centerX - normalX * halfWidth, centerY - normalY * halfWidth));
         }
-        
+
         var headLeft = new Point(headBase.X + px * headWidth / 2, headBase.Y + py * headWidth / 2);
         var headRight = new Point(headBase.X - px * headWidth / 2, headBase.Y - py * headWidth / 2);
-        
+
         // Build streamlined path with curves
         var fig = new PathFigure { StartPoint = leftPoints[0], IsClosed = true };
         var segs = new PathSegments();
-        
+
         // Swallow tail (燕尾) - create a forked tail like a swallow's tail
         var tailNotchDepth = tailWidth * 0.5; // How deep the notch goes into the tail
-        
+
         // Calculate the center point between left and right tail edges
         var tailCenter = new Point((leftPoints[0].X + rightPoints[0].X) / 2, (leftPoints[0].Y + rightPoints[0].Y) / 2);
-        
+
         // Create the notch point - this goes inward (toward the arrow head)
         var tailNotchPoint = new Point(
             tailCenter.X + ux * tailNotchDepth, // Move forward (toward arrow head)
             tailCenter.Y + uy * tailNotchDepth
         );
-        
+
         // Create swallow tail shape - simple V shape
         segs.Add(new LineSegment { Point = tailNotchPoint }); // Left edge to notch (inward)
         segs.Add(new LineSegment { Point = rightPoints[0] }); // Notch to right edge
-        
+
         // Smooth curved shaft right edge
         for (int i = 1; i < rightPoints.Count; i++)
         {
@@ -640,43 +640,43 @@ public class AnnotationRenderer : IAnnotationRenderer
                 segs.Add(new QuadraticBezierSegment { Point1 = ctrl, Point2 = curr });
             }
         }
-        
+
         // Smooth connection to arrow head
-        segs.Add(new QuadraticBezierSegment 
-        { 
+        segs.Add(new QuadraticBezierSegment
+        {
             Point1 = new Point((rightPoints.Last().X + headRight.X) / 2, (rightPoints.Last().Y + headRight.Y) / 2),
             Point2 = headRight
         });
-        
+
         // Arrow head right edge with inward curve
         var rightCurveCtrl = new Point(
             headRight.X + (b.X - headRight.X) * 0.3 + px * headWidth * 0.1,
             headRight.Y + (b.Y - headRight.Y) * 0.3 + py * headWidth * 0.1
         );
-        segs.Add(new QuadraticBezierSegment 
-        { 
+        segs.Add(new QuadraticBezierSegment
+        {
             Point1 = rightCurveCtrl,
             Point2 = b
         });
-        
+
         // Arrow head left edge with inward curve
         var leftCurveCtrl = new Point(
             headLeft.X + (b.X - headLeft.X) * 0.3 - px * headWidth * 0.1,
             headLeft.Y + (b.Y - headLeft.Y) * 0.3 - py * headWidth * 0.1
         );
-        segs.Add(new QuadraticBezierSegment 
-        { 
+        segs.Add(new QuadraticBezierSegment
+        {
             Point1 = leftCurveCtrl,
             Point2 = headLeft
         });
-        
+
         // Smooth connection back to shaft
-        segs.Add(new QuadraticBezierSegment 
-        { 
+        segs.Add(new QuadraticBezierSegment
+        {
             Point1 = new Point((headLeft.X + leftPoints.Last().X) / 2, (headLeft.Y + leftPoints.Last().Y) / 2),
             Point2 = leftPoints.Last()
         });
-        
+
         // Smooth curved shaft left edge (reverse)
         for (int i = leftPoints.Count - 2; i >= 0; i--)
         {
@@ -690,7 +690,7 @@ public class AnnotationRenderer : IAnnotationRenderer
                 segs.Add(new QuadraticBezierSegment { Point1 = ctrl, Point2 = curr });
             }
         }
-        
+
         fig.Segments = segs;
         var geom = new PathGeometry { Figures = new PathFigures { fig } };
         bodyPath.Data = geom;
@@ -699,13 +699,13 @@ public class AnnotationRenderer : IAnnotationRenderer
         // Gradient re-tuned to reduce banding and jagged transparency edges
         var baseColor = arrow.Style.StrokeColor;
         var tailSoft = Color.FromArgb((byte)(baseColor.A * 0.12), baseColor.R, baseColor.G, baseColor.B);   // 12%
-        var tailMid  = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);   // 28%
+        var tailMid = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);   // 28%
         var shaftMid = Color.FromArgb((byte)(baseColor.A * 0.48), baseColor.R, baseColor.G, baseColor.B);   // 48%
         var shaftEnd = Color.FromArgb((byte)(baseColor.A * 0.72), baseColor.R, baseColor.G, baseColor.B);   // 72%
-            
+
         // Calculate arrow head base position for gradient endpoint
         var arrowHeadBase = new Point(b.X - ux * headLen, b.Y - uy * headLen);
-            
+
         bodyPath.Fill = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(a, RelativeUnit.Absolute),
@@ -890,7 +890,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         bounds = geom.Bounds;
         return geom;
     }
-    
+
     private static long ComputeArrowVersion(ArrowAnnotation arrow)
     {
         // Combine key properties into a simple version hash surrogate
@@ -909,7 +909,7 @@ public class AnnotationRenderer : IAnnotationRenderer
                 v *= 1099511628211L;
             }
             Mix(arrow.StartPoint.X); Mix(arrow.StartPoint.Y);
-            Mix(arrow.EndPoint.X);   Mix(arrow.EndPoint.Y);
+            Mix(arrow.EndPoint.X); Mix(arrow.EndPoint.Y);
             Mix(arrow.Style.StrokeWidth);
             Mix(arrow.Style.Opacity);
             MixColor(arrow.Style.StrokeColor);
@@ -929,7 +929,7 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         var baseColor = arrow.Style.StrokeColor;
         var tailSoft = Color.FromArgb((byte)(baseColor.A * 0.12), baseColor.R, baseColor.G, baseColor.B);
-        var tailMid  = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);
+        var tailMid = Color.FromArgb((byte)(baseColor.A * 0.28), baseColor.R, baseColor.G, baseColor.B);
         var shaftMid = Color.FromArgb((byte)(baseColor.A * 0.48), baseColor.R, baseColor.G, baseColor.B);
         var shaftEnd = Color.FromArgb((byte)(baseColor.A * 0.72), baseColor.R, baseColor.G, baseColor.B);
 
@@ -961,7 +961,7 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         // Use smoothed points if available, otherwise use original points
         var points = (freehand.SmoothedPoints?.Count > 0 ? freehand.SmoothedPoints : freehand.Points) ?? new List<Point>();
-        
+
         if (points.Count < 2) return;
 
         // Cache key and version
@@ -969,39 +969,39 @@ public class AnnotationRenderer : IAnnotationRenderer
         if (!_freehandCache.TryGetValue(freehand.Id, out var cached) || cached.version != version)
         {
             // Rebuild
-        var pathGeometry = new PathGeometry();
-        var pathFigure = new PathFigure { StartPoint = points[0], IsClosed = false };
-        if (points.Count == 2)
-        {
-            pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
-        }
-        else
-        {
-            for (int i = 1; i < points.Count; i++)
+            var pathGeometry = new PathGeometry();
+            var pathFigure = new PathFigure { StartPoint = points[0], IsClosed = false };
+            if (points.Count == 2)
             {
-                if (i == 1)
+                pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
+            }
+            else
+            {
+                for (int i = 1; i < points.Count; i++)
                 {
-                    pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
-                }
-                else if (i == points.Count - 1)
-                {
-                    pathFigure.Segments!.Add(new LineSegment { Point = points[i] });
-                }
-                else
-                {
-                    var controlPoint = points[i - 1];
-                    var endPoint = new Point(
-                        (points[i - 1].X + points[i].X) / 2,
-                        (points[i - 1].Y + points[i].Y) / 2);
-                    pathFigure.Segments!.Add(new QuadraticBezierSegment 
-                    { 
-                        Point1 = controlPoint, 
-                        Point2 = endPoint 
-                    });
+                    if (i == 1)
+                    {
+                        pathFigure.Segments!.Add(new LineSegment { Point = points[1] });
+                    }
+                    else if (i == points.Count - 1)
+                    {
+                        pathFigure.Segments!.Add(new LineSegment { Point = points[i] });
+                    }
+                    else
+                    {
+                        var controlPoint = points[i - 1];
+                        var endPoint = new Point(
+                            (points[i - 1].X + points[i].X) / 2,
+                            (points[i - 1].Y + points[i].Y) / 2);
+                        pathFigure.Segments!.Add(new QuadraticBezierSegment
+                        {
+                            Point1 = controlPoint,
+                            Point2 = endPoint
+                        });
+                    }
                 }
             }
-        }
-        pathGeometry.Figures!.Add(pathFigure);
+            pathGeometry.Figures!.Add(pathFigure);
             var bounds = pathGeometry.Bounds.Inflate(freehand.Style.StrokeWidth / 2);
             _freehandCache[freehand.Id] = (pathGeometry, bounds, version);
             cached = (pathGeometry, bounds, version);
@@ -1057,18 +1057,18 @@ public class AnnotationRenderer : IAnnotationRenderer
         // Measure the text to get actual size
         textBlock.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var textSize = textBlock.DesiredSize;
-        
+
         // Position centered at the emoji position
         var centerX = emoji.Position.X;
         var centerY = emoji.Position.Y;
-        
+
         // Calculate position to center the text
         var left = centerX - textSize.Width / 2;
         var top = centerY - textSize.Height / 2;
-        
+
         Canvas.SetLeft(textBlock, left);
         Canvas.SetTop(textBlock, top);
-        
+
         // Set explicit size to ensure proper rendering
         textBlock.Width = textSize.Width;
         textBlock.Height = textSize.Height;
