@@ -1012,7 +1012,7 @@ public partial class SettingsWindow : Window
 
         // Check current button state to determine action
         var buttonContent = button.Content?.ToString();
-        
+
         if (buttonContent == "Download Update")
         {
             // Handle download update action
@@ -1168,9 +1168,7 @@ public partial class SettingsWindow : Window
                 }
 
                 // Note: Installation may require restart, so we might not reach this point
-                var tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AGI.Captor", "Updates");
-                var platformInfo = Services.Update.Platforms.PlatformUpdateHelper.GetPlatformInfo();
-                var installerPath = System.IO.Path.Combine(tempDir, $"AGI.Captor-{_availableUpdate.Version}-{platformInfo.Identifier}.{platformInfo.Extension}");
+                var installerPath = Services.Update.UpdateService.GetInstallerPath(_availableUpdate.Version);
 
                 await _updateService.InstallUpdateAsync(installerPath);
             }

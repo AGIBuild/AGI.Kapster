@@ -34,10 +34,10 @@ public class UpdateService : IUpdateService, IDisposable
     public UpdateService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
-        
+
         // Load current settings first
         _settings = LoadUpdateSettings();
-        
+
         // Initialize GitHub update provider with configurable repository
         _updateProvider = new GitHubUpdateProvider(_settings.GitHubRepository);
         _httpClient = new HttpClient();
@@ -77,6 +77,19 @@ public class UpdateService : IUpdateService, IDisposable
 #else
         return Debugger.IsAttached;
 #endif
+    }
+
+    /// <summary>
+    /// Get the installer file path for a given version and platform
+    /// </summary>
+    /// <param name="version">Update version</param>
+    /// <param name="platformInfo">Platform information, if null will get current platform</param>
+    /// <returns>Full path to the installer file</returns>
+    public static string GetInstallerPath(string version, (string Identifier, string Extension)? platformInfo = null)
+    {
+        var platform = platformInfo ?? PlatformUpdateHelper.GetPlatformInfo();
+        var tempDir = Path.Combine(Path.GetTempPath(), "AGI.Captor", "Updates");
+        return Path.Combine(tempDir, $"AGI.Captor-{version}-{platform.Identifier}.{platform.Extension}");
     }
 
     public async Task<UpdateInfo?> CheckForUpdatesAsync()
@@ -141,12 +154,9 @@ public class UpdateService : IUpdateService, IDisposable
     {
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "AGI.Captor", "Updates");
+            var filePath = GetInstallerPath(updateInfo.Version);
+            var tempDir = Path.GetDirectoryName(filePath)!;
             Directory.CreateDirectory(tempDir);
-
-            var platformInfo = PlatformUpdateHelper.GetPlatformInfo();
-            var fileName = $"AGI.Captor-{updateInfo.Version}-{platformInfo.Identifier}.{platformInfo.Extension}";
-            var filePath = Path.Combine(tempDir, fileName);
 
             _logger.Information("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, filePath);
 
@@ -471,7 +481,7 @@ public class UpdateService : IUpdateService, IDisposable
             {
                 _logger.Information("Scheduling delayed update check in 5 seconds. Reason: {Reason}", reason);
                 await Task.Delay(5000);
-                
+
                 var update = await CheckForUpdatesAsync();
                 if (update != null)
                 {

@@ -29,20 +29,29 @@ public class GitHubUpdateProvider
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
 
         // Build API URL from repository setting
+        _gitHubApiUrl = BuildGitHubApiUrl(gitHubRepository);
+        _logger.Debug("GitHub update provider initialized with URL: {ApiUrl}", _gitHubApiUrl);
+    }
+
+    /// <summary>
+    /// Validates and constructs the GitHub API URL from the repository setting.
+    /// </summary>
+    /// <param name="gitHubRepository">The repository string or full API URL.</param>
+    /// <returns>The GitHub API URL for releases.</returns>
+    private static string BuildGitHubApiUrl(string? gitHubRepository)
+    {
         var repository = !string.IsNullOrWhiteSpace(gitHubRepository) ? gitHubRepository : DefaultGitHubRepository;
-        
+
         // Check if it's already a full API URL or just owner/repo format
         if (repository.StartsWith("https://api.github.com/"))
         {
-            _gitHubApiUrl = repository;
+            return repository;
         }
         else
         {
             // Assume it's owner/repo format
-            _gitHubApiUrl = $"https://api.github.com/repos/{repository}/releases";
+            return $"https://api.github.com/repos/{repository}/releases";
         }
-
-        _logger.Debug("GitHub update provider initialized with URL: {ApiUrl}", _gitHubApiUrl);
     }
 
     /// <summary>

@@ -112,7 +112,7 @@ class BuildTasks : NukeBuild
     (string AssemblyVersion, string FileVersion, string InformationalVersion) GetVersionInfo()
     {
         var gitVersion = GetGitVersionOrFallback();
-        
+
         if (gitVersion != null)
         {
             return (
@@ -127,9 +127,9 @@ class BuildTasks : NukeBuild
         var buildNumber = Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0";
         var shaEnv = Environment.GetEnvironmentVariable("GITHUB_SHA");
         var sha = !string.IsNullOrEmpty(shaEnv) && shaEnv.Length >= 7 ? shaEnv.Substring(0, 7) : "local";
-        
+
         Console.WriteLine($"📋 Using fallback version: {fallbackVersion}.{buildNumber}+{sha}");
-        
+
         return (
             $"{fallbackVersion}.0",
             $"{fallbackVersion}.{buildNumber}",
@@ -538,33 +538,41 @@ class BuildTasks : NukeBuild
                 CreateNoWindow = true
             };
 
-            // Add arguments safely without manual escaping
-            processInfo.ArgumentList.Add("build");
-            processInfo.ArgumentList.Add("-arch");
-            processInfo.ArgumentList.Add(rid == "win-arm64" ? "arm64" : "x64");
-            processInfo.ArgumentList.Add("-define");
-            processInfo.ArgumentList.Add($"SourceDir={publishPath}");
-            processInfo.ArgumentList.Add("-define");
-            processInfo.ArgumentList.Add($"ProductVersion={version.FileVersion}");
-            processInfo.ArgumentList.Add("-out");
-            processInfo.ArgumentList.Add(packagePath);
-            processInfo.ArgumentList.Add(wxsFile);
+            // Add arguments safely without manual escaping using foreach for better readability
+            var wixArgs = new string[]
+            {
+                "build",
+                "-arch",
+                rid == "win-arm64" ? "arm64" : "x64",
+                "-define",
+                $"SourceDir={publishPath}",
+                "-define",
+                $"ProductVersion={version.FileVersion}",
+                "-out",
+                packagePath,
+                wxsFile
+            };
+
+            foreach (var arg in wixArgs)
+            {
+                processInfo.ArgumentList.Add(arg);
+            }
 
             using var process = System.Diagnostics.Process.Start(processInfo);
             if (process == null)
                 throw new InvalidOperationException("Failed to start WiX process");
-            
+
             // Read outputs to prevent deadlock
             var outputBuilder = new System.Text.StringBuilder();
             var errorBuilder = new System.Text.StringBuilder();
-            
+
             process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
             process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
-            
+
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             process.WaitForExit();
-            
+
             if (process.ExitCode != 0)
             {
                 var error = errorBuilder.ToString();

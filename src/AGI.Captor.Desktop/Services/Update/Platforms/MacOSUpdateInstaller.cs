@@ -182,42 +182,27 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
 
             if (process.ExitCode != 0) return null;
 
-            // Parse plist output to find mount point using proper XML parsing
+            // Parse plist output to find mount point using robust XML parsing with XPath
             try
             {
                 var xmlDoc = new XmlDocument();
                 xmlDoc.LoadXml(output);
-                
-                // Navigate through the plist structure to find mount points
-                var dictNodes = xmlDoc.SelectNodes("//dict");
-                if (dictNodes != null)
+
+                // Use XPath to find the <key> node with value "mount-point" and its following <string> sibling
+                var mountPointNode = xmlDoc.SelectSingleNode("//dict/key[.='mount-point']/following-sibling::string[1]");
+                if (mountPointNode != null)
                 {
-                    foreach (XmlNode dict in dictNodes)
+                    var mountPoint = mountPointNode.InnerText;
+                    if (!string.IsNullOrEmpty(mountPoint) && mountPoint.StartsWith("/Volumes/"))
                     {
-                        var keys = dict.SelectNodes("key");
-                        var strings = dict.SelectNodes("string");
-                        
-                        if (keys != null && strings != null)
-                        {
-                            for (int i = 0; i < keys.Count; i++)
-                            {
-                                if (keys[i]?.InnerText == "mount-point" && i < strings.Count && strings[i] != null)
-                                {
-                                    var mountPoint = strings[i]!.InnerText;
-                                    if (!string.IsNullOrEmpty(mountPoint) && mountPoint.StartsWith("/Volumes/"))
-                                    {
-                                        return mountPoint;
-                                    }
-                                }
-                            }
-                        }
+                        return mountPoint;
                     }
                 }
             }
             catch (XmlException xmlEx)
             {
                 _logger.Warning(xmlEx, "Failed to parse plist XML output, falling back to string parsing");
-                
+
                 // Fallback to string parsing if XML parsing fails
                 var lines = output.Split('\n');
                 foreach (var line in lines)
