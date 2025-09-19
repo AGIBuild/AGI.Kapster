@@ -521,7 +521,8 @@ class BuildTasks : NukeBuild
                 wxsFile
             };
 
-            ProcessTasks.StartProcess("wix", $"{string.Join(" ", compileArgs)}")
+            ProcessTasks.StartProcess("wix", string.Join(" ", compileArgs.Select(arg => 
+                arg.Contains(" ") || arg.Contains("\"") ? $"\"{arg.Replace("\"", "\"\"")}\"" : arg)))
                 .AssertZeroExitCode();
 
             Console.WriteLine($"✅ Created: {packagePath}");
