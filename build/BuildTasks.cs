@@ -50,14 +50,16 @@ class BuildTasks : NukeBuild
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
     [GitVersion(NoFetch = true, NoCache = true)] GitVersion GitVersion;
 
-    // Ensure GitVersion is injected correctly; fail fast if not.
-    GitVersion GetGitVersionOrFail()
+    // Ensure GitVersion is injected correctly; provide fallback if not.
+    GitVersion GetGitVersionOrFallback()
     {
-        if (GitVersion == null)
+        if (GitVersion != null)
         {
-            throw new Exception("❌ GitVersion injection failed. Please ensure GitVersion is available and properly configured.");
+            return GitVersion;
         }
-        return GitVersion;
+
+        Console.WriteLine("⚠️ GitVersion injection failed. Using fallback version calculation.");
+        return null;
     }
 
     // Paths
@@ -105,15 +107,32 @@ class BuildTasks : NukeBuild
     }
 
     /// <summary>
-    /// Get version information from GitVersion (fail fast approach)
+    /// Get version information from GitVersion with fallback support
     /// </summary>
     (string AssemblyVersion, string FileVersion, string InformationalVersion) GetVersionInfo()
     {
-        var gitVersion = GetGitVersionOrFail();
+        var gitVersion = GetGitVersionOrFallback();
+        
+        if (gitVersion != null)
+        {
+            return (
+                gitVersion.AssemblySemVer ?? "1.0.0.0",
+                gitVersion.AssemblySemFileVer ?? "1.0.0.0",
+                gitVersion.InformationalVersion ?? "1.0.0+local"
+            );
+        }
+
+        // Fallback version when GitVersion fails
+        var fallbackVersion = "1.3.0";
+        var buildNumber = Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0";
+        var sha = Environment.GetEnvironmentVariable("GITHUB_SHA")?.Substring(0, 7) ?? "local";
+        
+        Console.WriteLine($"📋 Using fallback version: {fallbackVersion}.{buildNumber}+{sha}");
+        
         return (
-            gitVersion.AssemblySemVer ?? "1.0.0.0",
-            gitVersion.AssemblySemFileVer ?? "1.0.0.0",
-            gitVersion.InformationalVersion ?? "1.0.0+local"
+            $"{fallbackVersion}.0",
+            $"{fallbackVersion}.{buildNumber}",
+            $"{fallbackVersion}.{buildNumber}+{sha}"
         );
     }
 
