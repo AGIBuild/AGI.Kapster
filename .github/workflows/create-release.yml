@@ -43,6 +43,22 @@ jobs:
           ${{ env.DOTNET_VERSION }}
         dotnet-quality: 'preview'
         
+    - name: 🔧 Setup tool environment
+      run: |
+        # Ensure dotnet tools directory is in PATH
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+        echo "DOTNET_TOOL_PATH=$HOME/.dotnet/tools" >> $GITHUB_ENV
+        
+        # Create tools directory if it doesn't exist
+        mkdir -p "$HOME/.dotnet/tools"
+        
+        # Show environment info
+        echo "🔍 Environment Information:"
+        echo "  .NET version: $(dotnet --version)"
+        echo "  HOME: $HOME"
+        echo "  PATH: $PATH"
+        echo "  Tools directory: $HOME/.dotnet/tools"
+        
     - name: ⚙️ Configure Git
       run: |
         git config --global --add safe.directory /github/workspace
@@ -56,26 +72,81 @@ jobs:
       run: |
         Write-Host "🔍 Calculating version using GitVersion..."
         
-        # Install GitVersion tool if not available
-        try {
-          $null = dotnet tool list --global | Select-String "gitversion"
-          if (-not $?) {
-            throw "GitVersion not found"
+        # Function to check if GitVersion is available
+        function Test-GitVersion {
+          try {
+            # Try to run GitVersion and check if it produces valid output
+            $result = & dotnet gitversion 2>&1
+            return $LASTEXITCODE -eq 0 -and (-not [string]::IsNullOrWhiteSpace($result))
+          } catch {
+            return $false
           }
-          Write-Host "✅ GitVersion already available"
-        } catch {
-          Write-Host "📦 Installing GitVersion tool..."
-          dotnet tool install --global GitVersion.Tool --version 5.12.0
         }
         
-        # Get current version information with error handling
+        # Install GitVersion tool if not available
+        if (-not (Test-GitVersion)) {
+          Write-Host "📦 Installing GitVersion tool..."
+          try {
+            & dotnet tool install --global GitVersion.Tool --version 5.12.0
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to install GitVersion tool with exit code $LASTEXITCODE"
+            }
+            
+            Write-Host "✅ GitVersion tool installed"
+            
+            # Verify installation by checking the tool directly
+            $toolPath = "$env:DOTNET_TOOL_PATH/dotnet-gitversion"
+            if (Test-Path $toolPath) {
+              Write-Host "✅ GitVersion executable found at: $toolPath"
+            } else {
+              # Try alternative path
+              $toolPath = "$env:HOME/.dotnet/tools/dotnet-gitversion"
+              if (Test-Path $toolPath) {
+                Write-Host "✅ GitVersion executable found at: $toolPath"
+              } else {
+                Write-Host "⚠️ GitVersion executable not found, but proceeding with dotnet command"
+              }
+            }
+            
+          } catch {
+            Write-Host "❌ Failed to install GitVersion: $($_.Exception.Message)"
+            Write-Host "🔄 Checking if GitVersion is available through other means..."
+            
+            # List installed tools
+            Write-Host "📋 Installed global tools:"
+            & dotnet tool list --global
+            
+            exit 1
+          }
+        } else {
+          Write-Host "✅ GitVersion already available"
+        }
+        
+        # Get current version information with comprehensive error handling
         try {
-          $gitVersionJson = dotnet gitversion --output json
+          Write-Host "📊 Executing GitVersion..."
+          
+          # GitVersion 6.x outputs JSON by default, no need for --output json parameter
+          $gitVersionJson = & dotnet gitversion 2>&1
+          
           if ($LASTEXITCODE -ne 0) {
-            throw "GitVersion execution failed with exit code $LASTEXITCODE"
+            throw "GitVersion execution failed with exit code $LASTEXITCODE. Output: $gitVersionJson"
           }
           
-          $gitVersion = $gitVersionJson | ConvertFrom-Json
+          if ([string]::IsNullOrWhiteSpace($gitVersionJson)) {
+            throw "GitVersion returned empty output"
+          }
+          
+          # Parse JSON output
+          try {
+            $gitVersion = $gitVersionJson | ConvertFrom-Json
+          } catch {
+            throw "Failed to parse GitVersion JSON output: $($_.Exception.Message). Raw output: $gitVersionJson"
+          }
+          
+          if (-not $gitVersion.SemVer) {
+            throw "Invalid GitVersion output - missing SemVer property. Available properties: $($gitVersion | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)"
+          }
           
           Write-Host "📋 Current Version Information:"
           Write-Host "  SemVer: $($gitVersion.SemVer)"
@@ -88,8 +159,33 @@ jobs:
           
         } catch {
           Write-Host "❌ Error getting GitVersion information: $($_.Exception.Message)"
-          Write-Host "📋 GitVersion output:"
-          dotnet gitversion
+          Write-Host ""
+          Write-Host "🔍 Comprehensive debugging information:"
+          Write-Host "  Current directory: $(pwd)"
+          Write-Host "  Git repository status:"
+          & git status --porcelain
+          Write-Host "  Git branches:"
+          & git branch -a
+          Write-Host "  Git tags:"
+          & git tag -l | Sort-Object
+          Write-Host "  GitVersion.yml exists: $(Test-Path 'GitVersion.yml')"
+          if (Test-Path 'GitVersion.yml') {
+            Write-Host "  GitVersion.yml content:"
+            Get-Content 'GitVersion.yml' | ForEach-Object { Write-Host "    $_" }
+          }
+          Write-Host "  Available dotnet tools:"
+          & dotnet tool list --global
+          Write-Host "  PATH environment:"
+          Write-Host "    $env:PATH"
+          Write-Host "  Tool path check:"
+          Write-Host "    DOTNET_TOOL_PATH: $env:DOTNET_TOOL_PATH"
+          Write-Host "    HOME/.dotnet/tools exists: $(Test-Path "$env:HOME/.dotnet/tools")"
+          Write-Host "    dotnet-gitversion exists: $(Test-Path "$env:HOME/.dotnet/tools/dotnet-gitversion")"
+          
+          Write-Host ""
+          Write-Host "📋 Raw GitVersion output attempt:"
+          & dotnet gitversion 2>&1
+          
           exit 1
         }
         
