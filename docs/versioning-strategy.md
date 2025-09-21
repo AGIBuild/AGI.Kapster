@@ -1,19 +1,74 @@
-# AGI.Captor 版本计算策略和使用指南
+# AGI.Captor 版本策略与 GitVersion 集成指南
 
 ## 📋 概述
 
-AGI.Captor 采用基于 GitVersion 的自动版本计算策略，结合 Git 分支和提交消息来自动生成语义化版本号。
+AGI.Captor 采用基于 GitVersion 的智能版本计算策略，通过分析 Git 分支、提交历史和标签来自动生成符合语义化版本规范的版本号，并与 GitHub Actions 实现全自动化发布流程。
+
+## 🔧 GitVersion 配置
+
+### 核心配置 (`GitVersion.yml`)
+
+```yaml
+mode: ContinuousDelivery
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatchTag
+
+branches:
+  main:
+    mode: ContinuousDelivery
+    tag: ''
+    increment: Patch
+  release:
+    mode: ContinuousDelivery
+    tag: ''
+    increment: Patch
+  feature:
+    mode: ContinuousDelivery
+    tag: 'preview'
+    increment: Minor
+  hotfix:
+    mode: ContinuousDelivery
+    tag: 'hotfix'
+    increment: Patch
+```
+
+### 版本计算逻辑
+
+1. **基础版本**: 从最近的版本标签开始
+2. **分支策略**: 根据分支类型确定增量和标签
+3. **提交分析**: 解析 Conventional Commits 影响版本类型
+4. **预发布标识**: 自动添加分支相关的预发布标签
 
 ## 🌿 分支策略
 
 ### 分支类型和版本规则
 
-| 分支类型 | 分支模式 | 版本标签 | 增量策略 | 示例版本 |
+| 分支类型 | 分支模式 | 版本增量 | 标签格式 | 示例版本 |
 |---------|---------|---------|---------|---------|
-| **main** | `main`, `master` | `alpha` | `Minor` | `1.3.0-alpha.1+sha` |
-| **feature** | `features/*`, `feature/*` | `branch-name` | `Inherit` | `1.3.0-autoupdate.1+sha` |
-| **release** | `release` | *无* | `Auto-increment` | `1.3.1` (从标签自动递增) |
-| **hotfix** | `hotfix/*`, `hotfixes/*` | `hotfix` | `Patch` | `1.3.1-hotfix.1+sha` |
+| **main** | `main`, `master` | Patch | `X.Y.Z` | `1.2.3` |
+| **release** | `release` | Patch | `X.Y.Z` | `1.2.3` |
+| **feature** | `feature/*`, `features/*` | Minor | `X.Y.Z-preview.N` | `1.3.0-preview.1` |
+| **hotfix** | `hotfix/*`, `hotfixes/*` | Patch | `X.Y.Z-hotfix.N` | `1.2.4-hotfix.1` |
+
+### 自动化工作流集成
+
+```mermaid
+flowchart TD
+    A[代码提交] --> B{分支类型}
+    B -->|main/release| C[Patch 增量]
+    B -->|feature/*| D[Minor 增量 + preview]
+    B -->|hotfix/*| E[Patch 增量 + hotfix]
+    
+    C --> F[GitVersion 计算]
+    D --> F
+    E --> F
+    
+    F --> G[创建发布标签工作流]
+    G --> H[验证版本唯一性]
+    H --> I[创建 Git 标签]
+    I --> J[触发发布构建]
+    J --> K[GitHub Release]
+```
 
 ### 分支工作流程
 
@@ -21,25 +76,19 @@ AGI.Captor 采用基于 GitVersion 的自动版本计算策略，结合 Git 分�
 gitgraph
     commit id: "Initial"
     branch main
-    commit id: "Feature A"
-    commit id: "Feature B"
-    branch features/new-feature
-    commit id: "Work 1"
-    commit id: "Work 2"
+    commit id: "v1.2.0" tag: "v1.2.0"
+    branch feature/new-ui
+    commit id: "UI Work 1"
+    commit id: "UI Work 2"
     checkout main
-    merge features/new-feature
-    branch release
-    commit id: "Release prep"
-    commit id: "Version 1.3.0" tag: "v1.3.0"
-    commit id: "Version 1.3.1" tag: "v1.3.1"
+    merge feature/new-ui
+    commit id: "v1.3.0" tag: "v1.3.0"
+    branch hotfix/security-fix  
+    commit id: "Security patch"
     checkout main
-    merge release
+    merge hotfix/security-fix
+    commit id: "v1.3.1" tag: "v1.3.1"
 ```
-
-**说明**: 
-- 使用固定的 `release` 分支而非版本特定分支（如 `release/1.3.0`）
-- 版本号通过 Git 标签管理，自动从最新标签递增补丁版本
-- Release 分支可以持续接收更新并自动发布新版本
 
 ## 🏷️ 版本号格式
 
@@ -48,27 +97,44 @@ gitgraph
 主版本.次版本.修订版本[-预发布标识符][+构建元数据]
 ```
 
-### 示例版本号
+### 版本号示例
+
+| 场景 | 版本格式 | 示例 |
+|------|---------|------|
+| 正式发布 | `X.Y.Z` | `1.3.0` |
+| 预发布 | `X.Y.Z-preview.N` | `1.3.0-preview.1` |
+| 热修复 | `X.Y.Z-hotfix.N` | `1.2.4-hotfix.1` |
+| 开发构建 | `X.Y.Z-preview.N+Sha.abcd123` | `1.3.0-preview.1+Sha.abc1234` |
+
+## 📝 Conventional Commits 集成
+
+### 提交消息格式影响版本计算
+
+GitVersion 可以解析 Conventional Commits 格式来智能确定版本增量：
+
 ```bash
-# 开发版本 (main分支)
-1.3.0-alpha.1+Branch.main.Sha.abc1234
+# 功能增加 → Minor 版本增量
+feat(ui): add new dashboard layout
+# 1.2.3 → 1.3.0
 
-# 功能分支版本
-1.3.0-autoupdate.1+Branch.features-autoupdate.Sha.def5678
+# 问题修复 → Patch 版本增量  
+fix(auth): resolve login timeout issue
+# 1.2.3 → 1.2.4
 
-# 发布版本 (release分支/标签)
-1.3.0
-
-# 热修复版本
-1.3.1-hotfix.1+Branch.hotfix-critical-fix.Sha.ghi9012
+# 破坏性变更 → Major 版本增量
+feat(api)!: redesign REST endpoints
+# 或在提交正文中包含 "BREAKING CHANGE:"
+# 1.2.3 → 2.0.0
 ```
 
-## 📝 提交消息控制版本增量
+### 支持的提交类型
 
-### 提交消息格式
-在提交消息中使用特殊标记来控制版本增量：
-
-```bash
+| 类型 | 版本影响 | 说明 |
+|------|---------|------|
+| `feat:` | Minor | 新功能 |
+| `fix:` | Patch | 错误修复 |
+| `!` 后缀或 `BREAKING CHANGE:` | Major | 破坏性变更 |
+| `chore:`, `docs:`, `style:` | None | 不影响版本号 |
 # 主版本增量 (破坏性变更)
 git commit -m "feat: new API +semver:breaking"
 git commit -m "refactor: change interface +semver:major"
@@ -223,29 +289,120 @@ Console.WriteLine($"Informational: {informationalVersion}");
 
 ### 常见问题和解决方案
 
-#### 1. GitVersion 配置错误
+#### 1. GitVersion 工具问题
 ```bash
-# 错误: Property 'xxx' not found
-# 解决: 检查 GitVersion.yml 语法
+# 安装 GitVersion 工具
+dotnet tool install --global GitVersion.Tool --version 5.12.0
 
-# 验证配置
-dotnet gitversion /verbosity Diagnostic
+# 验证安装
+dotnet tool list --global | grep gitversion
+
+# 更新工具
+dotnet tool update --global GitVersion.Tool
 ```
 
-#### 2. 版本号不正确
+#### 2. 版本计算错误
 ```bash
-# 检查当前分支和提交
-git branch
-git log --oneline -5
-
-# 检查 GitVersion 计算
+# 检查 GitVersion 配置
 dotnet gitversion /showconfig
+
+# 详细诊断信息
+dotnet gitversion /verbosity diagnostic
+
+# 查看特定版本变量
+dotnet gitversion /showvariable SemVer
+dotnet gitversion /showvariable FullSemVer
 ```
 
-#### 3. 构建失败
+#### 3. 分支策略问题
+```bash
+# 检查当前分支状态
+git branch -v
+git status
+
+# 查看最近的标签
+git tag -l --sort=-version:refname | head -5
+
+# 检查分支历史
+git log --oneline --graph -10
+```
+
+#### 4. 版本号重复
+```bash
+# 查看现有标签
+git tag -l | sort -V
+
+# 删除错误的标签
+git tag -d v1.2.3
+git push origin :refs/tags/v1.2.3
+```
+
+### 调试工具
+
+#### 本地版本验证
+```bash
+# 完整版本信息
+dotnet gitversion
+
+# JSON 格式输出
+dotnet gitversion /output json
+
+# 特定信息查询
+dotnet gitversion /showvariable SemVer
+dotnet gitversion /showvariable FullSemVer
+dotnet gitversion /showvariable BranchName
+dotnet gitversion /showvariable CommitsSinceVersionSource
+```
+
+#### 构建问题诊断
 ```powershell
 # 清理并重新构建
-./build.ps1 Clean
+./build.ps1 Clean Build
+
+# 检查构建输出
+./build.ps1 Build --verbosity detailed
+
+# 验证版本注入
+dotnet build --verbosity normal | findstr Version
+```
+
+## 🎯 最佳实践
+
+### 1. 版本发布前检查清单
+- [ ] 运行完整测试套件
+- [ ] 验证 GitVersion 计算的版本号
+- [ ] 检查分支状态和提交历史
+- [ ] 确认没有未提交的更改
+- [ ] 使用 dry run 模式验证发布流程
+
+### 2. 分支管理策略
+- 保持 main 分支的稳定性
+- 功能开发使用 `feature/` 前缀分支
+- 紧急修复使用 `hotfix/` 前缀分支
+- 及时清理已合并的分支
+
+### 3. 标签管理规范
+- 仅通过自动化工作流创建版本标签
+- 避免手动修改或删除版本标签
+- 保持标签历史的清洁和连续性
+- 使用有意义的标签注释信息
+
+### 4. 提交消息规范
+- 使用 Conventional Commits 格式
+- 明确标注破坏性变更
+- 提供清晰的变更描述
+- 关联相关的 Issue 或 PR
+
+## 📚 相关文档
+
+- [发布工作流指南](./release-workflow.md)
+- [测试架构文档](./testing-architecture.md)
+- [构建系统说明](./build-system.md)
+- [项目状态报告](./project-status.md)
+
+---
+
+*本文档会随着项目发展持续更新，请定期查看最新版本。*
 ./build.ps1 Build
 ```
 

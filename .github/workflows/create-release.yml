@@ -4,16 +4,6 @@ name: Create Release Tag
 on:
   workflow_dispatch:
     inputs:
-      version_increment:
-        description: '版本增量类型'
-        required: true
-        default: 'auto'
-        type: choice
-        options:
-          - auto       # 根据提交消息自动决定
-          - patch      # 修订版本 (1.0.0 → 1.0.1)
-          - minor      # 次版本 (1.0.0 → 1.1.0)  
-          - major      # 主版本 (1.0.0 → 2.0.0)
       prerelease:
         description: '是否为预发布版本'
         required: false
@@ -68,83 +58,65 @@ jobs:
         
         # Install GitVersion tool if not available
         try {
-          $gitVersionOutput = dotnet gitversion 2>$null
+          $null = dotnet tool list --global | Select-String "gitversion"
+          if (-not $?) {
+            throw "GitVersion not found"
+          }
           Write-Host "✅ GitVersion already available"
         } catch {
           Write-Host "📦 Installing GitVersion tool..."
-          dotnet tool install --global GitVersion.Tool
+          dotnet tool install --global GitVersion.Tool --version 5.12.0
         }
         
-        # Get current version information
-        $gitVersion = dotnet gitversion | ConvertFrom-Json
+        # Get current version information with error handling
+        try {
+          $gitVersionJson = dotnet gitversion --output json
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitVersion execution failed with exit code $LASTEXITCODE"
+          }
+          
+          $gitVersion = $gitVersionJson | ConvertFrom-Json
+          
+          Write-Host "📋 Current Version Information:"
+          Write-Host "  SemVer: $($gitVersion.SemVer)"
+          Write-Host "  FullSemVer: $($gitVersion.FullSemVer)"
+          Write-Host "  Major: $($gitVersion.Major)"
+          Write-Host "  Minor: $($gitVersion.Minor)"
+          Write-Host "  Patch: $($gitVersion.Patch)"
+          Write-Host "  BranchName: $($gitVersion.BranchName)"
+          Write-Host "  CommitsSinceVersionSource: $($gitVersion.CommitsSinceVersionSource)"
+          
+        } catch {
+          Write-Host "❌ Error getting GitVersion information: $($_.Exception.Message)"
+          Write-Host "📋 GitVersion output:"
+          dotnet gitversion
+          exit 1
+        }
         
-        Write-Host "📋 Current Version Information:"
-        Write-Host "  SemVer: $($gitVersion.SemVer)"
-        Write-Host "  FullSemVer: $($gitVersion.FullSemVer)"
-        Write-Host "  Major: $($gitVersion.Major)"
-        Write-Host "  Minor: $($gitVersion.Minor)"
-        Write-Host "  Patch: $($gitVersion.Patch)"
-        Write-Host "  BranchName: $($gitVersion.BranchName)"
-        Write-Host "  CommitsSinceVersionSource: $($gitVersion.CommitsSinceVersionSource)"
-        
-        # Determine version increment
-        $increment = "${{ github.event.inputs.version_increment }}"
+        # Use GitVersion calculated version
         $isPrerelease = "${{ github.event.inputs.prerelease }}" -eq "true"
         
-        Write-Host "🎯 Version increment: $increment"
-        Write-Host "🔄 Is prerelease: $isPrerelease"
-        
-        # Calculate new version based on increment type
-        $major = [int]$gitVersion.Major
-        $minor = [int]$gitVersion.Minor
-        $patch = [int]$gitVersion.Patch
-        
-        switch ($increment) {
-          "major" {
-            $major++
-            $minor = 0
-            $patch = 0
-            Write-Host "📈 Major version increment: $major.$minor.$patch"
-          }
-          "minor" {
-            $minor++
-            $patch = 0
-            Write-Host "📈 Minor version increment: $major.$minor.$patch"
-          }
-          "patch" {
-            $patch++
-            Write-Host "📈 Patch version increment: $major.$minor.$patch"
-          }
-          "auto" {
-            # Use GitVersion's calculated next version
-            # Check recent commits for conventional commit patterns
-            $recentCommits = git log --oneline -10
-            $hasBreaking = $recentCommits | Where-Object { $_ -match "BREAKING CHANGE|!:" }
-            $hasFeature = $recentCommits | Where-Object { $_ -match "^[a-f0-9]+ feat(\(.*\))?:" }
-            
-            if ($hasBreaking) {
-              $major++
-              $minor = 0
-              $patch = 0
-              Write-Host "📈 Auto: Breaking changes detected, major increment: $major.$minor.$patch"
-            } elseif ($hasFeature) {
-              $minor++
-              $patch = 0
-              Write-Host "📈 Auto: Features detected, minor increment: $major.$minor.$patch"
-            } else {
-              $patch++
-              Write-Host "📈 Auto: Patch increment: $major.$minor.$patch"
-            }
-          }
-        }
-        
-        # Construct version string
-        $newVersion = "$major.$minor.$patch"
+        # Determine version to use
         if ($isPrerelease) {
-          $newVersion += "-preview.1"
+          # For prerelease, use FullSemVer or add preview suffix
+          if ($gitVersion.FullSemVer -match "-") {
+            $newVersion = $gitVersion.FullSemVer
+          } else {
+            $newVersion = "$($gitVersion.SemVer)-preview.1"
+          }
+          $actualPrerelease = $true
+        } else {
+          # For stable release, use SemVer
+          $newVersion = $gitVersion.SemVer
+          $actualPrerelease = $gitVersion.FullSemVer -match "-(alpha|beta|rc|preview)"
         }
         
         $tagName = "v$newVersion"
+        
+        Write-Host "🎯 Version determination:"
+        Write-Host "  Requested prerelease: $isPrerelease"
+        Write-Host "  Actual prerelease: $actualPrerelease"
+        Write-Host "  Final version: $newVersion"
         
         # Check if tag already exists
         $existingTag = git tag -l $tagName
@@ -158,13 +130,14 @@ jobs:
         # Output version information
         echo "version=$newVersion" >> $env:GITHUB_OUTPUT
         echo "tag-name=$tagName" >> $env:GITHUB_OUTPUT
-        echo "is-prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
-        echo "increment=$increment" >> $env:GITHUB_OUTPUT
+        echo "is-prerelease=$actualPrerelease" >> $env:GITHUB_OUTPUT
+        echo "gitversion-semver=$($gitVersion.SemVer)" >> $env:GITHUB_OUTPUT
+        echo "gitversion-fullsemver=$($gitVersion.FullSemVer)" >> $env:GITHUB_OUTPUT
         
         Write-Host ""
         Write-Host "🏷️ New Release Version: $newVersion"
         Write-Host "🔖 Tag Name: $tagName"
-        Write-Host "🔄 Is Prerelease: $isPrerelease"
+        Write-Host "🔄 Is Prerelease: $actualPrerelease"
         
         # Show what will be included in this release
         $lastTag = git describe --tags --abbrev=0 2>$null
@@ -172,6 +145,9 @@ jobs:
           Write-Host ""
           Write-Host "📝 Changes since last release ($lastTag):"
           git log --oneline "$lastTag..HEAD" | ForEach-Object { Write-Host "  $_" }
+        } else {
+          Write-Host ""
+          Write-Host "📝 This will be the first release"
         }
         
     - name: 🏷️ Create and push tag
@@ -185,7 +161,7 @@ jobs:
         Write-Host "🚀 Creating release tag: $tagName"
         
         # Create annotated tag with release information
-        $tagMessage = "Release $version`n`nAuto-generated release tag created by GitHub Actions.`nIncrement type: ${{ steps.version.outputs.increment }}`nPrerelease: $isPrerelease`nCreated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')`n`nThis tag will trigger the automated release build process."
+        $tagMessage = "Release $version`n`nAuto-generated release tag created by GitHub Actions.`nPrerelease: $isPrerelease`nCreated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')`n`nThis tag will trigger the automated release build process."
         
         git tag -a $tagName -m $tagMessage
         
@@ -206,7 +182,6 @@ jobs:
         Write-Host "Calculated version: ${{ steps.version.outputs.version }}"
         Write-Host "Tag name: ${{ steps.version.outputs.tag-name }}"
         Write-Host "Is prerelease: ${{ steps.version.outputs.is-prerelease }}"
-        Write-Host "Increment type: ${{ steps.version.outputs.increment }}"
         Write-Host ""
         Write-Host "To create this release, run this workflow again with 'Dry run' unchecked."
         
