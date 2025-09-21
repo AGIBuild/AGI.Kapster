@@ -2,74 +2,87 @@
 
 ## 📋 概述
 
-AGI.Captor 采用自动化的发布流程，支持多种发布触发方式和全自动的跨平台构建。本文档详细描述了当前的发布工作流程。
+AGI.Captor 采用基于 GitVersion 的自动化发布流程，通过 GitHub Actions 实现智能版本管理和全自动跨平台构建发布。
+
+## 🔧 核心组件
+
+### 1. GitVersion 集成
+- **配置文件**: `GitVersion.yml`
+- **版本策略**: 基于分支和提交历史的智能版本计算
+- **语义化版本**: 严格遵循 SemVer 规范
+
+### 2. 自动化工作流
+- **创建标签**: `.github/workflows/create-release.yml` - GitVersion 驱动的标签创建
+- **发布构建**: `.github/workflows/release.yml` - 标签触发的自动发布
+- **持续集成**: `.github/workflows/ci.yml` - 代码质量保证
 
 ## 🚀 发布触发方式
 
 ### 1. 自动创建标签（推荐）
-```bash
-# 在 GitHub Actions 页面触发 "Create Release Tag" 工作流
-# 选择版本增量类型：auto/patch/minor/major
-# 系统会自动使用 GitVersion 计算版本号并创建标签
-```
-- 使用 GitVersion 自动计算版本号，遵循 SemVer 规范
-- 支持自动检测提交类型决定版本增量
-- 可选择手动指定版本增量类型
-- 支持预发布版本和干运行模式
+通过 GitHub Actions 触发 "Create Release Tag" 工作流：
+
+**工作流参数**:
+- `prerelease`: 是否为预发布版本 (boolean)
+- `dry_run`: 仅计算版本不创建标签 (boolean)
+
+**工作流程**:
+1. GitVersion 分析当前代码状态
+2. 计算符合 SemVer 规范的版本号
+3. 验证版本标签的唯一性
+4. 创建带注释的 Git 标签
+5. 自动触发发布构建流程
 
 ### 2. 手动创建标签
 ```bash
-# 创建版本标签
+# 创建版本标签（遵循 v{SemVer} 格式）
 git tag v1.4.0
 git push origin v1.4.0
 ```
-- 使用标签名作为版本号
-- 支持预发布标签（包含 alpha、beta、rc、preview 的自动识别为预发布）
-- 确保版本号一致性
+- 支持任何符合 SemVer 格式的标签
+- 预发布标签自动识别（包含 alpha、beta、rc、preview）
+- 立即触发自动发布流程
 
-### 3. 手动触发发布（GitHub Actions）
-在 GitHub Actions 页面手动触发 Release 工作流：
-- 可指定自定义版本标签
-- 可选择是否为预发布版本
-- 适用于临时或测试发布
-
-**注意**: 推荐使用自动创建标签的方式，这样可以确保版本号的一致性和规范性。
+**重要**: 推荐使用自动创建标签方式，确保版本号的一致性和可预测性。
 
 ## 🏗️ 发布流程详解
 
-### 阶段 1: 准备发布 (prepare-release)
+### 阶段 1: 版本计算与标签创建
+**工作流**: `.github/workflows/create-release.yml`
+
+**功能**:
+- GitVersion 分析当前代码状态和分支策略
+- 计算符合语义化版本规范的版本号
+- 验证版本标签的唯一性和有效性
+- 创建带版本信息的 Git 标签
+- 推送标签到远程仓库
+
+**版本计算逻辑**:
+```
+GitVersion 配置 + 分支策略 + 提交历史 → 计算版本号
+├── main/release 分支: Patch 增量
+├── feature/* 分支: Minor 增量 + preview 标签
+└── hotfix/* 分支: Patch 增量 + hotfix 标签
+```
+
+### 阶段 2: 自动发布构建
+**工作流**: `.github/workflows/release.yml`
+**触发**: 推送版本标签 (v*.*.*)
+
+#### 2.1 准备发布 (prepare-release)
 - **环境**: Ubuntu Latest
 - **功能**: 
-  - 确定发布版本号（从标签或手动输入）
-  - 设置预发布标志
-  - 生成版本号变量供构建使用
+  - 从标签解析版本号和预发布状态
+  - 标准化版本号格式
+  - 设置构建环境变量
   - 输出版本信息供后续阶段使用
 
-**版本确定逻辑**:
-```
-Create Release Tag 工作流 → GitVersion 计算 → 创建标签 → 触发 Release 构建
-手动创建标签 → 使用标签版本
-手动触发 → 使用输入的标签
-```
-
-### 自动版本计算规则
-
-**GitVersion 增量类型**:
-- `auto`: 根据最近提交自动决定增量类型
-  - 检测到 `BREAKING CHANGE` 或 `!:` → 主版本增量
-  - 检测到 `feat:` → 次版本增量  
-  - 其他情况 → 修订版本增量
-- `patch`: 强制修订版本增量 (1.0.0 → 1.0.1)
-- `minor`: 强制次版本增量 (1.0.0 → 1.1.0)
-- `major`: 强制主版本增量 (1.0.0 → 2.0.0)
-
-### 阶段 2: 构建和测试 (build-and-test)
+#### 2.2 构建和测试 (build-and-test)
 - **环境**: Ubuntu Latest
 - **功能**:
-  - 完整的构建和单元测试
-  - 使用统一的版本号进行构建
-  - 生成测试报告和覆盖率报告
-  - 支持灵活的构建脚本（build.ps1 → build.sh → dotnet 命令）
+  - 完整的构建和单元测试流程
+  - 使用统一版本号进行构建
+  - 生成测试报告和代码覆盖率
+  - 支持灵活的构建脚本策略
 
 **构建脚本优先级**:
 1. `./build.ps1` (PowerShell 脚本)
