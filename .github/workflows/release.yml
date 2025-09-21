@@ -167,7 +167,10 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: 🔧 Setup WiX Toolset
       shell: pwsh
@@ -184,9 +187,24 @@ jobs:
     - name: 📦 Build and package
       shell: pwsh
       run: |
-        ./build.ps1 Clean
-        ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests
-        ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }}
+        # Choose appropriate build script for Windows
+        if (Test-Path "./build.ps1") {
+          Write-Host "Using build.ps1 script"
+          ./build.ps1 Clean
+          ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests
+          ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }}
+        } elseif (Test-Path "./build.sh") {
+          Write-Host "Using build.sh script"
+          # Use pwsh to call bash script on Windows
+          bash -c "chmod +x ./build.sh && ./build.sh Clean && ./build.sh Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests && ./build.sh Package --configuration Release --rids win-${{ matrix.arch }}"
+        } else {
+          Write-Host "Using dotnet commands directly"
+          dotnet clean
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r win-${{ matrix.arch }} --self-contained true -o artifacts/publish/win-${{ matrix.arch }}
+          # Create simple zip package as fallback
+          New-Item -ItemType Directory -Path artifacts/packages -Force
+          Compress-Archive -Path artifacts/publish/win-${{ matrix.arch }}/* -DestinationPath artifacts/packages/AGI.Captor-win-${{ matrix.arch }}.zip
+        }
         
     - name: 📤 Upload release assets
       uses: actions/upload-artifact@v4
@@ -212,14 +230,33 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: 📦 Build and package
       shell: bash
       run: |
-        ./build.sh Clean
-        ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests
-        ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }}
+        # Choose appropriate build script for macOS
+        if [ -f "./build.sh" ]; then
+          echo "Using build.sh script"
+          chmod +x ./build.sh
+          ./build.sh Clean
+          ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests
+          ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }}
+        elif [ -f "./build.ps1" ]; then
+          echo "Using build.ps1 script via pwsh"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids osx-${{ matrix.arch }}"
+        else
+          echo "Using dotnet commands directly"
+          dotnet clean
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r osx-${{ matrix.arch }} --self-contained true -o artifacts/publish/osx-${{ matrix.arch }}
+          # Create package directory
+          mkdir -p artifacts/packages
+          cd artifacts/publish/osx-${{ matrix.arch }}
+          zip -r ../../packages/AGI.Captor-osx-${{ matrix.arch }}.zip .
+        fi
         
     - name: 📤 Upload release assets
       uses: actions/upload-artifact@v4
@@ -245,14 +282,33 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: 📦 Build and package
       shell: bash
       run: |
-        ./build.sh Clean
-        ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests
-        ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }}
+        # Choose appropriate build script for Linux
+        if [ -f "./build.sh" ]; then
+          echo "Using build.sh script"
+          chmod +x ./build.sh
+          ./build.sh Clean
+          ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests
+          ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }}
+        elif [ -f "./build.ps1" ]; then
+          echo "Using build.ps1 script via pwsh"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids linux-${{ matrix.arch }}"
+        else
+          echo "Using dotnet commands directly"
+          dotnet clean
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r linux-${{ matrix.arch }} --self-contained true -o artifacts/publish/linux-${{ matrix.arch }}
+          # Create package directory
+          mkdir -p artifacts/packages
+          cd artifacts/publish/linux-${{ matrix.arch }}
+          tar -czf ../../packages/AGI.Captor-linux-${{ matrix.arch }}.tar.gz .
+        fi
         
     - name: 📤 Upload release assets
       uses: actions/upload-artifact@v4
