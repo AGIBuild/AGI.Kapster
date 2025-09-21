@@ -3,8 +3,7 @@ name: Release Build & Publish
 # 发布分支和标签的正式发布构建
 on:
   push:
-    branches: [ 'release' ]  # 固定使用 release 分支
-    tags: [ 'v*' ]
+    tags: [ 'v*' ]  # 只在版本标签推送时触发
   workflow_dispatch:
     inputs:
       tag:
@@ -30,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      version-number: ${{ steps.version.outputs.version-number }}
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
       
     steps:
@@ -49,33 +49,15 @@ jobs:
         if ("${{ github.event_name }}" -eq "workflow_dispatch") {
           $version = "${{ github.event.inputs.tag }}"
           $isPrerelease = "${{ github.event.inputs.prerelease }}"
-          Write-Host "Using workflow_dispatch inputs"
+          Write-Host "Using workflow_dispatch inputs: $version"
         } elseif ("${{ github.ref_type }}" -eq "tag") {
           $version = "${{ github.ref_name }}"
           $isPrerelease = if ($version -match "-(alpha|beta|rc|preview)") { "true" } else { "false" }
           Write-Host "Using tag version: $version"
         } else {
-          # Release branch build - use GitVersion or extract from latest tag
-          Write-Host "Building from release branch"
-          
-          # Try to get the latest tag
-          $latestTag = git describe --tags --abbrev=0 2>$null
-          if ($latestTag) {
-            # Increment patch version for release branch builds
-            if ($latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
-              $major = $matches[1]
-              $minor = $matches[2]
-              $patch = [int]$matches[3] + 1
-              $version = "v$major.$minor.$patch"
-              Write-Host "Auto-incremented version from latest tag: $version"
-            } else {
-              $version = "v1.3.0"
-              Write-Host "Using default version: $version"
-            }
-          } else {
-            $version = "v1.3.0"
-            Write-Host "No tags found, using default version: $version"
-          }
+          # This should not happen with current trigger configuration
+          Write-Host "ERROR: Unexpected trigger condition"
+          $version = "v1.3.0"
           $isPrerelease = "false"
         }
         
@@ -84,10 +66,15 @@ jobs:
           $version = "v$version"
         }
         
+        # Export version without 'v' prefix for build scripts
+        $versionNumber = $version -replace "^v", ""
+        
         echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "version-number=$versionNumber" >> $env:GITHUB_OUTPUT
         echo "is-prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
         
         Write-Host "🏷️ Release Version: $version"
+        Write-Host "🔢 Version Number: $versionNumber"
         Write-Host "🔄 Is Prerelease: $isPrerelease"
 
   build-and-test:
@@ -111,26 +98,32 @@ jobs:
         
     - name: 🏗️ Full build and test
       shell: pwsh
+      env:
+        VERSION: ${{ needs.prepare-release.outputs.version-number }}
+        RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
+        Write-Host "Building with version: $env:VERSION"
+        Write-Host "Release version: $env:RELEASE_VERSION"
+        
         # Choose appropriate build script based on availability
         if (Test-Path "./build.ps1") {
           Write-Host "Using build.ps1 script"
           ./build.ps1 Clean
           ./build.ps1 Restore
-          ./build.ps1 Build --configuration Release
+          ./build.ps1 Build --configuration Release --version $env:VERSION
           ./build.ps1 Test --configuration Release --coverage
         } elseif (Test-Path "./build.sh") {
           Write-Host "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
           ./build.sh Restore
-          ./build.sh Build --configuration Release
+          ./build.sh Build --configuration Release --version $env:VERSION
           ./build.sh Test --configuration Release --coverage
         } else {
           Write-Host "Using dotnet commands directly"
           dotnet clean
           dotnet restore
-          dotnet build --configuration Release --no-restore
+          dotnet build --configuration Release --no-restore -p:Version=$env:VERSION
           dotnet test --configuration Release --no-build --verbosity normal
         }
         
@@ -186,24 +179,30 @@ jobs:
         
     - name: 📦 Build and package
       shell: pwsh
+      env:
+        VERSION: ${{ needs.prepare-release.outputs.version-number }}
+        RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
+        Write-Host "Building Windows ${{ matrix.arch }} with version: $env:VERSION"
+        Write-Host "Release version: $env:RELEASE_VERSION"
+        
         # Choose appropriate build script for Windows
         if (Test-Path "./build.ps1") {
           Write-Host "Using build.ps1 script"
           ./build.ps1 Clean
-          ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests
-          ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }}
+          ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests --version $env:VERSION
+          ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }} --version $env:VERSION
         } elseif (Test-Path "./build.sh") {
           Write-Host "Using build.sh script"
           # Use pwsh to call bash script on Windows
-          bash -c "chmod +x ./build.sh && ./build.sh Clean && ./build.sh Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests && ./build.sh Package --configuration Release --rids win-${{ matrix.arch }}"
+          bash -c "chmod +x ./build.sh && ./build.sh Clean && ./build.sh Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests --version $env:VERSION && ./build.sh Package --configuration Release --rids win-${{ matrix.arch }} --version $env:VERSION"
         } else {
           Write-Host "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r win-${{ matrix.arch }} --self-contained true -o artifacts/publish/win-${{ matrix.arch }}
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r win-${{ matrix.arch }} --self-contained true -o artifacts/publish/win-${{ matrix.arch }} -p:Version=$env:VERSION
           # Create simple zip package as fallback
           New-Item -ItemType Directory -Path artifacts/packages -Force
-          Compress-Archive -Path artifacts/publish/win-${{ matrix.arch }}/* -DestinationPath artifacts/packages/AGI.Captor-win-${{ matrix.arch }}.zip
+          Compress-Archive -Path artifacts/publish/win-${{ matrix.arch }}/* -DestinationPath artifacts/packages/AGI.Captor-$env:VERSION-win-${{ matrix.arch }}.zip
         }
         
     - name: 📤 Upload release assets
@@ -237,25 +236,31 @@ jobs:
         
     - name: 📦 Build and package
       shell: bash
+      env:
+        VERSION: ${{ needs.prepare-release.outputs.version-number }}
+        RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
+        echo "Building macOS ${{ matrix.arch }} with version: $VERSION"
+        echo "Release version: $RELEASE_VERSION"
+        
         # Choose appropriate build script for macOS
         if [ -f "./build.sh" ]; then
           echo "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
-          ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests
-          ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }}
+          ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests --version $VERSION
+          ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }} --version $VERSION
         elif [ -f "./build.ps1" ]; then
           echo "Using build.ps1 script via pwsh"
-          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids osx-${{ matrix.arch }}"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests --version $env:VERSION; ./build.ps1 Package --configuration Release --rids osx-${{ matrix.arch }} --version $env:VERSION"
         else
           echo "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r osx-${{ matrix.arch }} --self-contained true -o artifacts/publish/osx-${{ matrix.arch }}
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r osx-${{ matrix.arch }} --self-contained true -o artifacts/publish/osx-${{ matrix.arch }} -p:Version=$VERSION
           # Create package directory
           mkdir -p artifacts/packages
           cd artifacts/publish/osx-${{ matrix.arch }}
-          zip -r ../../packages/AGI.Captor-osx-${{ matrix.arch }}.zip .
+          zip -r ../../packages/AGI.Captor-$VERSION-osx-${{ matrix.arch }}.zip .
         fi
         
     - name: 📤 Upload release assets
@@ -289,25 +294,31 @@ jobs:
         
     - name: 📦 Build and package
       shell: bash
+      env:
+        VERSION: ${{ needs.prepare-release.outputs.version-number }}
+        RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
+        echo "Building Linux ${{ matrix.arch }} with version: $VERSION"
+        echo "Release version: $RELEASE_VERSION"
+        
         # Choose appropriate build script for Linux
         if [ -f "./build.sh" ]; then
           echo "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
-          ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests
-          ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }}
+          ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests --version $VERSION
+          ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }} --version $VERSION
         elif [ -f "./build.ps1" ]; then
           echo "Using build.ps1 script via pwsh"
-          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids linux-${{ matrix.arch }}"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests --version $env:VERSION; ./build.ps1 Package --configuration Release --rids linux-${{ matrix.arch }} --version $env:VERSION"
         else
           echo "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r linux-${{ matrix.arch }} --self-contained true -o artifacts/publish/linux-${{ matrix.arch }}
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r linux-${{ matrix.arch }} --self-contained true -o artifacts/publish/linux-${{ matrix.arch }} -p:Version=$VERSION
           # Create package directory
           mkdir -p artifacts/packages
           cd artifacts/publish/linux-${{ matrix.arch }}
-          tar -czf ../../packages/AGI.Captor-linux-${{ matrix.arch }}.tar.gz .
+          tar -czf ../../packages/AGI.Captor-$VERSION-linux-${{ matrix.arch }}.tar.gz .
         fi
         
     - name: 📤 Upload release assets
@@ -341,21 +352,16 @@ jobs:
         
         Write-Host "🎯 Processing release artifacts for version: $version"
         
-        # Process all downloaded artifacts
+        # Process all downloaded artifacts - files should already have correct naming
         Get-ChildItem "release-artifacts" -Directory | ForEach-Object {
           $platformDir = $_.FullName
           Write-Host "📂 Processing: $($_.Name)"
           
           Get-ChildItem "$platformDir" -File -Recurse | ForEach-Object {
             $file = $_
-            $newName = if ($file.Name -notmatch $version) {
-              $file.Name -replace "(.+)(\..+)$", "`$1-$version`$2"
-            } else {
-              $file.Name
-            }
-            
-            Copy-Item $file.FullName "$releaseDir/$newName"
-            Write-Host "  ✅ $newName"
+            # Files should already have correct version naming from build scripts
+            Copy-Item $file.FullName "$releaseDir/$($file.Name)"
+            Write-Host "  ✅ $($file.Name)"
           }
         }
         

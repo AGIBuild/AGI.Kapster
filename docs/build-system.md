@@ -43,19 +43,22 @@ AGI.Captor 项目已成功升级为使用 **Nuke 构建系统**，实现了更�
 
 ### 主要工作流
 1. **ci.yml** - 主 CI/CD 流程
-   - 构建信息提取
-   - 多平台测试和构建
-   - 自动化发布
+   - 构建信息提取和版本计算
+   - 多平台测试和构建 (Ubuntu/Windows/macOS)
+   - 安全扫描 (CodeQL)
+   - 预览版本构建 (main 分支)
 
-2. **dev.yml** - 开发工作流
+2. **release.yml** - 生产发布流程
+   - 自动版本管理（标签递增）
+   - 跨平台发布构建 (Windows/macOS/Linux x64+ARM64)
+   - 自动创建 GitHub Release
+   - 支持多种触发方式（release分支/标签/手动）
+
+3. **dev.yml** - 开发工作流 *(如果存在)*
    - 快速验证构建
    - 当前平台测试
 
-3. **release.yml** - 生产发布
-   - 完整多平台构建
-   - GitHub Release 发布
-
-4. **quality.yml** - 代码质量检查
+4. **quality.yml** - 代码质量检查 *(如果存在)*
    - 安全扫描
    - 依赖分析
    - 性能测试
@@ -77,7 +80,28 @@ AGI.Captor 项目已成功升级为使用 **Nuke 构建系统**，实现了更�
 - 🔐 GitHub Releases 集成
 - ⚙️ 环境配置控制
 
-## 📚 技术栈
+## � 发布工作流
+
+### 发布触发方式
+1. **推送到 release 分支** - 自动递增版本发布
+2. **创建版本标签** - 指定版本发布
+3. **手动触发** - GitHub Actions 手动触发
+
+### 发布产物
+- **Windows**: .msi 安装包 (x64, ARM64)
+- **macOS**: .pkg 安装包 (Intel, Apple Silicon)  
+- **Linux**: .tar.gz 压缩包 (x64, ARM64)
+
+### 技术特性
+- ✅ 自动版本管理和递增
+- ✅ 跨平台并行构建
+- ✅ 灵活构建脚本支持 (PowerShell/Bash/dotnet)
+- ✅ .NET 9.0 预览版 + 8.0 LTS 回退
+- ✅ 自动创建 GitHub Release
+
+**详细发布流程**: 参考 [Release Workflow Guide](./release-workflow.md)
+
+## �📚 技术栈
 
 - **构建系统**: Nuke Build
 - **测试框架**: xUnit + FluentAssertions + NSubstitute
