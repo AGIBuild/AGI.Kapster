@@ -75,8 +75,9 @@ jobs:
         # Function to check if GitVersion is available
         function Test-GitVersion {
           try {
-            $result = & dotnet gitversion --version 2>&1
-            return $LASTEXITCODE -eq 0
+            # Try to run GitVersion and check if it produces valid output
+            $result = & dotnet gitversion 2>&1
+            return $LASTEXITCODE -eq 0 -and (-not [string]::IsNullOrWhiteSpace($result))
           } catch {
             return $false
           }
@@ -125,16 +126,8 @@ jobs:
         try {
           Write-Host "📊 Executing GitVersion..."
           
-          # First try to run GitVersion with verbose output for debugging
-          Write-Host "🔍 GitVersion configuration check:"
-          & dotnet gitversion --showconfig
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "⚠️ GitVersion config check failed, but continuing..."
-          }
-          
-          # Get the actual version information
-          $gitVersionJson = & dotnet gitversion --output json 2>&1
+          # GitVersion 6.x outputs JSON by default, no need for --output json parameter
+          $gitVersionJson = & dotnet gitversion 2>&1
           
           if ($LASTEXITCODE -ne 0) {
             throw "GitVersion execution failed with exit code $LASTEXITCODE. Output: $gitVersionJson"
@@ -190,8 +183,8 @@ jobs:
           Write-Host "    dotnet-gitversion exists: $(Test-Path "$env:HOME/.dotnet/tools/dotnet-gitversion")"
           
           Write-Host ""
-          Write-Host "📋 Raw GitVersion diagnostic output:"
-          & dotnet gitversion --verbosity Diagnostic 2>&1
+          Write-Host "📋 Raw GitVersion output attempt:"
+          & dotnet gitversion 2>&1
           
           exit 1
         }
