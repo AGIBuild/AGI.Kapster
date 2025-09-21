@@ -36,7 +36,10 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: ⚙️ Configure Git for GitVersion
       run: |
@@ -78,7 +81,10 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: ⚙️ Configure Git for GitVersion
       run: |
@@ -88,8 +94,23 @@ jobs:
     - name: 🔨 Build and Test
       shell: pwsh
       run: |
-        ./build.ps1 Clean
-        ./build.ps1 Build Test --coverage
+        # Choose appropriate build script based on availability
+        if (Test-Path "./build.ps1") {
+          Write-Host "Using build.ps1 script"
+          ./build.ps1 Clean
+          ./build.ps1 Build Test --coverage
+        } elseif (Test-Path "./build.sh") {
+          Write-Host "Using build.sh script"
+          chmod +x ./build.sh
+          ./build.sh Clean
+          ./build.sh Build Test --coverage
+        } else {
+          Write-Host "Using dotnet commands directly"
+          dotnet clean
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+          dotnet test --configuration Release --no-build --verbosity normal
+        }
         
     - name: 📊 Upload test results
       uses: actions/upload-artifact@v4
@@ -128,7 +149,10 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: ⚙️ Configure Git for GitVersion
       run: |
@@ -138,8 +162,21 @@ jobs:
     - name: 🔨 Build and Publish
       shell: pwsh
       run: |
-        ./build.ps1 Clean
-        ./build.ps1 Publish --rids ${{ matrix.platform }}
+        # Choose appropriate build script based on availability
+        if (Test-Path "./build.ps1") {
+          Write-Host "Using build.ps1 script"
+          ./build.ps1 Clean
+          ./build.ps1 Publish --rids ${{ matrix.platform }}
+        } elseif (Test-Path "./build.sh") {
+          Write-Host "Using build.sh script"
+          chmod +x ./build.sh
+          ./build.sh Clean
+          ./build.sh Publish --rids ${{ matrix.platform }}
+        } else {
+          Write-Host "Using dotnet commands directly"
+          dotnet clean
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r ${{ matrix.platform }} --self-contained true -o artifacts/publish/${{ matrix.platform }}
+        }
         
     - name: 📦 Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -151,11 +188,8 @@ jobs:
   security-scan:
     name: 🔒 Security Scan
     runs-on: ubuntu-latest
-    needs: [build-windows, build-macos]
-    # Run when a GitHub Release is published, or when a tag starting with 'v' is pushed
-    if: |
-      github.event_name == 'release' || 
-      startsWith(github.ref, 'refs/tags/v')
+    needs: [build-info, test-and-quality]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     
@@ -168,7 +202,10 @@ jobs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
         
     - name: ⚙️ Configure Git for GitVersion
       run: |
@@ -183,7 +220,18 @@ jobs:
     - name: 🔨 Build for analysis
       shell: pwsh
       run: |
-        ./build.ps1 Build
+        # Choose appropriate build script based on availability
+        if (Test-Path "./build.ps1") {
+          Write-Host "Using build.ps1 script"
+          ./build.ps1 Build
+        } elseif (Test-Path "./build.sh") {
+          Write-Host "Using build.sh script"
+          chmod +x ./build.sh
+          ./build.sh Build
+        } else {
+          Write-Host "Using dotnet commands directly"
+          dotnet build --configuration Release
+        }
         
     - name: 🔍 Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
@@ -191,7 +239,7 @@ jobs:
   preview-summary:
     name: 📋 Preview Summary
     runs-on: ubuntu-latest
-    needs: [build-info, test-and-quality, build-preview, security-scan]
+    needs: [build-info, test-and-quality, build-preview]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -203,7 +251,6 @@ jobs:
         Write-Host "Version: ${{ needs.build-info.outputs.version }}"
         Write-Host "Build: ${{ needs.build-info.outputs.build-number }}"
         Write-Host "Tests: ${{ needs.test-and-quality.result }}"
-        Write-Host "Security: ${{ needs.security-scan.result }}"
         Write-Host "Preview Builds: ${{ needs.build-preview.result }}"
         Write-Host ""
         Write-Host "✅ Ready for release branch creation!"

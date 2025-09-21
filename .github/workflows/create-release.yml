@@ -1,0 +1,229 @@
+name: Create Release Tag
+
+# 创建发布标签工作流 - 使用 GitVersion 自动计算版本号
+on:
+  workflow_dispatch:
+    inputs:
+      version_increment:
+        description: '版本增量类型'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto       # 根据提交消息自动决定
+          - patch      # 修订版本 (1.0.0 → 1.0.1)
+          - minor      # 次版本 (1.0.0 → 1.1.0)  
+          - major      # 主版本 (1.0.0 → 2.0.0)
+      prerelease:
+        description: '是否为预发布版本'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: '仅计算版本号，不创建标签'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  create-release-tag:
+    name: 📋 Create Release Tag
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+          ${{ env.DOTNET_VERSION }}
+        dotnet-quality: 'preview'
+        
+    - name: ⚙️ Configure Git
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+    - name: 📊 Calculate version with GitVersion
+      id: version
+      shell: pwsh
+      run: |
+        Write-Host "🔍 Calculating version using GitVersion..."
+        
+        # Install GitVersion tool if not available
+        try {
+          $gitVersionOutput = dotnet gitversion 2>$null
+          Write-Host "✅ GitVersion already available"
+        } catch {
+          Write-Host "📦 Installing GitVersion tool..."
+          dotnet tool install --global GitVersion.Tool
+        }
+        
+        # Get current version information
+        $gitVersion = dotnet gitversion | ConvertFrom-Json
+        
+        Write-Host "📋 Current Version Information:"
+        Write-Host "  SemVer: $($gitVersion.SemVer)"
+        Write-Host "  FullSemVer: $($gitVersion.FullSemVer)"
+        Write-Host "  Major: $($gitVersion.Major)"
+        Write-Host "  Minor: $($gitVersion.Minor)"
+        Write-Host "  Patch: $($gitVersion.Patch)"
+        Write-Host "  BranchName: $($gitVersion.BranchName)"
+        Write-Host "  CommitsSinceVersionSource: $($gitVersion.CommitsSinceVersionSource)"
+        
+        # Determine version increment
+        $increment = "${{ github.event.inputs.version_increment }}"
+        $isPrerelease = "${{ github.event.inputs.prerelease }}" -eq "true"
+        
+        Write-Host "🎯 Version increment: $increment"
+        Write-Host "🔄 Is prerelease: $isPrerelease"
+        
+        # Calculate new version based on increment type
+        $major = [int]$gitVersion.Major
+        $minor = [int]$gitVersion.Minor
+        $patch = [int]$gitVersion.Patch
+        
+        switch ($increment) {
+          "major" {
+            $major++
+            $minor = 0
+            $patch = 0
+            Write-Host "📈 Major version increment: $major.$minor.$patch"
+          }
+          "minor" {
+            $minor++
+            $patch = 0
+            Write-Host "📈 Minor version increment: $major.$minor.$patch"
+          }
+          "patch" {
+            $patch++
+            Write-Host "📈 Patch version increment: $major.$minor.$patch"
+          }
+          "auto" {
+            # Use GitVersion's calculated next version
+            # Check recent commits for conventional commit patterns
+            $recentCommits = git log --oneline -10
+            $hasBreaking = $recentCommits | Where-Object { $_ -match "BREAKING CHANGE|!:" }
+            $hasFeature = $recentCommits | Where-Object { $_ -match "^[a-f0-9]+ feat(\(.*\))?:" }
+            
+            if ($hasBreaking) {
+              $major++
+              $minor = 0
+              $patch = 0
+              Write-Host "📈 Auto: Breaking changes detected, major increment: $major.$minor.$patch"
+            } elseif ($hasFeature) {
+              $minor++
+              $patch = 0
+              Write-Host "📈 Auto: Features detected, minor increment: $major.$minor.$patch"
+            } else {
+              $patch++
+              Write-Host "📈 Auto: Patch increment: $major.$minor.$patch"
+            }
+          }
+        }
+        
+        # Construct version string
+        $newVersion = "$major.$minor.$patch"
+        if ($isPrerelease) {
+          $newVersion += "-preview.1"
+        }
+        
+        $tagName = "v$newVersion"
+        
+        # Check if tag already exists
+        $existingTag = git tag -l $tagName
+        if ($existingTag) {
+          Write-Host "❌ Tag $tagName already exists!"
+          Write-Host "Existing tags:"
+          git tag -l | Sort-Object | ForEach-Object { Write-Host "  $_" }
+          exit 1
+        }
+        
+        # Output version information
+        echo "version=$newVersion" >> $env:GITHUB_OUTPUT
+        echo "tag-name=$tagName" >> $env:GITHUB_OUTPUT
+        echo "is-prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+        echo "increment=$increment" >> $env:GITHUB_OUTPUT
+        
+        Write-Host ""
+        Write-Host "🏷️ New Release Version: $newVersion"
+        Write-Host "🔖 Tag Name: $tagName"
+        Write-Host "🔄 Is Prerelease: $isPrerelease"
+        
+        # Show what will be included in this release
+        $lastTag = git describe --tags --abbrev=0 2>$null
+        if ($lastTag) {
+          Write-Host ""
+          Write-Host "📝 Changes since last release ($lastTag):"
+          git log --oneline "$lastTag..HEAD" | ForEach-Object { Write-Host "  $_" }
+        }
+        
+    - name: 🏷️ Create and push tag
+      if: github.event.inputs.dry_run != 'true'
+      shell: pwsh
+      run: |
+        $tagName = "${{ steps.version.outputs.tag-name }}"
+        $version = "${{ steps.version.outputs.version }}"
+        $isPrerelease = "${{ steps.version.outputs.is-prerelease }}"
+        
+        Write-Host "🚀 Creating release tag: $tagName"
+        
+        # Create annotated tag with release information
+        $tagMessage = "Release $version`n`nAuto-generated release tag created by GitHub Actions.`nIncrement type: ${{ steps.version.outputs.increment }}`nPrerelease: $isPrerelease`nCreated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')`n`nThis tag will trigger the automated release build process."
+        
+        git tag -a $tagName -m $tagMessage
+        
+        Write-Host "📤 Pushing tag to remote repository..."
+        git push origin $tagName
+        
+        Write-Host "✅ Tag $tagName created and pushed successfully!"
+        Write-Host ""
+        Write-Host "🔄 This will automatically trigger the Release Build & Publish workflow."
+        Write-Host "📊 Monitor the progress at: https://github.com/${{ github.repository }}/actions"
+        
+    - name: 📋 Dry run summary
+      if: github.event.inputs.dry_run == 'true'
+      shell: pwsh
+      run: |
+        Write-Host "🔍 DRY RUN - No tag was created"
+        Write-Host "======================================"
+        Write-Host "Calculated version: ${{ steps.version.outputs.version }}"
+        Write-Host "Tag name: ${{ steps.version.outputs.tag-name }}"
+        Write-Host "Is prerelease: ${{ steps.version.outputs.is-prerelease }}"
+        Write-Host "Increment type: ${{ steps.version.outputs.increment }}"
+        Write-Host ""
+        Write-Host "To create this release, run this workflow again with 'Dry run' unchecked."
+        
+    - name: 📊 Output summary
+      shell: pwsh
+      run: |
+        $dryRun = "${{ github.event.inputs.dry_run }}" -eq "true"
+        
+        if (-not $dryRun) {
+          Write-Host "🎉 Release tag creation completed!"
+          Write-Host "=================================="
+          Write-Host "Version: ${{ steps.version.outputs.version }}"
+          Write-Host "Tag: ${{ steps.version.outputs.tag-name }}"
+          Write-Host "Prerelease: ${{ steps.version.outputs.is-prerelease }}"
+          Write-Host ""
+          Write-Host "🔄 Next steps:"
+          Write-Host "1. The Release Build & Publish workflow will start automatically"
+          Write-Host "2. Monitor progress in the Actions tab"
+          Write-Host "3. Release will be published to GitHub Releases when complete"
+        }

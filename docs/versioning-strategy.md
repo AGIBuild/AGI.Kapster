@@ -12,7 +12,7 @@ AGI.Captor 采用基于 GitVersion 的自动版本计算策略，结合 Git 分�
 |---------|---------|---------|---------|---------|
 | **main** | `main`, `master` | `alpha` | `Minor` | `1.3.0-alpha.1+sha` |
 | **feature** | `features/*`, `feature/*` | `branch-name` | `Inherit` | `1.3.0-autoupdate.1+sha` |
-| **release** | `releases/*`, `release/*` | *无* | `None` | `1.3.0` |
+| **release** | `release` | *无* | `Auto-increment` | `1.3.1` (从标签自动递增) |
 | **hotfix** | `hotfix/*`, `hotfixes/*` | `hotfix` | `Patch` | `1.3.1-hotfix.1+sha` |
 
 ### 分支工作流程
@@ -28,12 +28,18 @@ gitgraph
     commit id: "Work 2"
     checkout main
     merge features/new-feature
-    branch release/1.3.0
+    branch release
     commit id: "Release prep"
     commit id: "Version 1.3.0" tag: "v1.3.0"
+    commit id: "Version 1.3.1" tag: "v1.3.1"
     checkout main
-    merge release/1.3.0
+    merge release
 ```
+
+**说明**: 
+- 使用固定的 `release` 分支而非版本特定分支（如 `release/1.3.0`）
+- 版本号通过 Git 标签管理，自动从最新标签递增补丁版本
+- Release 分支可以持续接收更新并自动发布新版本
 
 ## 🏷️ 版本号格式
 
@@ -131,34 +137,44 @@ dotnet gitversion /updateassemblyinfo
 ### Git 标签和发布
 
 ```bash
-# 创建发布分支
-git checkout -b release/1.3.0
-
-# 创建发布标签
-git tag v1.3.0
-git push origin v1.3.0
+# 创建特定版本标签（推荐方式）
+git tag v1.4.0
+git push origin v1.4.0  # 使用标签版本发布
 
 # 查看所有标签
 git tag -l
 
 # 删除标签（如果需要）
-git tag -d v1.3.0
-git push origin :refs/tags/v1.3.0
+git tag -d v1.4.0
+git push origin :refs/tags/v1.4.0
 ```
+
+**发布策略说明**:
+- **标签发布**: 创建版本标签进行精确版本控制（推荐）
+- **手动触发**: 在 GitHub Actions 页面手动触发发布
 
 ## 🚀 CI/CD 工作流程
 
 ### 开发流程 (main分支)
 1. **推送到main分支** → 触发 `ci.yml`
 2. **自动构建测试** → 生成预览版本
-3. **版本格式**: `1.3.0-alpha.X+sha`
+3. **安全扫描** → CodeQL 分析
+4. **版本格式**: `1.3.0-alpha.X+sha`
 
-### 发布流程 (release分支)
-1. **创建release分支** → `git checkout -b release/1.3.0`
-2. **推送分支** → 触发 `release.yml`
-3. **创建标签** → `git tag v1.3.0 && git push origin v1.3.0`
-4. **自动发布** → 生成正式版本
-5. **版本格式**: `1.3.0`
+### 发布流程 (版本标签)
+1. **方式一: 标签发布** 
+   ```bash
+   git tag v1.4.0
+   git push origin v1.4.0  # 使用指定版本发布
+   ```
+2. **方式二: 手动触发** → GitHub Actions 页面手动触发
+3. **自动构建** → 跨平台构建 (Windows/macOS/Linux)
+4. **自动发布** → 创建 GitHub Release
+5. **版本格式**: `1.4.0` (正式版本)
+
+**注意**: 不再支持通过推送 release 分支触发发布，必须使用标签或手动触发。
+
+**详细发布流程请参考**: [Release Workflow Guide](./release-workflow.md)
 
 ## 📊 版本信息获取
 
