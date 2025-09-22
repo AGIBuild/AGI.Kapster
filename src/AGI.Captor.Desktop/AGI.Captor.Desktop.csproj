@@ -1,3 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,17 +14,16 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <!-- Disable AOT for easier packaging and deployment -->
     <PublishAot>False</PublishAot>
-    
     <!-- Version Information -->
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-    <Version>1.2.0</Version>
+    <AssemblyVersion>2025.922.90115</AssemblyVersion>
+    <FileVersion>2025.922.90115</FileVersion>
+    <Version>2025.922.90115</Version>
     <Product>AGI Captor</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
+    <InformationalVersion>2025.922.90115</InformationalVersion>
   </PropertyGroup>
-
   <!-- macOS App Bundle Configuration -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
     <CFBundleName>AGI Captor</CFBundleName>
@@ -44,8 +44,6 @@
   <ItemGroup>
     <Content Include="logo.ico" />
   </ItemGroup>
-
-
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.5" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.5" />
@@ -69,7 +67,6 @@
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -81,13 +78,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
   <ItemGroup>
     <Folder Include="Properties\" />
   </ItemGroup>
-
   <ItemGroup>
     <AvaloniaResource Include="logo.ico" />
   </ItemGroup>
-
 </Project>

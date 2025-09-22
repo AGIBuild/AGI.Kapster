@@ -25,13 +25,15 @@
       "type": "string",
       "enum": [
         "Build",
+        "CheckVersionLocked",
         "Clean",
         "Info",
         "Package",
         "Publish",
         "Restore",
         "Run",
-        "Test"
+        "Test",
+        "UpgradeVersion"
       ]
     },
     "Verbosity": {
@@ -136,6 +138,10 @@
         "MacSigningIdentity": {
           "type": "string",
           "description": "Code signing identity for macOS (Developer ID Application: Your Name)"
+        },
+        "NewVersion": {
+          "type": "string",
+          "description": "Manual new version (format: yyyy.MMdd.HHmmss or compact yyyy.MMd.HHmmss without leading zero segments). If omitted auto-generate"
         },
         "Rids": {
           "type": "string",
