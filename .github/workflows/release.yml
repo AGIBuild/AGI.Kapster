@@ -134,9 +134,10 @@ jobs:
         cache-key-suffix: '-release'
         
     - name: 🔒 Validate locked version
+      shell: pwsh
       run: |
-        if [ ! -f version.json ]; then echo 'version.json missing'; exit 1; fi
-        ./build.sh CheckVersionLocked || (echo 'CheckVersionLocked failed' && exit 1)
+        if (-not (Test-Path version.json)) { Write-Host 'version.json missing'; exit 1 }
+        ./build.ps1 CheckVersionLocked
         
     - name: � Full Build and Test
       uses: ./.github/actions/build-and-test

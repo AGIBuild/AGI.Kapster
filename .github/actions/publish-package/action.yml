@@ -35,28 +35,12 @@ runs:
           $publishArgs += " --skip-tests"
         }
         
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Clean
-          ./build.ps1 Publish $publishArgs
-        } elseif (Test-Path "./build.sh") {
-          chmod +x ./build.sh
-          ./build.sh Clean  
-          ./build.sh Publish $publishArgs
-        } else {
-          dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c ${{ inputs.configuration }} -r ${{ inputs.runtime-id }} --self-contained true -o artifacts/publish/${{ inputs.runtime-id }}
-        }
+        ./build.ps1 Clean
+        ./build.ps1 Publish $publishArgs
         
     - name: 📦 Create packages
       if: inputs.package == 'true'
       shell: pwsh
       run: |
         $packageArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
-        
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Package $packageArgs
-        } elseif (Test-Path "./build.sh") {
-          ./build.sh Package $packageArgs
-        } else {
-          Write-Host "⚠️ No build script found, skipping packaging"
-        }
+        ./build.ps1 Package $packageArgs

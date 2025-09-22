@@ -43,7 +43,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run CheckVersionLocked
-        run: ./build.sh CheckVersionLocked
+        shell: pwsh
+        run: ./build.ps1 CheckVersionLocked
 
       - name: Ensure tag not exists
         run: |

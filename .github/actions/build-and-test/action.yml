@@ -41,27 +41,12 @@ runs:
           
     - name: 📦 Restore dependencies
       shell: pwsh
-      run: |
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Restore
-        } elseif (Test-Path "./build.sh") {
-          chmod +x ./build.sh
-          ./build.sh Restore
-        } else {
-          dotnet restore
-        }
+      run: ./build.ps1 Restore
         
     - name: 🔨 Build project
       id: build
       shell: pwsh
-      run: |
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Build --configuration ${{ inputs.configuration }}
-        } elseif (Test-Path "./build.sh") {
-          ./build.sh Build --configuration ${{ inputs.configuration }}
-        } else {
-          dotnet build --configuration ${{ inputs.configuration }} --no-restore
-        }
+      run: ./build.ps1 Build --configuration ${{ inputs.configuration }}
         
     - name: 🧪 Run tests
       id: test
@@ -72,11 +57,4 @@ runs:
         if ("${{ inputs.enable-coverage }}" -eq "true") {
           $testArgs += " --coverage"
         }
-        
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Test $testArgs
-        } elseif (Test-Path "./build.sh") {
-          ./build.sh Test $testArgs
-        } else {
-          dotnet test --configuration ${{ inputs.configuration }} --no-build --verbosity normal
-        }
+        ./build.ps1 Test $testArgs
