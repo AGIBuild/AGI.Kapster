@@ -28,23 +28,23 @@
 ```
 
 规则更新：
-1. `version`（Display）采用四段结构：`YYYY.M.D.HHmmss`（月日无前导零，时间固定 6 位）。
-2. `assemblyVersion` = `Year.Month.Day.Hour`（满足 CLR 四段且各段 <= 65535）。
-3. `fileVersion` = `Year.Month.Day.(Minute*100 + Second)`（精度到秒，范围 0..5959）。
-4. `informationalVersion` 与 Display 完全一致（保留完整 HHmmss 追溯）。
+1. `version`（Display）采用四段结构：`YYYY.M.D.HHmm`（月日无前导零，时间固定 4 位）。
+2. `assemblyVersion` = Display（所有版本字段统一）。
+3. `fileVersion` = Display（所有版本字段统一）。
+4. `informationalVersion` = Display（所有版本字段统一）。
 5. `.csproj` 中对应字段由 Nuke 写回，不得手动编辑。
 6. 发布标签名仍使用 `v<version>`（即四段 Display 版本）。
-7. 守卫：Display 正则 + 派生一致性 + csproj 对齐。
+7. 守卫：Display 正则 + 版本字段一致性。
 
 Display 正则：
 ```
-^\d{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d[0-5]\d$
+^\d{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$
 ```
 
 结构分段（Display 四段）：
 ```
-YYYY . M . D . HHmmss
-│      │   │    └─ 24h 时间六位（小时两位+分两位+秒两位）
+YYYY . M . D . HHmm
+│      │   │    └─ 24h 时间四位（小时两位+分两位）
 │      │   └─ 日 (1-31 无前导零)
 │      └─ 月 (1-12 无前导零)
 └─ 年
@@ -87,10 +87,10 @@ informational   = 2025.9.22.070405
 ## 🏷️ 版本号格式（Time-based Display）
 
 ```
-YYYY.M.D.HHmmss
+YYYY.M.D.HHmm
 ```
 
-示例：`2025.9.22.154759`
+示例：`2025.9.22.1547`
 
 优势：
 - 线性时序即可判定新旧

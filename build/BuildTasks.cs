@@ -378,9 +378,6 @@ class BuildTasks : NukeBuild
         }
     }
 
-    /// <summary>
-    /// Create MSI using WiX v4+
-    /// </summary>
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
         var wxsFile = WindowsPackagingDirectory / "AGI.Captor.v4.wxs";
@@ -469,9 +466,6 @@ class BuildTasks : NukeBuild
         }
     }
 
-    /// <summary>
-    /// Create portable ZIP package
-    /// </summary>
     void CreatePortableZip(AbsolutePath publishPath, string rid, string version)
     {
         var zipName = $"AGI.Captor-{version}-{rid}-portable.zip";
@@ -491,9 +485,6 @@ class BuildTasks : NukeBuild
         Console.WriteLine($"✅ Created: {zipPath}");
     }
 
-    /// <summary>
-    /// Create macOS packages based on specified formats
-    /// </summary>
     void CreateMacPackage(AbsolutePath publishPath, string rid)
     {
         try
@@ -611,9 +602,6 @@ class BuildTasks : NukeBuild
         }
     }
 
-    /// <summary>
-    /// Run macOS notarization process
-    /// </summary>
     void RunMacNotarization(string version)
     {
         var scriptPath = MacPackagingDirectory / "notarize.sh";
@@ -637,9 +625,6 @@ class BuildTasks : NukeBuild
         }
     }
 
-    /// <summary>
-    /// Create Linux DEB and RPM packages
-    /// </summary>
     void CreateLinuxPackage(AbsolutePath publishPath, string rid)
     {
         try

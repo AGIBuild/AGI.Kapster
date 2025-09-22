@@ -103,14 +103,11 @@ xcrun stapler validate *.pkg
 - 发布前产物清单与 SHA256 严格匹配
 
 ## 🔄 版本管理策略
-- Display 格式：`YYYY.M.D.HHmmss`（四段，月日无前导零，最后一段固定 6 位时间）
-- 通过 `UpgradeVersion --lock` 原子更新并写入：`version`, `assemblyVersion`, `fileVersion`, `informationalVersion`
+- Display 格式：`YYYY.M.D.HHmm`（四段，月日无前导零，最后一段固定 4 位时间）
+- 通过 `UpgradeVersion --lock` 原子更新并写入：所有版本字段统一
 - 禁止手动编辑 `version.json` / `.csproj` 中相关字段（Nuke 自动同步）
-- 派生规则：
-  - `assemblyVersion = Year.Month.Day.Hour`
-  - `fileVersion = Year.Month.Day.(Minute*100 + Second)`
-  - `informationalVersion = Display`
-- 约束：所有 Assembly/File 版本段值 <= 65535，确保 CLR 合法；`Minute*100+Second` 范围 0..5959 安全。
+- 统一规则：所有版本字段（`version`/`assemblyVersion`/`fileVersion`/`informationalVersion`）使用相同值
+- 约束：所有版本段值 <= 65535，确保 CLR 合法；分钟级精度降低冲突概率。
 
 ## 🛠 典型问题排查
 | 问题 | 可能原因 | 处理 |
