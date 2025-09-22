@@ -35,7 +35,8 @@ jobs:
           VERSION=$(jq -r '.version' version.json)
           # Pattern: YYYY.(month+day).(hour+mmss)
           # month+day: 3-4 digits; hour+mmss: 5-6 digits
-          if ! echo "$VERSION" | grep -Eq '^[0-9]{4}\.[0-9]{0,1}[0-9]{2}\.[0-9]{1,2}[0-9]{4}$'; then
+          # Regex stricter: Year '.' (month+day 3-4 digits) '.' (hour+mmss 5-6 digits)
+          if ! echo "$VERSION" | grep -Eq '^[0-9]{4}\.[1-9][0-9]{2,3}\.[0-9]{1,2}[0-9]{4}$'; then
             echo "Invalid version format: $VERSION" >&2
             exit 1
           fi
@@ -50,8 +51,14 @@ jobs:
       - name: Ensure tag not exists
         run: |
           TAG=v$VERSION
+          # Local check
           if git rev-parse -q --verify refs/tags/$TAG >/dev/null; then
-            echo "Tag $TAG already exists" >&2
+            echo "Tag $TAG already exists locally" >&2
+            exit 1
+          fi
+          # Remote check (race-safe)
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists on remote" >&2
             exit 1
           fi
 
