@@ -141,7 +141,7 @@
         },
         "NewVersion": {
           "type": "string",
-          "description": "Manual new version (format: yyyy.MMdd.HHmmss or compact yyyy.MMd.HHmmss without leading zero segments). If omitted auto-generate"
+          "description": "Manual new version (display format: yyyy.M.d.HHmmss — month/day no leading zero, time HHmmss). If omitted auto-generate"
         },
         "Rids": {
           "type": "string",

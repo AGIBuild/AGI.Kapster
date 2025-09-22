@@ -16,8 +16,6 @@
     <PackageReference Include="Nuke.Common" Version="9.0.4" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageDownload Include="GitVersion.Tool" Version="[6.4.0]" />
-  </ItemGroup>
+  <!-- GitVersion removed: no dynamic versioning tool required -->
 
 </Project>

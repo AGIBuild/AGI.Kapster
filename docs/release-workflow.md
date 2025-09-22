@@ -2,67 +2,119 @@
 
 ## 📋 概述
 
-AGI.Captor 采用基于 GitVersion 的自动化发布流程，通过 GitHub Actions 实现智能版本管理和全自动跨平台构建发布。
+AGI.Captor 发布流程已升级为 **“锁定版本 + 标签驱动”** 的确定性模型：
 
-## 🔧 核心组件
+- 不再使用 GitVersion 动态计算版本。
+- 版本通过 Nuke 目标 `UpgradeVersion` 生成并写入根目录 `version.json`，随后**锁定**。
+- 创建发布标签前必须确保：标签名 `v<version>` 与 `version.json` 内字段完全一致。
+- 仅当推送符合规则的版本标签时才执行完整跨平台发布。
+- 工作流内实施并发互斥、祖先校验、产物完整性与 SHA256 清单验证、分类变更日志生成。
 
-### 1. GitVersion 集成
-- **配置文件**: `GitVersion.yml`
-- **版本策略**: 基于分支和提交历史的智能版本计算
-- **语义化版本**: 严格遵循 SemVer 规范
+## 🔧 核心组件（新版）
 
-### 2. 自动化工作流
-- **创建标签**: `.github/workflows/create-release.yml` - GitVersion 驱动的标签创建
-- **发布构建**: `.github/workflows/release.yml` - 标签触发的自动发布
-- **持续集成**: `.github/workflows/ci.yml` - 代码质量保证
+### 1. 锁定时间序列版本 (Time-based Locked Version)
+- **来源**: 运行 `./build.ps1 UpgradeVersion --lock`（或对应 Nuke 目标）生成。
+- **文件**: `version.json`（唯一可信源，含统一的版本字段）。
+- **Display 格式**: `YYYY.M.D.HHmm` （示例：`2025.9.22.1547`）。
+   - 正则校验：`^\d{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$`
+   - 所有版本字段（`version`/`assemblyVersion`/`fileVersion`/`informationalVersion`）均使用相同值。
+   - 时间冲突概率极低；若同分钟生成可手动调整或等待。
+- **锁定机制**: 生成后必须提交。`CheckVersionLocked` / `verify-version` 工作流阻止未锁定或篡改。
 
-## 🚀 发布触发方式
+### 2. 工作流
+- **创建标签**: `.github/workflows/create-release.yml` 仅负责读取已经锁定的 `version.json`，验证并创建注释标签 `v<version>`。
+- **发布构建**: `.github/workflows/release.yml` 由标签触发，执行构建、打包、完整性校验与 GitHub Release 发布。
+- **版本校验**: `.github/workflows/verify-version.yml`（PR 守卫），确保 PR 不引入未锁定版本与非法格式。
 
-### 1. 自动创建标签（推荐）
-通过 GitHub Actions 触发 "Create Release Tag" 工作流：
+### 3. 并发与祖先控制
+- 通过 `concurrency: group: release-${{ github.ref }} cancel-in-progress: true` 防止同一标签重复执行。
+- 早期步骤校验标签 commit 是否为 `release` 分支可达（祖先校验），防止脱离发布分支的野生标签。
 
-**工作流参数**:
-- `prerelease`: 是否为预发布版本 (boolean)
-- `dry_run`: 仅计算版本不创建标签 (boolean)
+### 4. 分类变更日志 (Categorized Changelog)
+- 解析自上一个版本标签以来的提交消息。
+- 根据前缀（`feat:`, `fix:`, `refactor:`, `perf:`, `docs:`, `build:` 等）分组。
+- 生成临时文件（`CHANGELOG_BODY.md`）并以 `body_path` 方式传入 `gh release create`，屏蔽 GitHub 自动生成说明。
 
-**工作流程**:
-1. GitVersion 分析当前代码状态
-2. 计算符合 SemVer 规范的版本号
-3. 验证版本标签的唯一性
-4. 创建带注释的 Git 标签
-5. 自动触发发布构建流程
+### 5. 产物完整性与清单
+- 验证所有预期 RID 目录是否存在（如：`win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`）。
+- 缺失即失败（快速反馈）。
+- 汇总文件至统一目录 `final-release/`。
+- 生成 `SHASUMS-<version>.txt`（按文件名排序）。
+- 将 SHA256 清单与发布资产一起上传，并在发布说明中附“Integrity”区块。
 
-### 2. 手动创建标签
-```bash
-# 创建版本标签（遵循 v{SemVer} 格式）
-git tag v1.4.0
-git push origin v1.4.0
+### 6. 已移除内容
+- GitVersion 逻辑与动态增量策略。
+- 重复的 `create-release-tag.yml` 旧工作流。
+- 多分散平台 Job：现以矩阵统一生成。
+
+### 7. 提交规范
+- 仍建议使用 Conventional Commits，以便分类 changelog 更清晰；但不再驱动版本号。
+
+### 8. 安全
+- 限制权限（`contents: write` + 最小化）。
+- 校验输入版本与目录结构，拒绝伪造产物。
+
+## 🚀 发布触发方式（新版）
+
+仅支持“锁定版本 + 匹配标签”路径：
+
+1. 运行升级锁定：
+```powershell
+./build.ps1 UpgradeVersion --lock
+git add version.json
+git commit -m "build(version): lock version <new-version>"
 ```
-- 支持任何符合 SemVer 格式的标签
-- 预发布标签自动识别（包含 alpha、beta、rc、preview）
-- 立即触发自动发布流程
-
-**重要**: 推荐使用自动创建标签方式，确保版本号的一致性和可预测性。
-
-## 🏗️ 发布流程详解
-
-### 阶段 1: 版本计算与标签创建
-**工作流**: `.github/workflows/create-release.yml`
-
-**功能**:
-- GitVersion 分析当前代码状态和分支策略
-- 计算符合语义化版本规范的版本号
-- 验证版本标签的唯一性和有效性
-- 创建带版本信息的 Git 标签
-- 推送标签到远程仓库
-
-**版本计算逻辑**:
+2. 创建匹配标签（必须从 `release` 分支最新提交或其祖先上执行）
+```powershell
+git tag v<new-version>
+git push origin v<new-version>
 ```
-GitVersion 配置 + 分支策略 + 提交历史 → 计算版本号
-├── main/release 分支: Patch 增量
-├── feature/* 分支: Minor 增量 + preview 标签
-└── hotfix/* 分支: Patch 增量 + hotfix 标签
-```
+3. 推送标签后自动触发 `release.yml`。
+4. 工作流将再次校验：标签 = `version.json`，结构完整，产物齐全。
+
+（可选）使用 `.github/workflows/create-release.yml` 在 GitHub Actions 中触发“Create Release Tag”——它不会计算版本，只会读取已锁定版本并创建标签。
+
+## 🏗️ 发布流程详解（新版）
+
+### 阶段 0: 锁定版本
+开发者在主仓库执行 `UpgradeVersion`。版本写入并锁定于 `version.json` —— 未提交或修改将被 PR 守卫拒绝。
+
+### 阶段 1: 创建标签
+执行 `.github/workflows/create-release.yml`（或手动本地 tag）：
+- 读取 `version.json` → 得到 `<ver>`
+- 校验本地是否已存在同名标签
+- 创建注释标签 `v<ver>` 并推送
+
+### 阶段 2: 触发发布 (`release.yml`)
+事件：`push` 到 `refs/tags/v*`。
+- 并发防重：同标签重复触发会被自动取消早期运行。
+- 祖先校验：确保标签 commit 位于 `origin/release` 历史之内。
+- 读取并复核 `version.json` 与标签一致。
+
+### 阶段 3: 构建与测试
+统一 Job 执行核心构建与测试，输出基础工件（中间层）。
+
+### 阶段 4: 多 RID 打包（矩阵）
+矩阵包含所有需支持的运行时标识（win/linux/osx × x64/arm64）。
+输出隔离存放：`artifacts/packages/by-rid/<rid>/...`。
+
+### 阶段 5: 汇总与验证
+- 收集所有矩阵产物
+- 验证期望 RID 集是否全部存在
+- 生成 `final-release/` 聚合目录
+- 计算 SHA256 → 生成 `SHASUMS-<ver>.txt`
+
+### 阶段 6: 生成分类变更日志
+- 获取上一个版本标签（若存在）到当前标签之间提交
+- 按类别分组并写入 `CHANGELOG_BODY.md`
+- 附加 Integrity 部分 (hash manifest)
+
+### 阶段 7: 创建 GitHub Release
+- 使用 `gh release create v<ver> final-release/* --title "AGI.Captor <ver>" --draft=false --notes-file CHANGELOG_BODY.md`
+- 上传所有安装包与 `SHASUMS-<ver>.txt`
+
+### 阶段 8: 完成与清理
+保留最终产物，清理中间输出。
 
 ### 阶段 2: 自动发布构建
 **工作流**: `.github/workflows/release.yml`
@@ -123,7 +175,7 @@ GitVersion 配置 + 分支策略 + 提交历史 → 计算版本号
 - **功能**: 清理中间构建产物
 - **保留**: 最终发布的安装包（90天）
 
-## 📦 发布产物
+## 📦 发布产物（新版统一命名示例）
 
 ### Windows
 - `AGI.Captor-v{version}-win-x64.msi` - Windows 64位安装程序
@@ -155,56 +207,29 @@ GitVersion 配置 + 分支策略 + 提交历史 → 计算版本号
 
 ## 🎯 发布最佳实践
 
-### 1. 使用自动版本管理（推荐）
-```bash
-# 在 GitHub 仓库的 Actions 页面
-# 1. 选择 "Create Release Tag" 工作流
-# 2. 点击 "Run workflow"
-# 3. 选择版本增量类型或使用 "auto"
-# 4. 点击 "Run workflow" 开始
-```
+### 1. 明确版本唯一来源
+仅 `version.json`；不要手动编辑项目文件内的 AssemblyVersion（构建会同步）。
 
 ### 2. 提交消息规范
-遵循约定式提交格式，以便 GitVersion 正确计算版本：
-```bash
-# 修订版本增量
-git commit -m "fix: 修复内存泄漏问题"
-git commit -m "docs: 更新 README"
-
-# 次版本增量  
-git commit -m "feat: 添加自动更新功能"
-git commit -m "feat(ui): 新增设置页面"
-
-# 主版本增量
-git commit -m "feat!: 重构 API 接口"
-git commit -m "feat: 更改配置格式 BREAKING CHANGE: 配置文件格式已更改"
-```
+仍推荐 Conventional Commits（用于 changelog 分类，而非驱动版本号）。
 
 ### 3. 发布前检查
-```bash
-# 确保代码已推送到 release 分支
+```powershell
 git checkout release
-git pull origin release
-
-# 检查 GitVersion 当前计算的版本
-dotnet gitversion
-
-# 查看自上次发布以来的更改
+git pull --ff-only
+pwsh ./build.ps1 CheckVersionLocked
+pwsh ./build.ps1 UpgradeVersion --dryrun   # （可选：估计下一个时间基版本，不写入）
 git log --oneline $(git describe --tags --abbrev=0)..HEAD
 ```
 
-### 3. 预发布测试
-```bash
-# 创建预发布版本进行测试
-git tag v1.4.0-beta.1
-git push origin v1.4.0-beta.1
-```
+### 4. 预发布策略
+当前模型不鼓励附加 `-beta` 等后缀（时间基版本已保证唯一性）。如需临时测试，可使用分支构建工件而非发布标签。
 
-### 4. 发布验证
-发布完成后验证：
-- GitHub Release 页面检查所有安装包
-- 下载并测试各平台安装包
-- 验证自动更新功能
+### 5. 发布验证
+确认：
+- Release 页面存在所有 RID 产物 + `SHASUMS-<ver>.txt`
+- 校验：`sha256sum -c SHASUMS-<ver>.txt`（Windows 可用 `Get-FileHash` + 对比）
+- 下载主要平台测试启动与更新检查
 
 ## 🔄 自动更新机制
 
@@ -214,7 +239,7 @@ git push origin v1.4.0-beta.1
 - **支持平台**: Windows, macOS, Linux
 - **更新源**: GitHub Releases
 
-## 🐛 故障排除
+## 🐛 故障排除（新增场景）
 
 ### 常见问题
 
@@ -223,76 +248,57 @@ git push origin v1.4.0-beta.1
    dotnet tool install --global wix
    ```
 
-2. **构建脚本不存在**
-   - 自动回退到 dotnet 命令
-   - 检查 build.ps1 或 build.sh 文件
+2. **版本不匹配**
+   - 标签 `vX` 与 `version.json` 不一致 → 工作流直接失败
+   - 解决：更新并锁定版本后重新打标签
+
+3. **缺失 RID 目录**
+   - 某个平台打包失败 → 汇总验证阶段失败
+   - 解决：查看对应矩阵 Job 日志修复，再重新推送标签（删除旧标签后重建）
+
+4. **构建脚本不存在**
+   - 回退 `dotnet build`，检查 `build.ps1` / `build.sh`
 
 3. **权限不足**
    - 检查 GitHub Token 权限
    - 确认仓库设置允许 Actions 创建 Release
 
-4. **版本冲突**
-   - 删除冲突的标签：`git tag -d v1.0.0 && git push origin :refs/tags/v1.0.0`
-   - 重新创建正确的标签
+5. **版本回滚需求**
+   - 不支持覆盖同标签：需删除旧标签 + 重新创建（历史可见，不建议频繁回滚）
 
 ### 日志查看
 - GitHub Actions 页面查看详细构建日志
 - 每个阶段都有独立的日志输出
 - 失败时会保留构建产物便于调试
 
-## � Create Release Tag 工作流详解
+## 🔖 Create Release Tag 工作流详解（新版）
 
 ### 功能特性
-- **GitVersion 集成**: 自动计算符合 SemVer 规范的版本号
-- **智能增量**: 根据提交消息自动决定版本增量类型
-- **安全检查**: 防止创建重复标签
-- **干运行模式**: 可以预览版本号而不实际创建标签
-- **预发布支持**: 可创建预发布版本标签
+- 读取并验证已锁定 `version.json`
+- 校验版本格式 & 是否已存在标签
+- 创建注释标签（不做版本计算）
+- 可选 dry-run（仅验证不推送）
 
 ### 使用步骤
-1. **进入 GitHub Actions 页面**
-   - 导航到仓库的 Actions 标签页
-   - 选择 "Create Release Tag" 工作流
+1. Actions 页面选择该工作流
+2. （可选）启用 dry-run 先做一致性检查
+3. 执行后在日志中查看即将创建的 `v<version>`
+4. 确认无误后在非 dry-run 模式下执行创建标签
 
-2. **配置参数**
-   - **版本增量类型**: 选择 auto/patch/minor/major
-   - **预发布版本**: 勾选以创建预发布版本
-   - **干运行**: 勾选以仅预览版本号
+### 不再支持
+- 任何“版本增量类型”参数
+- 基于提交类型自动推导版本
+- 动态预发布序列号
 
-3. **运行工作流**
-   - 点击 "Run workflow" 按钮
-   - 工作流将自动计算版本号并创建标签
-   - 标签创建后会自动触发 Release Build & Publish 工作流
-
-### 版本增量示例
-```bash
-# 当前版本: v1.2.0
-
-# auto 模式 + 最近有 feat: 提交
-# 计算结果: v1.3.0
-
-# patch 模式
-# 计算结果: v1.2.1
-
-# minor 模式  
-# 计算结果: v1.3.0
-
-# major 模式
-# 计算结果: v2.0.0
-
-# 预发布模式
-# 计算结果: v1.3.0-preview.1
-```
-
-### 提交消息影响
-Create Release Tag 工作流会分析最近的提交消息来决定版本增量：
-
-| 提交消息模式 | 版本增量 | 示例 |
-|-------------|---------|------|
-| `feat:` | minor | `feat: 添加新功能` → 1.0.0 → 1.1.0 |
-| `fix:` | patch | `fix: 修复bug` → 1.0.0 → 1.0.1 |
-| `BREAKING CHANGE:` | major | `feat!: 重构API` → 1.0.0 → 2.0.0 |
-| `docs:`, `ci:`, etc. | patch | `docs: 更新文档` → 1.0.0 → 1.0.1 |
+### Changelog 分类逻辑（参考）
+| 前缀 | 归类 | 示例 |
+|------|------|------|
+| feat: | Features | feat: 添加新渲染管线 |
+| fix: | Fixes | fix: 修复窗口闪烁 |
+| refactor: | Refactors | refactor: 简化 overlay 调度 |
+| perf: | Performance | perf: 降低 CPU 占用 |
+| docs: | Docs | docs: 更新 release 流程 |
+| build: | Build | build(ci): 合并矩阵 |
 
 ## �📈 发布统计
 
@@ -304,5 +310,5 @@ Create Release Tag 工作流会分析最近的提交消息来决定版本增量�
 
 ---
 
-*最后更新: 2025-09-21*
-*文档版本: 2.0*
+*最后更新: 2025-09-22*
+*文档版本: 3.0*
