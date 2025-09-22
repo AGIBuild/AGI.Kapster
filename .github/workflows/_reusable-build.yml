@@ -1,6 +1,6 @@
 name: Reusable Build and Test
 
-# 可重用的构建和测试工作流
+# Reusable build and test workflow
 on:
   workflow_call:
     inputs:
