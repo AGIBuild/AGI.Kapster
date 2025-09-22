@@ -1,6 +1,6 @@
 name: Reusable Multi-Platform Build
 
-# 可重用的多平台构建工作流
+# Reusable multi-platform build workflow
 on:
   workflow_call:
     inputs:
