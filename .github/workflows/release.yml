@@ -298,7 +298,7 @@ jobs:
           set -e
           APPLE_ID="$MACOS_NOTARIZE_APPLE_ID"
           APP_PASSWORD="$MACOS_NOTARIZE_PASSWORD"
-            TEAM_ID="$MACOS_NOTARIZE_TEAM_ID"
+          TEAM_ID="$MACOS_NOTARIZE_TEAM_ID"
           if [ -z "$APPLE_ID" ] || [ -z "$APP_PASSWORD" ] || [ -z "$TEAM_ID" ]; then echo "Skipping notarization (MACOS_NOTARIZE_* env not set)"; exit 0; fi
           RID="osx-${{ matrix.arch }}"
           DIR="artifacts/packages/by-rid/$RID"
