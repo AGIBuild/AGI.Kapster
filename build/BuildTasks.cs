@@ -748,12 +748,29 @@ class BuildTasks : NukeBuild
             try
             {
                 var json = JsonDocument.Parse(File.ReadAllText(VersionFile));
-                var display = json.RootElement.GetProperty("version").GetString();
+                string Read(string name) => json.RootElement.TryGetProperty(name, out var p) ? p.GetString() : null;
+                var display = Read("version");                     // new schema primary display (yyyy.M.d.HHmmss)
                 if (!string.IsNullOrWhiteSpace(display))
                 {
-                    // unified three-part; ignore other fields if present
-                    _versionCache = (display!, display!, display!, display!);
-                    Console.WriteLine($"ℹ️ Using version.json version: {display}");
+                    var assembly = Read("assemblyVersion");
+                    var file = Read("fileVersion");
+                    var info = Read("informationalVersion");
+
+                    // Derive expected from display (handles legacy or partially missing fields)
+                    var derived = BuildVersionModel(display!);
+
+                    bool legacyAllSame = assembly == display && file == display; // legacy three-part or pre-migration
+
+                    if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file) || legacyAllSame)
+                    {
+                        // Auto-heal in-memory (do NOT write here; CheckVersionLocked/UpgradeVersion performs persistence)
+                        assembly = derived.Assembly;
+                        file = derived.File;
+                    }
+                    if (string.IsNullOrWhiteSpace(info)) info = display; // keep informational = display
+
+                    _versionCache = (display!, assembly!, file!, info!);
+                    Console.WriteLine($"ℹ️ Using version.json version: {display} (assembly={assembly}, file={file})");
                     return _versionCache.Value;
                 }
             }
