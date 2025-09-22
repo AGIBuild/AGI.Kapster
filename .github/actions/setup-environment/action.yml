@@ -1,5 +1,10 @@
-name: 'Setup Complete Environment'
-description: 'Complete environment setup including .NET, caching, and global configurations'
+name: 'Setup Complete Environment    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          ${{ inputs.include-dotnet8 == 'true' && '8.0.x' || '' }}
+          ${{ inputs.dotnet-version }}
+        dotnet-quality: ${{ inputs.dotnet-quality }}scription: 'Complete environment setup including .NET, caching, and global configurations'
 author: 'AGI.Captor Team'
 
 inputs:
