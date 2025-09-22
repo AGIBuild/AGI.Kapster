@@ -868,7 +868,7 @@ class BuildTasks : NukeBuild
         // Pattern: YYYY . (month+day) . (hour+mmss)
         // month+day: 3 or 4 digits (month 1-9 + dd OR month 10-12 + dd)
         // hour+mmss: 5 or 6 digits (H + mmss OR HH + mmss)
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d{2,3}\\.[0-9]{1,2}\\d{4}$");
+        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.\\d{0,1}\\d{2}\\.[0-9]{1,2}\\d{4}$");
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
     {
