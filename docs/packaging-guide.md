@@ -29,7 +29,6 @@ AGI.Captor 提供统一的跨平台打包体系，支持 Windows (MSI)、macOS (
 - 分类变更日志 + SHA256 清单同时上传至 Release。
 .\build.ps1 Package
 
-# 或使用 build.cmd
 ## 构建产物结构
 
 矩阵打包输出（示例版本 `2025.121.915304`）：
