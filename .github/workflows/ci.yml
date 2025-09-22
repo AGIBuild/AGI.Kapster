@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  security-events: write
   actions: read
   id-token: write
   packages: write
@@ -28,8 +27,8 @@ jobs:
       build-number: ${{ steps.version.outputs.build-number }}
       
     steps:
-    - name: 🔧 Setup .NET Environment
-      uses: ./.github/actions/setup-dotnet-env
+    - name: 🛠️ Setup Environment
+      uses: ./.github/actions/setup-environment
       with:
         fetch-depth: 0
         dotnet-version: ${{ env.DOTNET_VERSION }}
@@ -75,38 +74,6 @@ jobs:
       configuration: 'Release'
       skip-tests: true
       create-packages: false
-
-  security-scan:
-    name: 🔒 Security Scan
-    runs-on: ubuntu-latest
-    needs: [build-info, test-and-quality]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    
-    steps:
-    - name: 🔧 Setup .NET Environment
-      uses: ./.github/actions/setup-dotnet-env
-      with:
-        fetch-depth: 0
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        
-    - name: 🔍 Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: csharp
-        
-    - name: 🔨 Build for analysis
-      uses: ./.github/actions/build-and-test
-      with:
-        configuration: 'Release'
-        enable-coverage: false
-        skip-tests: true
-        
-    - name: 🔍 Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
 
   preview-summary:
     name: 📋 Preview Summary

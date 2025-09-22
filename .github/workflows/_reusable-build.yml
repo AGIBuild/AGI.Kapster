@@ -42,8 +42,8 @@ jobs:
       test-success: ${{ steps.build-test.outputs.test-success }}
     
     steps:
-    - name: 🔧 Setup .NET Environment
-      uses: ./.github/actions/setup-dotnet-env
+    - name: �️ Setup Environment
+      uses: ./.github/actions/setup-environment
       with:
         fetch-depth: 1
         dotnet-version: ${{ env.DOTNET_VERSION }}
