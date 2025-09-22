@@ -43,10 +43,12 @@ jobs:
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
       
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
+    - name: � Setup Complete Environment
+      uses: ./.github/actions/setup-environment
       with:
         fetch-depth: 0
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        enable-nuget-cache: true
         
     - name: 📊 Determine version
       id: version
@@ -123,55 +125,28 @@ jobs:
     needs: prepare-release
     
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
+    - name: � Setup Complete Environment
+      uses: ./.github/actions/setup-environment
       with:
         fetch-depth: 0
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        enable-nuget-cache: true
+        cache-key-suffix: '-release'
+        
     - name: 🔒 Validate locked version
       run: |
         if [ ! -f version.json ]; then echo 'version.json missing'; exit 1; fi
         ./build.sh CheckVersionLocked || (echo 'CheckVersionLocked failed' && exit 1)
         
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
+    - name: � Full Build and Test
+      uses: ./.github/actions/build-and-test
       with:
-        dotnet-version: |
-          8.0.x
-          ${{ env.DOTNET_VERSION }}
-        dotnet-quality: 'preview'
-    - name: ♻️ NuGet cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-        restore-keys: |
-          nuget-${{ runner.os }}-
-        
-    - name: 🏗️ Full build and test
-      shell: pwsh
+        configuration: 'Release'
+        enable-coverage: true
       env:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
-      run: |
-        Write-Host "Building (version already locked in source). Ignoring injected VERSION=$env:VERSION"
-        if (Test-Path "./build.ps1") {
-          ./build.ps1 Clean
-          ./build.ps1 Restore
-          ./build.ps1 Build --configuration Release
-          ./build.ps1 Test --configuration Release --coverage
-        } elseif (Test-Path "./build.sh") {
-          chmod +x ./build.sh
-          ./build.sh Clean
-          ./build.sh Restore
-          ./build.sh Build --configuration Release
-          ./build.sh Test --configuration Release --coverage
-        } else {
-          dotnet clean
-            dotnet restore
-          dotnet build --configuration Release --no-restore
-          dotnet test --configuration Release --no-build --verbosity normal
-        }
-        
+
     - name: 📊 Upload test results
       uses: actions/upload-artifact@v4
       if: always()
@@ -198,61 +173,23 @@ jobs:
         arch: [x64, arm64]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            ${{ env.DOTNET_VERSION }}
-          dotnet-quality: 'preview'
-      - name: NuGet cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-      - name: Setup WiX (Windows only)
+      - name: 🛠️ Setup Environment  
+        uses: ./.github/actions/setup-environment
+        
+      - name: 🔧 Setup WiX (Windows only)
         if: startsWith(matrix.os, 'windows')
         shell: pwsh
         run: |
           try { $wixVersion = & wix --version 2>$null; Write-Host "WiX: $wixVersion" } catch { dotnet tool install --global wix }
-      - name: Publish & Package
-        shell: bash
+      - name: 📦 Publish & Package
+        uses: ./.github/actions/publish-package
+        with:
+          rid: ${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'osx' || 'linux' }}-${{ matrix.arch }}
+          configuration: 'Release'
         env:
           VERSION: ${{ needs.prepare-release.outputs.version-number }}
           RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
-        run: |
-          set -e
-          case "${{ matrix.os }}" in
-            windows-latest) RID_PREFIX=win ;;
-            macos-latest)   RID_PREFIX=osx ;;
-            ubuntu-latest)  RID_PREFIX=linux ;;
-          esac
-          RID="$RID_PREFIX-${{ matrix.arch }}"
-          echo "Building $RELEASE_VERSION for $RID"
-          if [ -f ./build.sh ]; then
-            chmod +x ./build.sh
-            ./build.sh Publish --configuration Release --rids $RID --skip-tests
-            ./build.sh Package --configuration Release --rids $RID
-          elif [ -f ./build.ps1 ]; then
-            pwsh -c "./build.ps1 Publish --configuration Release --rids $RID --skip-tests; ./build.ps1 Package --configuration Release --rids $RID"
-          else
-            dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r $RID --self-contained true -o artifacts/publish/$RID
-            mkdir -p artifacts/packages
-            if [[ $RID == win-* || $RID == osx-* ]]; then
-              (cd artifacts/publish/$RID && zip -r ../../packages/AGI.Captor-$VERSION-$RID.zip .)
-            else
-              (cd artifacts/publish/$RID && tar -czf ../../packages/AGI.Captor-$VERSION-$RID.tar.gz .)
-            fi
-          fi
-          mkdir -p artifacts/packages/by-rid/$RID
-          find artifacts/packages -maxdepth 1 -type f -name "*-$RID.*" -exec mv {} artifacts/packages/by-rid/$RID/ \;
-          echo "Contents for $RID:" && ls -al artifacts/packages/by-rid/$RID
+          
       - name: 🔐 Windows Authenticode Sign (MSI)
         if: startsWith(matrix.os, 'windows')
         shell: pwsh

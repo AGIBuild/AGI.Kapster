@@ -28,23 +28,11 @@ jobs:
       build-number: ${{ steps.version.outputs.build-number }}
       
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
+    - name: 🔧 Setup .NET Environment
+      uses: ./.github/actions/setup-dotnet-env
       with:
         fetch-depth: 0
-        
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          ${{ env.DOTNET_VERSION }}
-        dotnet-quality: 'preview'
-        
-    - name: ⚙️ Configure Git safe.directory
-      run: |
-        git config --global --add safe.directory /github/workspace
-        git config --global --add safe.directory $(pwd)
+        dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: 📊 Get build information
       id: version
@@ -67,123 +55,26 @@ jobs:
         Write-Host "🏗️ Build: $buildNumber"
         Write-Host "🏷️ Version: $version"
 
+  # 使用可重用工作流进行构建和测试
   test-and-quality:
     name: 🧪 Test & Quality
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/_reusable-build.yml
     needs: build-info
-    
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          ${{ env.DOTNET_VERSION }}
-        dotnet-quality: 'preview'
-        
-    - name: ⚙️ Configure Git safe.directory
-      run: |
-        git config --global --add safe.directory /github/workspace
-        git config --global --add safe.directory $(pwd)
-        
-    - name: 🔨 Build and Test
-      shell: pwsh
-      run: |
-        # Choose appropriate build script based on availability
-        if (Test-Path "./build.ps1") {
-          Write-Host "Using build.ps1 script"
-          ./build.ps1 Clean
-          ./build.ps1 Build Test --coverage
-        } elseif (Test-Path "./build.sh") {
-          Write-Host "Using build.sh script"
-          chmod +x ./build.sh
-          ./build.sh Clean
-          ./build.sh Build Test --coverage
-        } else {
-          Write-Host "Using dotnet commands directly"
-          dotnet clean
-          dotnet restore
-          dotnet build --configuration Release --no-restore
-          dotnet test --configuration Release --no-build --verbosity normal
-        }
-        
-    - name: 📊 Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-ubuntu
-        path: |
-          artifacts/test-results/
-          artifacts/coverage/
-        retention-days: 7
+    with:
+      configuration: 'Release'
+      enable-coverage: true
+      upload-artifacts: true
 
+  # 使用可重用工作流进行多平台构建
   build-preview:
-    name: 🚀 Build Preview (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
+    name: 🚀 Build Preview
+    uses: ./.github/workflows/_reusable-multiplatform.yml
     needs: [build-info, test-and-quality]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    strategy:
-      matrix:
-        include:
-          - platform: win-x64
-            os: windows-latest
-          - platform: linux-x64  
-            os: ubuntu-latest
-          - platform: osx-x64
-            os: macos-13
-          - platform: osx-arm64
-            os: macos-latest
-    
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          ${{ env.DOTNET_VERSION }}
-        dotnet-quality: 'preview'
-        
-    - name: ⚙️ Configure Git safe.directory
-      run: |
-        git config --global --add safe.directory /github/workspace
-        git config --global --add safe.directory $(pwd)
-        
-    - name: 🔨 Build and Publish
-      shell: pwsh
-      run: |
-        # Choose appropriate build script based on availability
-        if (Test-Path "./build.ps1") {
-          Write-Host "Using build.ps1 script"
-          ./build.ps1 Clean
-          ./build.ps1 Publish --rids ${{ matrix.platform }}
-        } elseif (Test-Path "./build.sh") {
-          Write-Host "Using build.sh script"
-          chmod +x ./build.sh
-          ./build.sh Clean
-          ./build.sh Publish --rids ${{ matrix.platform }}
-        } else {
-          Write-Host "Using dotnet commands directly"
-          dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r ${{ matrix.platform }} --self-contained true -o artifacts/publish/${{ matrix.platform }}
-        }
-        
-    - name: 📦 Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: preview-${{ matrix.platform }}
-        path: artifacts/publish/${{ matrix.platform }}/
-        retention-days: 7
+    with:
+      configuration: 'Release'
+      skip-tests: true
+      create-packages: false
 
   security-scan:
     name: 🔒 Security Scan
@@ -196,23 +87,11 @@ jobs:
       security-events: write
     
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
+    - name: 🔧 Setup .NET Environment
+      uses: ./.github/actions/setup-dotnet-env
       with:
         fetch-depth: 0
-        
-    - name: 🔧 Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          8.0.x
-          ${{ env.DOTNET_VERSION }}
-        dotnet-quality: 'preview'
-        
-    - name: ⚙️ Configure Git safe.directory
-      run: |
-        git config --global --add safe.directory /github/workspace
-        git config --global --add safe.directory $(pwd)
+        dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: 🔍 Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -220,20 +99,11 @@ jobs:
         languages: csharp
         
     - name: 🔨 Build for analysis
-      shell: pwsh
-      run: |
-        # Choose appropriate build script based on availability
-        if (Test-Path "./build.ps1") {
-          Write-Host "Using build.ps1 script"
-          ./build.ps1 Build
-        } elseif (Test-Path "./build.sh") {
-          Write-Host "Using build.sh script"
-          chmod +x ./build.sh
-          ./build.sh Build
-        } else {
-          Write-Host "Using dotnet commands directly"
-          dotnet build --configuration Release
-        }
+      uses: ./.github/actions/build-and-test
+      with:
+        configuration: 'Release'
+        enable-coverage: false
+        skip-tests: true
         
     - name: 🔍 Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

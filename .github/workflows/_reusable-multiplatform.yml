@@ -1,0 +1,70 @@
+name: Reusable Multi-Platform Build
+
+# 可重用的多平台构建工作流
+on:
+  workflow_call:
+    inputs:
+      configuration:
+        type: string
+        required: false
+        default: 'Release'
+      platforms:
+        type: string
+        required: false
+        default: '["win-x64", "linux-x64", "osx-x64", "osx-arm64"]'
+      skip-tests:
+        type: boolean
+        required: false
+        default: true
+      create-packages:
+        type: boolean
+        required: false
+        default: true
+      artifact-retention-days:
+        type: number
+        required: false
+        default: 7
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-matrix:
+    name: 🚀 Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: win-x64
+            os: windows-latest
+          - platform: linux-x64
+            os: ubuntu-latest
+          - platform: osx-x64
+            os: macos-13
+          - platform: osx-arm64
+            os: macos-latest
+    
+    steps:
+    - name: 🔧 Setup .NET Environment
+      uses: ./.github/actions/setup-dotnet-env
+      with:
+        fetch-depth: 1
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 🚀 Publish and Package
+      uses: ./.github/actions/publish-package
+      with:
+        runtime-id: ${{ matrix.platform }}
+        configuration: ${{ inputs.configuration }}
+        skip-tests: ${{ inputs.skip-tests }}
+        package: ${{ inputs.create-packages }}
+        
+    - name: 📦 Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ matrix.platform }}
+        path: artifacts/publish/${{ matrix.platform }}/
+        retention-days: ${{ inputs.artifact-retention-days }}

@@ -1,0 +1,82 @@
+name: 'Build and Test'
+description: 'Common build and test operations for .NET projects'
+author: 'AGI.Captor Team'
+
+inputs:
+  configuration:
+    description: 'Build configuration (Debug, Release)'
+    required: false
+    default: 'Release'
+  enable-coverage:
+    description: 'Enable test coverage collection'
+    required: false
+    default: 'true'
+  skip-tests:
+    description: 'Skip running tests'
+    required: false
+    default: 'false'
+  cache-key-suffix:
+    description: 'Additional suffix for cache key'
+    required: false
+    default: ''
+
+outputs:
+  build-success:
+    description: 'Whether build was successful'
+    value: ${{ steps.build.outcome == 'success' }}
+  test-success:
+    description: 'Whether tests were successful'
+    value: ${{ steps.test.outcome == 'success' || inputs.skip-tests == 'true' }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: ♻️ Setup NuGet cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.fsproj', '**/*.vbproj') }}${{ inputs.cache-key-suffix }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+          
+    - name: 📦 Restore dependencies
+      shell: pwsh
+      run: |
+        if (Test-Path "./build.ps1") {
+          ./build.ps1 Restore
+        } elseif (Test-Path "./build.sh") {
+          chmod +x ./build.sh
+          ./build.sh Restore
+        } else {
+          dotnet restore
+        }
+        
+    - name: 🔨 Build project
+      id: build
+      shell: pwsh
+      run: |
+        if (Test-Path "./build.ps1") {
+          ./build.ps1 Build --configuration ${{ inputs.configuration }}
+        } elseif (Test-Path "./build.sh") {
+          ./build.sh Build --configuration ${{ inputs.configuration }}
+        } else {
+          dotnet build --configuration ${{ inputs.configuration }} --no-restore
+        }
+        
+    - name: 🧪 Run tests
+      id: test
+      if: inputs.skip-tests != 'true'
+      shell: pwsh
+      run: |
+        $testArgs = "--configuration ${{ inputs.configuration }}"
+        if ("${{ inputs.enable-coverage }}" -eq "true") {
+          $testArgs += " --coverage"
+        }
+        
+        if (Test-Path "./build.ps1") {
+          ./build.ps1 Test $testArgs
+        } elseif (Test-Path "./build.sh") {
+          ./build.sh Test $testArgs
+        } else {
+          dotnet test --configuration ${{ inputs.configuration }} --no-build --verbosity normal
+        }
