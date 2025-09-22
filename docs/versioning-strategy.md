@@ -1,116 +1,88 @@
-# AGI.Captor 版本策略与 GitVersion 集成指南
+# AGI.Captor 版本策略（锁定时间序列版本体系）
 
 ## 📋 概述
 
-AGI.Captor 采用基于 GitVersion 的智能版本计算策略，通过分析 Git 分支、提交历史和标签来自动生成符合语义化版本规范的版本号，并与 GitHub Actions 实现全自动化发布流程。
+本项目已从基于 GitVersion 的动态语义化增量模式迁移为 **“时间序列（Time-based）+ 显式锁定（Locked）+ 标签驱动（Tag-driven）”** 的确定性版本模型：
 
-## 🔧 GitVersion 配置
+| 目标 | 旧方案 (GitVersion) | 新方案 (Locked Time-based) |
+|------|---------------------|----------------------------|
+| 版本生成 | 运行时计算 | 一次生成，持久存档 |
+| 单一来源 | 隐式(分支+提交) | `version.json` 文件 |
+| 可重复性 | 依赖历史/工具版本 | 纯文件，可审计 diff |
+| 并行冲突 | 可能竞态 | 时间戳递增自然规避 |
+| Changelog | 决定版本增量 | 仅用于分类展示 |
+| 语义含义 | SemVer 语义等级 | 交付时间序列优先 |
 
-### 核心配置 (`GitVersion.yml`)
+> 版本不再“被计算”，而是“被声明并锁定”。流水线只接受与 `version.json` 一致的标签。
 
-```yaml
-mode: ContinuousDelivery
-assembly-versioning-scheme: MajorMinorPatch
-assembly-file-versioning-scheme: MajorMinorPatchTag
+## 🔧 版本文件 `version.json`
 
-branches:
-  main:
-    mode: ContinuousDelivery
-    tag: ''
-    increment: Patch
-  release:
-    mode: ContinuousDelivery
-    tag: ''
-    increment: Patch
-  feature:
-    mode: ContinuousDelivery
-    tag: 'preview'
-    increment: Minor
-  hotfix:
-    mode: ContinuousDelivery
-    tag: 'hotfix'
-    increment: Patch
+示例：
+```json
+{
+  "version": "2025.121.915304",
+  "assemblyVersion": "2025.121.915304",
+  "fileVersion": "2025.121.915304",
+  "informationalVersion": "2025.121.915304"
+}
 ```
 
-### 版本计算逻辑
+规则：
+1. 四个字段必须完全一致。
+2. 作为**唯一可信源 (SSOT)**，禁止在 `.csproj` 手动覆写。
+3. PR 守卫会校验：已锁定、格式合法、未被随意改写。
+4. 发布标签名必须为：`v<version>`。
+5. 任何偏差 → CI 立即失败。
 
-1. **基础版本**: 从最近的版本标签开始
-2. **分支策略**: 根据分支类型确定增量和标签
-3. **提交分析**: 解析 Conventional Commits 影响版本类型
-4. **预发布标识**: 自动添加分支相关的预发布标签
-
-## 🌿 分支策略
-
-### 分支类型和版本规则
-
-| 分支类型 | 分支模式 | 版本增量 | 标签格式 | 示例版本 |
-|---------|---------|---------|---------|---------|
-| **main** | `main`, `master` | Patch | `X.Y.Z` | `1.2.3` |
-| **release** | `release` | Patch | `X.Y.Z` | `1.2.3` |
-| **feature** | `feature/*`, `features/*` | Minor | `X.Y.Z-preview.N` | `1.3.0-preview.1` |
-| **hotfix** | `hotfix/*`, `hotfixes/*` | Patch | `X.Y.Z-hotfix.N` | `1.2.4-hotfix.1` |
-
-### 自动化工作流集成
-
-```mermaid
-flowchart TD
-    A[代码提交] --> B{分支类型}
-    B -->|main/release| C[Patch 增量]
-    B -->|feature/*| D[Minor 增量 + preview]
-    B -->|hotfix/*| E[Patch 增量 + hotfix]
-    
-    C --> F[GitVersion 计算]
-    D --> F
-    E --> F
-    
-    F --> G[创建发布标签工作流]
-    G --> H[验证版本唯一性]
-    H --> I[创建 Git 标签]
-    I --> J[触发发布构建]
-    J --> K[GitHub Release]
+格式正则：
+```
+^[0-9]{4}\.[1-9][0-9]{2,3}\.[0-9]{1,2}[0-9]{4}$
 ```
 
-### 分支工作流程
-
-```mermaid
-gitgraph
-    commit id: "Initial"
-    branch main
-    commit id: "v1.2.0" tag: "v1.2.0"
-    branch feature/new-ui
-    commit id: "UI Work 1"
-    commit id: "UI Work 2"
-    checkout main
-    merge feature/new-ui
-    commit id: "v1.3.0" tag: "v1.3.0"
-    branch hotfix/security-fix  
-    commit id: "Security patch"
-    checkout main
-    merge hotfix/security-fix
-    commit id: "v1.3.1" tag: "v1.3.1"
+结构分段：
+```
+YYYY . MDD . Hmmss
+│      │     └─ Hour + mmss  (无分隔，兼容文件/路径)
+│      └─ 月日（去前导0拼接，例如 Jan 21 -> 121）
+└─ 公历年份
 ```
 
-## 🏷️ 版本号格式
+### 版本生成逻辑（Nuke 目标 `UpgradeVersion`）
+1. 获取当前 UTC 时间。
+2. 按格式生成候选版本；若与上次相同秒，做补偿递增。
+3. 回写 `version.json` 四个字段。
+4. 使用 `--lock` 标记锁定（内部记录防止未授权改写）。
+5. 提交该文件；否则 PR 与发布检查会失败。
 
-### 语义化版本 (SemVer)
+## 🌿 分支策略（精简化）
+
+| 操作 | 要求 |
+|------|------|
+| 锁定新版本 | 在 `release` 分支执行 `UpgradeVersion --lock` 并提交 |
+| 创建发布标签 | 仅可在 `release` 分支祖先 commit 上打 `v<version>` 标签 |
+| 功能开发 | `feature/*` 分支开发，合并后再锁定版本 |
+| 修复补丁 | 修复合并后重新生成新时间基版本 |
+
+> 版本含义与功能规模解耦：更快发布、避免语义主观判断延迟。
+
+（旧的基于分支+增量示意已废弃）
+
+## 🏷️ 版本号格式（Time-based）
+
 ```
-主版本.次版本.修订版本[-预发布标识符][+构建元数据]
+YYYY.MDD.Hmmss
 ```
 
-### 版本号示例
+示例：`2025.121.915304`
 
-| 场景 | 版本格式 | 示例 |
-|------|---------|------|
-| 正式发布 | `X.Y.Z` | `1.3.0` |
-| 预发布 | `X.Y.Z-preview.N` | `1.3.0-preview.1` |
-| 热修复 | `X.Y.Z-hotfix.N` | `1.2.4-hotfix.1` |
-| 开发构建 | `X.Y.Z-preview.N+Sha.abcd123` | `1.3.0-preview.1+Sha.abc1234` |
+优势：
+- 线性时序即可判定新旧
+- 不需讨论“是否该 minor/major”
+- 解析简单，日志与构件命名直接关联
 
-## 📝 Conventional Commits 集成
+不包含：预发布 / build metadata / hotfix 后缀——额外状态通过 Release Notes 描述。
 
-### 提交消息格式影响版本计算
-
-GitVersion 可以解析 Conventional Commits 格式来智能确定版本增量：
+## 📝 Conventional Commits（仅用于分类展示）
 
 ```bash
 # 功能增加 → Minor 版本增量
@@ -127,49 +99,33 @@ feat(api)!: redesign REST endpoints
 # 1.2.3 → 2.0.0
 ```
 
-### 支持的提交类型
+### 不再使用的标记
+`+semver:major|minor|patch|breaking|skip|none` 全部失效，可去除。
 
-| 类型 | 版本影响 | 说明 |
-|------|---------|------|
-| `feat:` | Minor | 新功能 |
-| `fix:` | Patch | 错误修复 |
-| `!` 后缀或 `BREAKING CHANGE:` | Major | 破坏性变更 |
-| `chore:`, `docs:`, `style:` | None | 不影响版本号 |
-# 主版本增量 (破坏性变更)
-git commit -m "feat: new API +semver:breaking"
-git commit -m "refactor: change interface +semver:major"
-
-# 次版本增量 (新功能)
-git commit -m "feat: add auto-update +semver:feature"
-git commit -m "feat: new overlay system +semver:minor"
-
-# 修订版本增量 (错误修复)
-git commit -m "fix: memory leak issue +semver:fix"
-git commit -m "fix: crash on startup +semver:patch"
-
-# 不增量版本
-git commit -m "docs: update README +semver:none"
-git commit -m "ci: update workflow +semver:skip"
+### 分类引用示例（供 changelog 抓取）
+```
+feat: 新增 GPU overlay pipeline
+fix: 修复窗口闪烁
+refactor: 抽象渲染调度器接口
+perf: 降低内存占用 12%
+docs: 更新 release 流程
+build: 合并矩阵并增加 SHA256 清单
 ```
 
-## 🔧 常用命令
-
-### GitVersion 相关命令
+## 🔧 常用命令（新版）
 
 ```powershell
-# 获取当前版本信息
-dotnet gitversion
+# 生成并锁定新版本（写入 version.json）
+./build.ps1 UpgradeVersion --lock
 
-# 获取特定版本字段
-dotnet gitversion /showvariable SemVer
-dotnet gitversion /showvariable FullSemVer
-dotnet gitversion /showvariable InformationalVersion
+# 验证版本已锁定
+./build.ps1 CheckVersionLocked
 
-# 输出详细调试信息
-dotnet gitversion /verbosity Diagnostic
+# 显示构建信息（含当前锁定版本）
+./build.ps1 Info
 
-# 更新程序集版本信息
-dotnet gitversion /updateassemblyinfo
+# 创建安装包（示例）
+./build.ps1 Package --rids win-x64,linux-x64
 ```
 
 ### 构建系统命令
@@ -200,12 +156,11 @@ dotnet gitversion /updateassemblyinfo
 ./build.ps1 Clean Build Test Publish Package
 ```
 
-### Git 标签和发布
+### Git 标签与发布
 
 ```bash
-# 创建特定版本标签（推荐方式）
-git tag v1.4.0
-git push origin v1.4.0  # 使用标签版本发布
+git tag v2025.121.915304
+git push origin v2025.121.915304
 
 # 查看所有标签
 git tag -l
@@ -216,56 +171,36 @@ git push origin :refs/tags/v1.4.0
 ```
 
 **发布策略说明**:
-- **标签发布**: 创建版本标签进行精确版本控制（推荐）
-- **手动触发**: 在 GitHub Actions 页面手动触发发布
+- 仅允许 “锁定版本 + 匹配标签” 发布路径。
+- 任何与 `version.json` 不一致的标签会在 `release.yml` 失败。
 
-## 🚀 CI/CD 工作流程
+## 🚀 CI/CD 工作流程（高层）
 
-### 开发流程 (main分支)
-1. **推送到main分支** → 触发 `ci.yml`
-2. **自动构建测试** → 生成预览版本
-3. **安全扫描** → CodeQL 分析
-4. **版本格式**: `1.3.0-alpha.X+sha`
+### 开发流程
+1. 功能 / 修复分支 → 合并入 `release`
+2. CI 验证（测试 / 质量 / 覆盖率）
+3. 需要发布时执行：`UpgradeVersion --lock` → 提交
 
-### 发布流程 (版本标签)
-1. **方式一: 标签发布** 
-   ```bash
-   git tag v1.4.0
-   git push origin v1.4.0  # 使用指定版本发布
-   ```
-2. **方式二: 手动触发** → GitHub Actions 页面手动触发
-3. **自动构建** → 跨平台构建 (Windows/macOS/Linux)
-4. **自动发布** → 创建 GitHub Release
-5. **版本格式**: `1.4.0` (正式版本)
+### 发布流程
+1. 创建并推送 `v<locked-version>` 标签
+2. `release.yml`：祖先校验 + 并发互斥 + 版本匹配
+3. 矩阵打包（所有 RID）→ 验证缺失即 fail-fast
+4. 生成分类 changelog + `SHASUMS-<ver>.txt`
+5. 创建 GitHub Release（禁用自动 notes，使用自生成 body）
 
-**注意**: 不再支持通过推送 release 分支触发发布，必须使用标签或手动触发。
-
-**详细发布流程请参考**: [Release Workflow Guide](./release-workflow.md)
+详见： [Release Workflow Guide](./release-workflow.md)
 
 ## 📊 版本信息获取
 
 ### PowerShell 脚本示例
 
 ```powershell
-# 获取版本信息的脚本
-function Get-VersionInfo {
-    $version = dotnet gitversion | ConvertFrom-Json
-    
-    Write-Host "🏷️ 版本信息"
-    Write-Host "=============="
-    Write-Host "SemVer: $($version.SemVer)"
-    Write-Host "FullSemVer: $($version.FullSemVer)"
-    Write-Host "InformationalVersion: $($version.InformationalVersion)"
-    Write-Host "AssemblySemVer: $($version.AssemblySemVer)"
-    Write-Host "BranchName: $($version.BranchName)"
-    Write-Host "Sha: $($version.Sha)"
-    Write-Host "ShortSha: $($version.ShortSha)"
-    
-    return $version
+function Get-LockedVersion {
+  ($json = Get-Content version.json | ConvertFrom-Json) | Out-Null
+  Write-Host "Locked Version: $($json.version)"
+  return $json.version
 }
-
-# 使用示例
-$versionInfo = Get-VersionInfo
+Get-LockedVersion | Out-Null
 ```
 
 ### 在代码中获取版本
@@ -289,53 +224,22 @@ Console.WriteLine($"Informational: {informationalVersion}");
 
 ### 常见问题和解决方案
 
-#### 1. GitVersion 工具问题
+#### 1. 版本未锁定
+执行：`./build.ps1 UpgradeVersion --lock` 并提交。
+
+#### 2. 标签不匹配
+删除错误标签：
 ```bash
-# 安装 GitVersion 工具
-dotnet tool install --global GitVersion.Tool --version 5.12.0
-
-# 验证安装
-dotnet tool list --global | grep gitversion
-
-# 更新工具
-dotnet tool update --global GitVersion.Tool
+git tag -d v2025.121.915304
+git push origin :refs/tags/v2025.121.915304
 ```
+确保 `version.json` 正确后重新创建。
 
-#### 2. 版本计算错误
-```bash
-# 检查 GitVersion 配置
-dotnet gitversion /showconfig
+#### 3. 祖先校验失败
+标签指向 commit 不在 `release` 分支内 → 在正确基准重新打标签。
 
-# 详细诊断信息
-dotnet gitversion /verbosity diagnostic
-
-# 查看特定版本变量
-dotnet gitversion /showvariable SemVer
-dotnet gitversion /showvariable FullSemVer
-```
-
-#### 3. 分支策略问题
-```bash
-# 检查当前分支状态
-git branch -v
-git status
-
-# 查看最近的标签
-git tag -l --sort=-version:refname | head -5
-
-# 检查分支历史
-git log --oneline --graph -10
-```
-
-#### 4. 版本号重复
-```bash
-# 查看现有标签
-git tag -l | sort -V
-
-# 删除错误的标签
-git tag -d v1.2.3
-git push origin :refs/tags/v1.2.3
-```
+#### 4. 缺失某平台产物
+矩阵某 Job 失败 → 修复后需删除旧标签重新创建。
 
 ### 调试工具
 
@@ -368,12 +272,12 @@ dotnet build --verbosity normal | findstr Version
 
 ## 🎯 最佳实践
 
-### 1. 版本发布前检查清单
-- [ ] 运行完整测试套件
-- [ ] 验证 GitVersion 计算的版本号
-- [ ] 检查分支状态和提交历史
-- [ ] 确认没有未提交的更改
-- [ ] 使用 dry run 模式验证发布流程
+### 1. 发布前检查清单
+- [ ] `UpgradeVersion --lock` 已执行并提交
+- [ ] CI 全绿（测试/质量/安全）
+- [ ] `release` 分支为最新且无未提交
+- [ ] 差异审阅清晰（上一个标签..HEAD）
+- [ ] 无临时/调试文件
 
 ### 2. 分支管理策略
 - 保持 main 分支的稳定性
@@ -382,16 +286,14 @@ dotnet build --verbosity normal | findstr Version
 - 及时清理已合并的分支
 
 ### 3. 标签管理规范
-- 仅通过自动化工作流创建版本标签
-- 避免手动修改或删除版本标签
-- 保持标签历史的清洁和连续性
-- 使用有意义的标签注释信息
+- 标签 = 版本号的唯一绑定
+- 删除标签仅在产物错误且需重新发布时执行
+- 使用注释标签记录上下文
 
 ### 4. 提交消息规范
-- 使用 Conventional Commits 格式
-- 明确标注破坏性变更
-- 提供清晰的变更描述
-- 关联相关的 Issue 或 PR
+- 使用前缀（feat|fix|refactor|perf|docs|build|chore|ci|test）
+- 破坏性变更在正文说明迁移策略
+- 简洁且可读
 
 ## 📚 相关文档
 
@@ -402,21 +304,5 @@ dotnet build --verbosity normal | findstr Version
 
 ---
 
-*本文档会随着项目发展持续更新，请定期查看最新版本。*
-./build.ps1 Build
-```
-
-## 📚 相关资源
-
-- [GitVersion 官方文档](https://gitversion.net/)
-- [语义化版本规范](https://semver.org/lang/zh-CN/)
-- [Nuke 构建系统](https://nuke.build/)
-- [GitHub Actions 工作流](../.github/workflows/)
-
-## 🎯 最佳实践
-
-1. **分支命名规范**: 使用清晰的分支名称，如 `features/auto-update`
-2. **提交消息规范**: 使用约定式提交格式
-3. **标签创建**: 仅在release分支创建正式版本标签
-4. **版本增量**: 合理使用 `+semver:` 标记控制版本增量
-5. **CI/CD**: 充分利用自动化构建和测试流程
+---
+最后更新：2025-09-22 · 文档版本：2.0（迁移至锁定时间序列版本体系）

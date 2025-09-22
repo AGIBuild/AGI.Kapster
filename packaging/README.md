@@ -75,7 +75,7 @@ AGI.Captor 现已支持跨平台安装包创建，包括 Windows MSI、macOS PKG
 
 ## 高级配置
 
-### 代码签名
+### 代码签名（本地打包参数）
 
 #### Windows 代码签名
 ```bash
@@ -97,6 +97,50 @@ AGI.Captor 现已支持跨平台安装包创建，包括 Windows MSI、macOS PKG
   --apple-id "your.apple.id@example.com" \
   --app-password "app-specific-password" \
   --team-id "TEAM123456"
+```
+
+### CI 环境中的签名与公证（GitHub Actions）
+
+在 `release.yml` 中，签名与公证是“可选的”——仅当以下环境变量（通过仓库 / 环境 / 组织级 Secret 注入）存在且非空时才执行：
+
+| 功能 | 环境变量 | 说明 |
+| ---- | -------- | ---- |
+| Windows MSI 签名 | `CODE_SIGN_WINDOWS_PFX_BASE64` | Base64 编码的 PFX 证书内容 |
+| Windows MSI 签名 | `CODE_SIGN_WINDOWS_PFX_PASSWORD` | PFX 证书密码 |
+| macOS codesign | `MACOS_SIGN_IDENTITY` | 例如：`Developer ID Application: Example Corp (TEAMID)` |
+| macOS notarize | `MACOS_NOTARIZE_APPLE_ID` | Apple 开发者账号（邮箱） |
+| macOS notarize | `MACOS_NOTARIZE_PASSWORD` | App-Specific Password 或 Keychain Profile 密码 |
+| macOS notarize | `MACOS_NOTARIZE_TEAM_ID` | 10位团队 ID |
+
+#### Secret 注入示例
+在仓库 `Settings -> Secrets -> Actions` 中添加：
+- `CODE_SIGN_WINDOWS_PFX_BASE64`
+- `CODE_SIGN_WINDOWS_PFX_PASSWORD`
+- `MACOS_SIGN_IDENTITY`
+- `MACOS_NOTARIZE_APPLE_ID`
+- `MACOS_NOTARIZE_PASSWORD`
+- `MACOS_NOTARIZE_TEAM_ID`
+
+然后在环境或组织层配置（如需多仓库复用）。无需修改工作流文件即可启用/停用签名。
+
+#### 生成 Windows PFX Base64
+```bash
+# 将 PFX 证书转为 Base64（GitHub Secret 只放单行字符串）
+base64 -w0 code-signing.pfx > pfx.b64   # Linux/macOS
+# PowerShell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('code-signing.pfx')) > pfx.b64
+```
+
+#### 验证 MSI 签名
+```powershell
+signtool verify /pa /all AGI.Captor-*.msi
+```
+
+#### 验证 macOS 签名 & 公证
+```bash
+codesign --verify --deep --strict --verbose=2 AGI.Captor.app
+spctl --assess --type exec -vv AGI.Captor.app
+xcrun stapler validate AGI.Captor-*.pkg
 ```
 
 ### 自定义版本
@@ -144,9 +188,12 @@ artifacts/packages/
 
 2. **macOS 签名失败**
    - 检查签名身份是否正确
-   - 确保证书已安装在钥匙串中
+   - 确保证书已安装（本地）或 CI 已注入变量
 
-3. **Linux 包创建失败**
+3. **公证长时间等待**
+   - Apple 服务高峰期，可重试或拆分提交
+
+4. **Linux 包创建失败**
    - 确保安装了必要的打包工具
    - 检查脚本执行权限
 
@@ -158,15 +205,13 @@ artifacts/packages/
 ## 自动化集成
 
 ### GitHub Actions
-可以集成到 CI/CD 流水线中：
-
+示例（简化）：
 ```yaml
 - name: Create Packages
-  run: |
-    .\build.cmd Package --rids win-x64,osx-x64,linux-x64 --configuration Release
-    
+  run: .\build.cmd Package --rids win-x64,osx-x64,linux-x64 --configuration Release
+
 - name: Upload Artifacts
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v4
   with:
     name: packages
     path: artifacts/packages/
@@ -174,9 +219,10 @@ artifacts/packages/
 
 ## 安全注意事项
 
-1. **签名证书**: 妥善保管代码签名证书
-2. **公证凭据**: 使用环境变量存储敏感信息
-3. **发布渠道**: 通过官方渠道分发签名包
+1. **证书**: 仅在受控环境中使用，避免泄露
+2. **变量注入**: 使用 GitHub Encrypted Secrets；不要提交到仓库
+3. **最小权限**: Apple ID 建议使用专用账号 + App-Specific Password
+4. **日志审查**: 签名步骤不回显敏感值
 
 ## 相关文件
 
@@ -184,6 +230,7 @@ artifacts/packages/
 - `packaging/macos/`: macOS 安装包脚本
 - `packaging/linux/`: Linux 安装包脚本
 - `build/BuildTasks.cs`: 构建系统配置
+- `.github/workflows/release.yml`: 发布与可选签名/公证
 
 ## 更多信息
 

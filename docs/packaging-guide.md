@@ -17,22 +17,62 @@ AGI.Captor 项目已配置完整的跨平台安装包制作系统，支持 Windo
 ### 构建所有平台安装包
 ```powershell
 # 构建所有支持的平台
+## 概述
+
+AGI.Captor 提供统一的跨平台打包体系，支持 Windows (MSI)、macOS (PKG/DMG)、Linux (DEB/RPM)。
+
+新版发布流水线特性：
+- 时间序列锁定版本（`version.json`）作为产物命名与校验根源。
+- 按运行时标识（RID）进行分目录隔离：`artifacts/packages/by-rid/<rid>/...`。
+- 发布阶段进行 **RID 完整性验证**（缺失即失败）。
+- 聚合产物到 `artifacts/packages/final-release/` 并生成 `SHASUMS-<version>.txt`。
+- 分类变更日志 + SHA256 清单同时上传至 Release。
 .\build.ps1 Package
 
 # 或使用 build.cmd
-.\build.cmd Package
+## 构建产物结构
+
+矩阵打包输出（示例版本 `2025.121.915304`）：
+```
+artifacts/packages/by-rid/
+├── win-x64/
+│   └── AGI.Captor-2025.121.915304-win-x64.msi
+├── win-arm64/
+│   └── AGI.Captor-2025.121.915304-win-arm64.msi
+├── osx-x64/
+│   ├── AGI.Captor-2025.121.915304-osx-x64.pkg
+│   └── AGI.Captor-2025.121.915304-osx-x64.dmg
+├── osx-arm64/
+│   ├── AGI.Captor-2025.121.915304-osx-arm64.pkg
+│   └── AGI.Captor-2025.121.915304-osx-arm64.dmg
+├── linux-x64/
+│   ├── AGI.Captor-2025.121.915304-linux-x64.deb
+│   └── AGI.Captor-2025.121.915304-linux-x64.rpm
+└── linux-arm64/
+    ├── AGI.Captor-2025.121.915304-linux-arm64.deb
+    └── AGI.Captor-2025.121.915304-linux-arm64.rpm
+
+artifacts/packages/final-release/
+├── (复制聚合的全部上列文件)
+└── SHASUMS-2025.121.915304.txt
 ```
 
-### 构建特定平台
+`SHASUMS-<version>.txt` 内容格式：
+```
+<sha256>  AGI.Captor-2025.121.915304-win-x64.msi
+<sha256>  AGI.Captor-2025.121.915304-win-arm64.msi
+...
+```
+校验示例：
+```bash
+sha256sum -c SHASUMS-2025.121.915304.txt
+```
+PowerShell：
 ```powershell
-# 仅构建Windows x64平台
-.\build.ps1 Package --rids win-x64
-
-# 构建多个指定平台
-.\build.ps1 Package --rids "win-x64,osx-x64,linux-x64"
-
-# macOS双架构支持
-.\build.ps1 Package --rids "osx-x64,osx-arm64"
+Get-Content SHASUMS-2025.121.915304.txt | ForEach-Object {
+  $p=$_ -split "  "; if((Get-FileHash $p[1] -Algorithm SHA256).Hash.ToLower() -ne $p[0]) { Write-Error "Mismatch: $($p[1])" }
+}
+```
 ```
 
 ### 可用的运行时标识符 (RIDs)
@@ -40,20 +80,19 @@ AGI.Captor 项目已配置完整的跨平台安装包制作系统，支持 Windo
 - `win-arm64` - Windows ARM64
 - `osx-x64` - macOS Intel
 - `osx-arm64` - macOS Apple Silicon
-- `linux-x64` - Linux 64位
+#### 2. 缺失 RID 产物
+发布阶段会检测所有预期 RID 目录是否存在，缺失即失败：
+处理：查看对应矩阵 Job 日志，修复后删除并重建标签。
 - `linux-arm64` - Linux ARM64
 
 ## 构建产物
+## 版本管理
 
-构建成功后，安装包将生成在 `artifacts/packages/` 目录：
-
+版本仅来源于根目录 `version.json`（锁定时间序列格式）。
+构建时同步到程序集 / WiX / 包元数据；禁止手动编辑下游文件内版本字段。
 ```
 artifacts/packages/
-├── AGI.Captor-1.0.0.0-win-x64.msi          # Windows MSI安装包
-├── AGI.Captor-1.0.0.0-win-arm64.msi        # Windows ARM64 MSI
-├── AGI.Captor-1.0.0.0-osx-x64.pkg          # macOS Intel PKG
 ├── AGI.Captor-1.0.0.0-osx-x64.dmg          # macOS Intel DMG镜像
-├── AGI.Captor-1.0.0.0-osx-arm64.pkg        # macOS Apple Silicon PKG
 ├── AGI.Captor-1.0.0.0-osx-arm64.dmg        # macOS Apple Silicon DMG
 ├── AGI.Captor-1.0.0.0-linux-x64.deb        # Linux DEB包
 ├── AGI.Captor-1.0.0.0-linux-x64.rpm        # Linux RPM包
