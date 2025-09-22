@@ -16,10 +16,6 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 class BuildTasks : NukeBuild
 {
-    /// <summary>
-    /// AGI.Captor Cross-platform Build System
-    /// Built with Nuke based on industry best practices
-    /// </summary>
     public static int Main() => Execute<BuildTasks>(x => x.Build);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
@@ -78,9 +74,6 @@ class BuildTasks : NukeBuild
 
     string TargetFramework => GetTargetFramework();
 
-    /// <summary>
-    /// Get target framework with safe fallback
-    /// </summary>
     string GetTargetFramework()
     {
         if (!string.IsNullOrWhiteSpace(Framework))
@@ -90,7 +83,7 @@ class BuildTasks : NukeBuild
         {
             return MainProject?.GetProperty("TargetFramework") ??
                    MainProject?.GetProperty("TargetFrameworks")?.Split(';').First() ??
-                   "net9.0"; // 与主项目保持一致的默认值
+                   "net9.0";
         }
         catch (Exception ex)
         {
@@ -99,11 +92,6 @@ class BuildTasks : NukeBuild
         }
     }
 
-    // Removed GitVersion integration; version is fully driven by locked version.json & timestamp generator.
-
-    /// <summary>
-    /// Clean artifacts and bin/obj directories
-    /// </summary>
     Target Clean => _ => _
         .Before(Restore)
         .Executes(() =>
@@ -118,9 +106,6 @@ class BuildTasks : NukeBuild
                 .SetConfiguration(Configuration));
         });
 
-    /// <summary>
-    /// Restore NuGet packages
-    /// </summary>
     Target Restore => _ => _
         .After(Clean)
         .Executes(() =>
@@ -129,9 +114,6 @@ class BuildTasks : NukeBuild
                 .SetProjectFile(Solution));
         });
 
-    /// <summary>
-    /// Build the solution
-    /// </summary>
     Target Build => _ => _
         .Description("Compile solution")
         .DependsOn(Restore)
@@ -143,9 +125,6 @@ class BuildTasks : NukeBuild
                 .EnableNoRestore());
         });
 
-    /// <summary>
-    /// Run unit tests (excluding UI tests)
-    /// </summary>
     Target Test => _ => _
         .DependsOn(Build)
         .OnlyWhenDynamic(() => !SkipTests)
@@ -182,9 +161,6 @@ class BuildTasks : NukeBuild
             }
         });
 
-    /// <summary>
-    /// Run the main application
-    /// </summary>
     Target Run => _ => _
         .DependsOn(Build)
         .Executes(() =>
@@ -199,16 +175,12 @@ class BuildTasks : NukeBuild
                 .SetConfiguration(Configuration));
         });
 
-    /// <summary>
-    /// Publish applications for specified runtime identifiers
-    /// </summary>
     Target Publish => _ => _
         .Description("Publish binaries")
         .DependsOn(Test)
         .Executes(() =>
         {
             var publishDir = RootDirectory / "artifacts" / "publish";
-            // Version is not injected here; must be locked via UpgradeVersion beforehand.
             DotNetPublish(s => s
                 .SetProject(MainProject)
                 .SetConfiguration(Configuration)
@@ -216,9 +188,6 @@ class BuildTasks : NukeBuild
                 .SetOutput(publishDir));
         });
 
-    /// <summary>
-    /// Display build environment information and diagnostics
-    /// </summary>
     Target Info => _ => _
         .Executes(() =>
         {
@@ -303,9 +272,6 @@ class BuildTasks : NukeBuild
     AbsolutePath LinuxPackagingDirectory => PackagingDirectory / "linux";
     AbsolutePath PackageOutputDirectory => ArtifactsDirectory / "packages";
 
-    /// <summary>
-    /// Create installation packages for all supported platforms
-    /// </summary>
     Target Package => _ => _
         .DependsOn(Publish, CheckVersionLocked)
         .Produces(PackageOutputDirectory / "*")
@@ -352,9 +318,6 @@ class BuildTasks : NukeBuild
             Console.WriteLine("✅ Package creation completed!");
         });
 
-    /// <summary>
-    /// Create Windows MSI installer using WiX
-    /// </summary>
     void CreateWindowsPackage(AbsolutePath publishPath, string rid)
     {
         try
@@ -742,35 +705,16 @@ class BuildTasks : NukeBuild
     {
         if (_versionCache.HasValue) return _versionCache.Value;
 
-        // 1) version.json (authoritative)
         if (File.Exists(VersionFile))
         {
             try
             {
                 var json = JsonDocument.Parse(File.ReadAllText(VersionFile));
-                string Read(string name) => json.RootElement.TryGetProperty(name, out var p) ? p.GetString() : null;
-                var display = Read("version");                     // new schema primary display (yyyy.M.d.HHmmss)
+                var display = json.RootElement.GetProperty("version").GetString();
                 if (!string.IsNullOrWhiteSpace(display))
                 {
-                    var assembly = Read("assemblyVersion");
-                    var file = Read("fileVersion");
-                    var info = Read("informationalVersion");
-
-                    // Derive expected from display (handles legacy or partially missing fields)
-                    var derived = BuildVersionModel(display!);
-
-                    bool legacyAllSame = assembly == display && file == display; // legacy three-part or pre-migration
-
-                    if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file) || legacyAllSame)
-                    {
-                        // Auto-heal in-memory (do NOT write here; CheckVersionLocked/UpgradeVersion performs persistence)
-                        assembly = derived.Assembly;
-                        file = derived.File;
-                    }
-                    if (string.IsNullOrWhiteSpace(info)) info = display; // keep informational = display
-
-                    _versionCache = (display!, assembly!, file!, info!);
-                    Console.WriteLine($"ℹ️ Using version.json version: {display} (assembly={assembly}, file={file})");
+                    _versionCache = (display, display, display, display);
+                    Console.WriteLine($"ℹ️ Using version.json: {display}");
                     return _versionCache.Value;
                 }
             }
@@ -780,7 +724,6 @@ class BuildTasks : NukeBuild
             }
         }
 
-        // 2) Project evaluated properties (Nuke's MSBuild evaluation)
         if (MainProject != null)
         {
             try
@@ -789,83 +732,36 @@ class BuildTasks : NukeBuild
                 if (!string.IsNullOrWhiteSpace(v))
                 {
                     _versionCache = (v, v, v, v);
-                    Console.WriteLine($"ℹ️ Using project evaluated Version: {v}");
+                    Console.WriteLine($"ℹ️ Using project Version: {v}");
                     return _versionCache.Value;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Failed to read project property Version: {ex.Message}");
+                Console.WriteLine($"⚠️ Failed to read project Version: {ex.Message}");
             }
         }
 
-        // 3) Final fallback: generate ephemeral timestamp-derived version (not persisted)
-        var fallbackDisplay = GenerateTimestampVersion();
-        var fallbackModel = BuildVersionModel(fallbackDisplay);
-        _versionCache = fallbackModel;
-        Console.WriteLine($"ℹ️ Using generated fallback version (no version.json present): {fallbackDisplay}");
+        var fallback = GenerateTimestampVersion();
+        _versionCache = (fallback, fallback, fallback, fallback);
+        Console.WriteLine($"ℹ️ Using generated version: {fallback}");
         return _versionCache.Value;
     }
-
-    // New display version format: YYYY.M.D.HHmmss
-    //  - Display has 4 segments (dot separated) for clarity & direct tag usage
-    //  - Segment 1: Year (yyyy)
-    //  - Segment 2: Month (1-12, no leading zero)
-    //  - Segment 3: Day (1-31, no leading zero)
-    //  - Segment 4: HHmmss (24h time, always 6 digits)
-    // Example: 2025-09-22 07:04:05 => 2025.9.22.070405 ; 2025-12-03 15:47:59 => 2025.12.3.154759
-    // NOTE: HHmmss may exceed 65535, so cannot be used directly as revision for CLR assembly/file versions.
-    // Mapping rules for assembly/file (both four-part, each <= 65535 components):
-    //   AssemblyVersion = Year.Month.Day.Hour
-    //   FileVersion     = Year.Month.Day.(Minute*100 + Second)  (range 0..5959) ensuring uniqueness within an hour.
-    // InformationalVersion = Display (full four-part) for traceability.
 
     string GenerateTimestampVersion()
     {
         var utc = DateTime.UtcNow;
-        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{utc:HHmmss}";
+        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{utc:HHmm}";
     }
 
     bool IsValidDisplayVersion(string v)
-        // Pattern: yyyy.M.d.HHmmss (Month, Day no leading zero; time fixed 6 digits)
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d?\\.[1-9]\\d?\\.[0-2]\\d[0-5]\\d[0-5]\\d$");
+        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d?\\.[1-9]\\d?\\.[0-2]\\d[0-5]\\d$");
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
-    {
-        if (!IsValidDisplayVersion(display) || !TryParseDisplayVersion(display, out var year, out var month, out var day, out var hour, out var minute, out var second))
-        {
-            // Fallback: append .0 for assembly/file to keep valid
-            return (display, $"{display}.0", $"{display}.0", display);
-        }
-        var assemblyVersion = $"{year}.{month}.{day}.{hour}";               // components within range
-        var fileRevision = minute * 100 + second;                             // 0..5959
-        var fileVersion = $"{year}.{month}.{day}.{fileRevision}";
-        return (display, assemblyVersion, fileVersion, display);
-    }
-
-    bool TryParseDisplayVersion(string display, out int year, out int month, out int day, out int hour, out int minute, out int second)
-    {
-        year = month = day = hour = minute = second = 0;
-        try
-        {
-            var parts = display.Split('.');
-            if (parts.Length != 4) return false;
-            year = int.Parse(parts[0]);
-            month = int.Parse(parts[1]);
-            day = int.Parse(parts[2]);
-            var time = parts[3];
-            if (time.Length != 6) return false;
-            hour = int.Parse(time.Substring(0,2));
-            minute = int.Parse(time.Substring(2,2));
-            second = int.Parse(time.Substring(4,2));
-            return month is >=1 and <=12 && day is >=1 and <=31 && hour is >=0 and <=23 && minute is >=0 and <=59 && second is >=0 and <=59;
-        }
-        catch { return false; }
-    }
+        => (display, display, display, display);
 
     void WriteVersionResources((string Display, string Assembly, string File, string Info) model)
     {
-        // version.json
         var payload = new
         {
             version = model.Display,
@@ -877,7 +773,6 @@ class BuildTasks : NukeBuild
         System.IO.File.WriteAllText(VersionFile,
             JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 
-        // csproj
         if (MainProject != null && System.IO.File.Exists(MainProject.Path))
         {
             var xdoc = XDocument.Load(MainProject.Path);
@@ -892,102 +787,58 @@ class BuildTasks : NukeBuild
                 pg.Add(el);
                 return el;
             }
-            Ensure("Version").Value = model.Display;              // four-part display version
-            Ensure("AssemblyVersion").Value = model.Assembly;     // derived 4-part (hour granularity)
-            Ensure("FileVersion").Value = model.File;             // derived 4-part (minute-second granularity)
-            Ensure("InformationalVersion").Value = model.Info;    // identical to display for traceability
+            Ensure("Version").Value = model.Display;
+            Ensure("AssemblyVersion").Value = model.Assembly;
+            Ensure("FileVersion").Value = model.File;
+            Ensure("InformationalVersion").Value = model.Info;
             xdoc.Save(MainProject.Path);
         }
         Console.WriteLine($"📝 Locked version: {model.Display}");
-        Console.WriteLine($"    → Assembly/File derived: {model.Assembly}");
     }
 
     Target UpgradeVersion => _ => _
-        .Description("Manually lock a new timestamp version (or use --NewVersion)")
+        .Description("Lock a new timestamp version or use --NewVersion")
         .Executes(() =>
         {
-            if (!string.IsNullOrWhiteSpace(NewVersion))
-            {
-                if (!IsValidDisplayVersion(NewVersion))
-                    throw new Exception($"Provided NewVersion '{NewVersion}' invalid. Expect compact format like 2025.922.74759");
-                Console.WriteLine($"Using provided NewVersion: {NewVersion}");
-            }
-            var display = string.IsNullOrWhiteSpace(NewVersion) ? GenerateTimestampVersion() : NewVersion!;
+            var display = !string.IsNullOrWhiteSpace(NewVersion) ? NewVersion : GenerateTimestampVersion();
+            
+            if (!IsValidDisplayVersion(display))
+                throw new Exception($"Invalid version format: {display}");
+
             var model = BuildVersionModel(display);
             WriteVersionResources(model);
         });
 
-    /// <summary>
-    /// Ensure version.json exists and matches expected schema (Display pattern + assembly/file alignment)
-    /// </summary>
     Target CheckVersionLocked => _ => _
         .Description("Validate locked version file exists and is consistent")
         .Executes(() =>
         {
             if (!File.Exists(VersionFile))
-                throw new Exception("version.json not found. Run 'nuke UpgradeVersion' before packaging or releasing.");
+                throw new Exception("version.json not found. Run 'nuke UpgradeVersion' first.");
 
             try
             {
-                using var fs = File.OpenRead(VersionFile);
-                var doc = JsonDocument.Parse(fs);
-                string Read(string name) => doc.RootElement.TryGetProperty(name, out var p) ? p.GetString() : null;
-                var display = Read("version");
-                var assembly = Read("assemblyVersion");
-                var file = Read("fileVersion");
-                var info = Read("informationalVersion");
+                var json = JsonDocument.Parse(File.ReadAllText(VersionFile));
+                var display = json.RootElement.GetProperty("version").GetString();
 
                 if (string.IsNullOrWhiteSpace(display) || !IsValidDisplayVersion(display))
-                    throw new Exception($"Invalid or missing 'version' in version.json: {display} (expected yyyy.M.d.HHmmss e.g. 2025.9.22.070405)");
+                    throw new Exception($"Invalid version in version.json: {display}");
 
-                if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file))
-                    throw new Exception("assemblyVersion/fileVersion missing in version.json");
-
-                var derived = BuildVersionModel(display);
-                bool legacyThreePart = assembly == display && file == display && display.Count(c=>c=='.')==2; // old schema
-                if (string.IsNullOrWhiteSpace(info) || info != display)
-                    throw new Exception($"informationalVersion must equal display (three-part) value: {info} vs {display}");
-                if (legacyThreePart)
+                if (MainProject != null && File.Exists(MainProject.Path))
                 {
-                    Console.WriteLine("⚠️ Legacy version schema detected (assembly/file three-part). Upgrading in-place...");
-                    WriteVersionResources(derived);
-                    Console.WriteLine("✅ Upgraded version.json & csproj. Re-run build.");
-                    return; // treat as recovered
-                }
-                if (assembly != derived.Assembly || file != derived.File)
-                    throw new Exception($"assembly/file mismatch: expected {derived.Assembly} derived from display {display} but found assembly={assembly} file={file}");
-
-                // Cross-check csproj values
-                if (MainProject == null || !File.Exists(MainProject.Path))
-                    throw new Exception("Main project file missing for cross validation");
-
-                var xdoc = XDocument.Load(MainProject.Path);
-                var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
-                string ReadProj(string name) => xdoc.Descendants(ns + name).FirstOrDefault()?.Value;
-                var pVersion = ReadProj("Version");
-                var pAssembly = ReadProj("AssemblyVersion");
-                var pFile = ReadProj("FileVersion");
-                var pInfo = ReadProj("InformationalVersion");
-
-                void MustEqual(string label, string expected, string actual)
-                {
-                    if (string.IsNullOrWhiteSpace(actual))
-                        throw new Exception($"csproj missing {label}");
-                    if (!string.Equals(expected, actual, StringComparison.Ordinal))
-                        throw new Exception($"Mismatch {label}: version.json='{expected}' csproj='{actual}'");
+                    var xdoc = XDocument.Load(MainProject.Path);
+                    var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
+                    var projectVersion = xdoc.Descendants(ns + "Version").FirstOrDefault()?.Value;
+                    
+                    if (projectVersion != display)
+                        throw new Exception($"Version mismatch: version.json={display}, project={projectVersion}");
                 }
 
-                MustEqual("Version", display, pVersion);
-                if (pInfo != display) throw new Exception($"Mismatch InformationalVersion: expected {display} got {pInfo}");
-                var derivedProj = BuildVersionModel(display);
-                MustEqual("AssemblyVersion", derivedProj.Assembly, pAssembly);
-                MustEqual("FileVersion", derivedProj.File, pFile);
-
-                Console.WriteLine($"✅ version.json & csproj validated: {display}");
+                Console.WriteLine($"✅ Version validated: {display}");
             }
             catch (Exception ex)
             {
-                throw new Exception($"version.json validation failed: {ex.Message}");
+                throw new Exception($"Version validation failed: {ex.Message}");
             }
         });
 }
