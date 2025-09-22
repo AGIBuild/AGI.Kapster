@@ -1,12 +1,8 @@
-name: 'Setup Complete Environment'
-description: 'Complete environment setup including .NET, caching, and global configurations'
+name: 'Setup .NET Environment'
+description: 'Setup .NET and NuGet cache without checkout (assumes repository already checked out)'
 author: 'AGI.Captor Team'
 
 inputs:
-  fetch-depth:
-    description: 'Git fetch depth for checkout'
-    required: false
-    default: '1'
   dotnet-version:
     description: '.NET version to install'
     required: false
@@ -30,8 +26,8 @@ inputs:
 
 runs:
   using: "composite"
-  steps:
-    - name:  Setup .NET
+  steps:        
+    - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ inputs.include-dotnet8 == 'true' && format('8.0.x{0}{1}', '\n', inputs.dotnet-version) || inputs.dotnet-version }}
@@ -52,9 +48,8 @@ runs:
         restore-keys: |
           nuget-${{ runner.os }}-
           
-    - name: 🔧 Setup global .NET environment
+    - name: 🌐 Set environment variables
       shell: bash
       run: |
         echo "DOTNET_NOLOGO=true" >> $GITHUB_ENV
         echo "DOTNET_CLI_TELEMETRY_OPTOUT=true" >> $GITHUB_ENV
-        echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true" >> $GITHUB_ENV

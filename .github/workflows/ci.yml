@@ -27,10 +27,14 @@ jobs:
       build-number: ${{ steps.version.outputs.build-number }}
       
     steps:
-    - name: 🛠️ Setup Environment
-      uses: ./.github/actions/setup-environment
+    - name: � Checkout repository
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        
+    - name: �🛠️ Setup Environment
+      uses: ./.github/actions/setup-environment
+      with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: 📊 Get build information
