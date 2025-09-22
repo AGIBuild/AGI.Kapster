@@ -10,7 +10,6 @@ using Nuke.Common;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
-using Nuke.Common.Tools.GitVersion;
 using Nuke.Common.Tooling;
 using static Nuke.Common.EnvironmentInfo;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
@@ -51,24 +50,10 @@ class BuildTasks : NukeBuild
     readonly bool Coverage;
 
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
-    [GitVersion(NoFetch = true, NoCache = true)] GitVersion GitVersion;
-
-    [Parameter("Manual new version (format: yyyy.MMdd.HHmmss or compact yyyy.MMd.HHmmss without leading zero segments). If omitted auto-generate.")] readonly string NewVersion; // updated
+    [Parameter("Manual new version (display format: yyyy.M.d.HHmmss — month/day no leading zero, time HHmmss). If omitted auto-generate.")] readonly string NewVersion; // updated
 
     AbsolutePath VersionFile => RootDirectory / "version.json"; // added
     static (string Display, string Assembly, string File, string Info)? _versionCache; // added
-
-    // Ensure GitVersion is injected correctly; provide fallback if not.
-    GitVersion GetGitVersionOrFallback()
-    {
-        if (GitVersion != null)
-        {
-            return GitVersion;
-        }
-
-        Console.WriteLine("⚠️ GitVersion injection failed. Using fallback version calculation.");
-        return null;
-    }
 
     // Paths
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
@@ -114,36 +99,7 @@ class BuildTasks : NukeBuild
         }
     }
 
-    /// <summary>
-    /// Get version information from GitVersion with fallback support
-    /// </summary>
-    (string AssemblyVersion, string FileVersion, string InformationalVersion) GetVersionInfo()
-    {
-        var gitVersion = GetGitVersionOrFallback();
-
-        if (gitVersion != null)
-        {
-            return (
-                gitVersion.AssemblySemVer ?? "1.0.0.0",
-                gitVersion.AssemblySemFileVer ?? "1.0.0.0",
-                gitVersion.InformationalVersion ?? "1.0.0+local"
-            );
-        }
-
-        // Fallback version when GitVersion fails
-        var fallbackVersion = "1.3.0";
-        var buildNumber = Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0";
-        var shaEnv = Environment.GetEnvironmentVariable("GITHUB_SHA");
-        var sha = !string.IsNullOrEmpty(shaEnv) && shaEnv.Length >= 7 ? shaEnv.Substring(0, 7) : "local";
-
-        Console.WriteLine($"📋 Using fallback version: {fallbackVersion}.{buildNumber}+{sha}");
-
-        return (
-            $"{fallbackVersion}.0",
-            $"{fallbackVersion}.{buildNumber}",
-            $"{fallbackVersion}.{buildNumber}+{sha}"
-        );
-    }
+    // Removed GitVersion integration; version is fully driven by locked version.json & timestamp generator.
 
     /// <summary>
     /// Clean artifacts and bin/obj directories
@@ -826,47 +782,68 @@ class BuildTasks : NukeBuild
             }
         }
 
-        // 3) Fallback GitVersion (legacy safety net)
-        var gv = GetVersionInfo();
-        _versionCache = (gv.InformationalVersion, gv.AssemblyVersion, gv.FileVersion, gv.InformationalVersion);
-        Console.WriteLine($"ℹ️ Using fallback GitVersion: {gv.InformationalVersion}");
+        // 3) Final fallback: generate ephemeral timestamp-derived version (not persisted)
+        var fallbackDisplay = GenerateTimestampVersion();
+        var fallbackModel = BuildVersionModel(fallbackDisplay);
+        _versionCache = fallbackModel;
+        Console.WriteLine($"ℹ️ Using generated fallback version (no version.json present): {fallbackDisplay}");
         return _versionCache.Value;
     }
 
-    // New compact display format request: example given 2025.922.74759
-    // Rules we adopt:
-    //  Display = Year "." (Month without leading zero)(Day always 2 digits) "." (Hour without leading zero)(Minute always 2 digits)(Second always 2 digits)
-    //  Example: 2025-09-22 07:47:59 UTC => 2025.922.74759
-    //  Month 9 + Day 22 => 922 ; Hour 7 + Minute 47 + Second 59 => 74759
-    //  For months >=10: 2025-11-03 15:04:05 => Month 11 + Day 03 => 1103 ; Hour 15 + 04 + 05 => 150405 => 2025.1103.150405
-    //  Regex pattern: ^\d{4}\.[1-9]\d?\d{2}\.[0-9]{1,2}\d{4}$
-    //                 Broken down: Year '.' (Month 1-12 no leading zero)(Day two digits) '.' (Hour 0-23 no leading zero) (Minute two digits) (Second two digits)
+    // New display version format: YYYY.M.D.HHmmss
+    //  - Display has 4 segments (dot separated) for clarity & direct tag usage
+    //  - Segment 1: Year (yyyy)
+    //  - Segment 2: Month (1-12, no leading zero)
+    //  - Segment 3: Day (1-31, no leading zero)
+    //  - Segment 4: HHmmss (24h time, always 6 digits)
+    // Example: 2025-09-22 07:04:05 => 2025.9.22.070405 ; 2025-12-03 15:47:59 => 2025.12.3.154759
+    // NOTE: HHmmss may exceed 65535, so cannot be used directly as revision for CLR assembly/file versions.
+    // Mapping rules for assembly/file (both four-part, each <= 65535 components):
+    //   AssemblyVersion = Year.Month.Day.Hour
+    //   FileVersion     = Year.Month.Day.(Minute*100 + Second)  (range 0..5959) ensuring uniqueness within an hour.
+    // InformationalVersion = Display (full four-part) for traceability.
 
     string GenerateTimestampVersion()
     {
         var utc = DateTime.UtcNow;
-        var monthPart = utc.Month.ToString(); // no leading zero
-        var dayPart = utc.Day.ToString("00");
-        var hourPart = utc.Hour.ToString(); // no leading zero
-        var minutePart = utc.Minute.ToString("00");
-        var secondPart = utc.Second.ToString("00");
-        return $"{utc:yyyy}.{monthPart}{dayPart}.{hourPart}{minutePart}{secondPart}";
+        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{utc:HHmmss}";
     }
 
     bool IsValidDisplayVersion(string v)
-        // Strict pattern: Year '.' (month+day) '.' (hour+mmss)
-        // month+day: month(1-12 no leading zero) + day(2 digits) => 3-4 digits
-        // hour+mmss: hour(0-23 no leading zero unless 0) + minute(2) + second(2) => 5-6 digits
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d{2,3}\\.[0-9]{1,2}\\d{4}$");
+        // Pattern: yyyy.M.d.HHmmss (Month, Day no leading zero; time fixed 6 digits)
+        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d?\\.[1-9]\\d?\\.[0-2]\\d[0-5]\\d[0-5]\\d$");
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
     {
-        // All versions unified to three-part display string.
-        // assembly/file/informational all identical to display for simplicity.
-        var sha = Environment.GetEnvironmentVariable("GITHUB_SHA");
-        var shortSha = string.IsNullOrWhiteSpace(sha) ? "local" : sha[..Math.Min(8, sha.Length)];
-        var info = display; // informational also pure three-part (no +sha suffix per requirement)
-        return (display, display, display, info);
+        if (!IsValidDisplayVersion(display) || !TryParseDisplayVersion(display, out var year, out var month, out var day, out var hour, out var minute, out var second))
+        {
+            // Fallback: append .0 for assembly/file to keep valid
+            return (display, $"{display}.0", $"{display}.0", display);
+        }
+        var assemblyVersion = $"{year}.{month}.{day}.{hour}";               // components within range
+        var fileRevision = minute * 100 + second;                             // 0..5959
+        var fileVersion = $"{year}.{month}.{day}.{fileRevision}";
+        return (display, assemblyVersion, fileVersion, display);
+    }
+
+    bool TryParseDisplayVersion(string display, out int year, out int month, out int day, out int hour, out int minute, out int second)
+    {
+        year = month = day = hour = minute = second = 0;
+        try
+        {
+            var parts = display.Split('.');
+            if (parts.Length != 4) return false;
+            year = int.Parse(parts[0]);
+            month = int.Parse(parts[1]);
+            day = int.Parse(parts[2]);
+            var time = parts[3];
+            if (time.Length != 6) return false;
+            hour = int.Parse(time.Substring(0,2));
+            minute = int.Parse(time.Substring(2,2));
+            second = int.Parse(time.Substring(4,2));
+            return month is >=1 and <=12 && day is >=1 and <=31 && hour is >=0 and <=23 && minute is >=0 and <=59 && second is >=0 and <=59;
+        }
+        catch { return false; }
     }
 
     void WriteVersionResources((string Display, string Assembly, string File, string Info) model)
@@ -898,13 +875,14 @@ class BuildTasks : NukeBuild
                 pg.Add(el);
                 return el;
             }
-            Ensure("Version").Value = model.Display;
-            Ensure("AssemblyVersion").Value = model.Assembly;
-            Ensure("FileVersion").Value = model.File;
-            Ensure("InformationalVersion").Value = model.Info;
+            Ensure("Version").Value = model.Display;              // four-part display version
+            Ensure("AssemblyVersion").Value = model.Assembly;     // derived 4-part (hour granularity)
+            Ensure("FileVersion").Value = model.File;             // derived 4-part (minute-second granularity)
+            Ensure("InformationalVersion").Value = model.Info;    // identical to display for traceability
             xdoc.Save(MainProject.Path);
         }
         Console.WriteLine($"📝 Locked version: {model.Display}");
+        Console.WriteLine($"    → Assembly/File derived: {model.Assembly}");
     }
 
     Target UpgradeVersion => _ => _
@@ -943,16 +921,24 @@ class BuildTasks : NukeBuild
                 var info = Read("informationalVersion");
 
                 if (string.IsNullOrWhiteSpace(display) || !IsValidDisplayVersion(display))
-                    throw new Exception($"Invalid or missing 'version' in version.json: {display} (expected compact yyyy.Mdd.Hmmss e.g. 2025.922.74759)");
+                    throw new Exception($"Invalid or missing 'version' in version.json: {display} (expected yyyy.M.d.HHmmss e.g. 2025.9.22.070405)");
 
                 if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file))
                     throw new Exception("assemblyVersion/fileVersion missing in version.json");
 
-                if (assembly != file || assembly != display)
-                    throw new Exception($"assembly/file/display mismatch – all must be identical three-part string: {display}");
-
+                var derived = BuildVersionModel(display);
+                bool legacyThreePart = assembly == display && file == display && display.Count(c=>c=='.')==2; // old schema
                 if (string.IsNullOrWhiteSpace(info) || info != display)
                     throw new Exception($"informationalVersion must equal display (three-part) value: {info} vs {display}");
+                if (legacyThreePart)
+                {
+                    Console.WriteLine("⚠️ Legacy version schema detected (assembly/file three-part). Upgrading in-place...");
+                    WriteVersionResources(derived);
+                    Console.WriteLine("✅ Upgraded version.json & csproj. Re-run build.");
+                    return; // treat as recovered
+                }
+                if (assembly != derived.Assembly || file != derived.File)
+                    throw new Exception($"assembly/file mismatch: expected {derived.Assembly} derived from display {display} but found assembly={assembly} file={file}");
 
                 // Cross-check csproj values
                 if (MainProject == null || !File.Exists(MainProject.Path))
@@ -975,9 +961,10 @@ class BuildTasks : NukeBuild
                 }
 
                 MustEqual("Version", display, pVersion);
-                MustEqual("AssemblyVersion", display, pAssembly);
-                MustEqual("FileVersion", display, pFile);
-                MustEqual("InformationalVersion", display, pInfo);
+                if (pInfo != display) throw new Exception($"Mismatch InformationalVersion: expected {display} got {pInfo}");
+                var derivedProj = BuildVersionModel(display);
+                MustEqual("AssemblyVersion", derivedProj.Assembly, pAssembly);
+                MustEqual("FileVersion", derivedProj.File, pFile);
 
                 Console.WriteLine($"✅ version.json & csproj validated: {display}");
             }

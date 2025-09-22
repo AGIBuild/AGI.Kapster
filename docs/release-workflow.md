@@ -14,10 +14,11 @@ AGI.Captor 发布流程已升级为 **“锁定版本 + 标签驱动”** 的确
 
 ### 1. 锁定时间序列版本 (Time-based Locked Version)
 - **来源**: 运行 `./build.ps1 UpgradeVersion --lock`（或对应 Nuke 目标）生成。
-- **文件**: `version.json`（唯一可信源，含 `version`, `assemblyVersion`, `fileVersion`, `informationalVersion` 四个相同字段）。
-- **格式**: `YYYY.MDD.Hmmss` （示例：`2025.121.915304`）。
-   - 正则校验：`^[0-9]{4}\.[1-9][0-9]{2,3}\.[0-9]{1,2}[0-9]{4}$`
-   - 单调递增，保证时间可追溯与冲突可检测。
+- **文件**: `version.json`（唯一可信源，含 `version`(Display 四段), `assemblyVersion`/`fileVersion`(派生四段), `informationalVersion`）。
+- **Display 格式**: `YYYY.M.D.HHmmss` （示例：`2025.9.22.154759`）。
+   - 正则校验：`^\d{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d[0-5]\d$`
+   - 映射：`assemblyVersion=Year.Month.Day.Hour`；`fileVersion=Year.Month.Day.(Minute*100+Second)`；`informational=Display`。
+   - 时间冲突概率极低；若同秒生成可重试。
 - **锁定机制**: 生成后必须提交。`CheckVersionLocked` / `verify-version` 工作流阻止未锁定或篡改。
 
 ### 2. 工作流

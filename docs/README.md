@@ -3,7 +3,7 @@
 ## Build and Deployment
 
 ### Version Management
-- **[Versioning Strategy](versioning-strategy.md)** - Complete versioning strategy and GitVersion configuration
+- **[Versioning Strategy](versioning-strategy.md)** - Locked time-based versioning strategy (GitVersion removed)
   - Branch strategy and version rules
   - Semantic versioning format
   - Commit message conventions
@@ -11,7 +11,6 @@
 
 - **[Commands Reference](commands-reference.md)** - Quick reference for common commands
   - Build system commands
-  - GitVersion operations
   - Git workflow commands
   - Testing and packaging
 

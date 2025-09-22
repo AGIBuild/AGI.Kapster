@@ -15,8 +15,8 @@
     <!-- Disable AOT for easier packaging and deployment -->
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
-    <AssemblyVersion>2025.922.90115</AssemblyVersion>
-    <FileVersion>2025.922.90115</FileVersion>
+  <AssemblyVersion>2025.922.9.115</AssemblyVersion>
+  <FileVersion>2025.922.9.115</FileVersion>
     <Version>2025.922.90115</Version>
     <Product>AGI Captor</Product>
     <Company>AGI Build</Company>

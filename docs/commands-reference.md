@@ -19,25 +19,47 @@ cd AGI.Captor
 ### 基础构建命令
 ```powershell
 # 清理构建输出
-./build.ps1 Clean
+## 🏷️ 版本管理（锁定时间序列模型）
 
-# 编译项目
-./build.ps1 Build
+### 基本操作
+```powershell
+# 升级并锁定版本（写入 version.json，三段展示 + 派生四段 assembly/file）
+./build.ps1 UpgradeVersion --lock
 
-# 运行测试
-./build.ps1 Test
+# 查看锁定版本
+Get-Content version.json | ConvertFrom-Json | Select-Object version,assemblyVersion,fileVersion,informationalVersion
 
-# 运行测试并生成覆盖率
-./build.ps1 Test --coverage
+# 仅查看展示版本
+(Get-Content version.json | ConvertFrom-Json).version
+```
 
-# 发布应用
-./build.ps1 Publish
+### 版本字段说明
+```text
+version               -> 展示版 (YYYY.MDD.Hmmss)
+assemblyVersion       -> 派生四段 (YYYY.(M*100+D).H.(m*100+s))
+fileVersion           -> 同 assemblyVersion
+informationalVersion  -> 与 version 一致（可扩展附加 build metadata）
+```
 
-# 创建安装包
-./build.ps1 Package
+### 示例
+```
+version: 2025.922.90115
+assemblyVersion: 2025.922.9.115
+fileVersion: 2025.922.9.115
+informationalVersion: 2025.922.90115
+```
 
-# 获取构建信息
-./build.ps1 Info
+### 常见检查
+```powershell
+# 验证派生规则（简单快速）
+$j = Get-Content version.json | ConvertFrom-Json
+$v = $j.version.Split('.')
+$year = [int]$v[0]; $mdd=[int]$v[1]; $hmmss=[int]$v[2]
+$hour = [int]($hmmss.ToString().Substring(0, if($hmmss -ge 100000){2}else{1}))
+$mmss = $hmmss.ToString().Substring($hour -lt 10 ? 1 : 2)
+$minute = [int]$mmss.Substring(0,2); $sec=[int]$mmss.Substring(2,2)
+$derived = "$year.$mdd.$hour." + ($minute*100 + $sec)
+if($derived -ne $j.assemblyVersion){ Write-Host "❌ 派生不匹配" } else { Write-Host "✅ 派生匹配" }
 ```
 
 ### 组合命令
@@ -53,28 +75,28 @@ cd AGI.Captor
 ```
 
 ### 平台特定构建
-```powershell
-# Windows x64
-./build.ps1 Publish --rids win-x64
+### 提交规范
+```bash
+# 功能提交
+git commit -m "feat: add auto-update feature"
 
-# Linux x64
-./build.ps1 Publish --rids linux-x64
+# 修复提交
+git commit -m "fix: resolve memory leak"
 
-# macOS x64
-./build.ps1 Publish --rids osx-x64
+# 破坏性变更（正文解释迁移）
+git commit -m "feat!: new API design" -m "BREAKING: 旧 API 将在下版本移除"
 
-# macOS ARM64
-./build.ps1 Publish --rids osx-arm64
-
-# 多平台构建
-./build.ps1 Publish --rids win-x64,linux-x64,osx-x64,osx-arm64
+# 文档更新
+git commit -m "docs: update README"
 ```
+./build.ps1 Publish --rids win-x64,linux-x64,osx-x64,osx-arm64
+# 1. 生成预览构建 (未改变锁定 version.json)
 
-## 🏷️ 版本管理
+# 3. 构建使用锁定的时间序列版本
 
-### GitVersion 命令
+# 2. 修复问题并提交
+git commit -m "fix: critical security issue"
 ```powershell
-# 获取完整版本信息
 dotnet gitversion
 
 # 获取特定版本字段
@@ -152,16 +174,12 @@ git push origin --delete v1.3.0
 ### 提交规范
 ```bash
 # 功能提交
-git commit -m "feat: add auto-update feature +semver:minor"
 
 # 修复提交
-git commit -m "fix: resolve memory leak +semver:patch"
 
 # 破坏性变更
-git commit -m "feat!: new API design +semver:breaking"
 
 # 文档更新（不增量版本）
-git commit -m "docs: update README +semver:none"
 ```
 
 ## 🧪 测试命令
@@ -300,7 +318,6 @@ git push origin v1.3.0
 git checkout -b hotfix/critical-fix
 
 # 2. 修复问题并提交
-git commit -m "fix: critical security issue +semver:patch"
 
 # 3. 推送分支
 git push origin hotfix/critical-fix
@@ -339,26 +356,6 @@ if ($LASTEXITCODE -eq 0) {
 }
 ```
 
-## 🆘 故障排除
-
-### 常见问题解决
-```powershell
-# 清理所有构建输出
-./build.ps1 Clean
-Remove-Item -Recurse -Force bin,obj,artifacts -ErrorAction SilentlyContinue
-
-# 重置 NuGet 包
-dotnet nuget locals all --clear
-dotnet restore --force
-
-# 重置 Git 状态
-git clean -fdx
-git reset --hard HEAD
-
-# 修复权限问题 (Linux/macOS)
-chmod +x build.sh
-chmod +x packaging/**/*.sh
-```
 
 ### 性能优化
 ```powershell
@@ -379,5 +376,4 @@ dotnet build src/AGI.Captor.Desktop/
 ```powershell
 # 添加到 $PROFILE
 New-Alias -Name build -Value "./build.ps1"
-New-Alias -Name gv -Value "dotnet gitversion"
 ```
