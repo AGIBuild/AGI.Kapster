@@ -3,8 +3,6 @@ name: verify-version
 on:
   pull_request:
     branches: [ main, release ]
-  push:
-    branches: [ main, release ]
 
 jobs:
   verify:
@@ -13,29 +11,25 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: �️ Setup Environment
+        uses: ./.github/actions/setup-environment
         with:
           fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
 
       - name: Restore tools
         run: dotnet tool restore || true
 
       - name: Validate version.json exists
+        shell: pwsh
         run: |
-          if [ ! -f version.json ]; then
-            echo "version.json missing. Run 'nuke UpgradeVersion' and commit." >&2
+          if (-not (Test-Path version.json)) {
+            Write-Host "version.json missing. Run 'nuke UpgradeVersion' and commit." -ForegroundColor Red
             exit 1
-          fi
+          }
 
       - name: Run CheckVersionLocked target
-        run: |
-          ./build.sh CheckVersionLocked
+        shell: pwsh
+        run: ./build.ps1 CheckVersionLocked
 
       - name: Detect direct csproj version edits (PR only)
         if: github.event_name == 'pull_request'

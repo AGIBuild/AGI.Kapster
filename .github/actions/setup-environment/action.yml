@@ -1,0 +1,65 @@
+name: 'Setup Complete Environment'
+description: 'Complete environment setup including .NET, caching, and global configurations'
+author: 'AGI.Captor Team'
+
+inputs:
+  fetch-depth:
+    description: 'Git fetch depth for checkout'
+    required: false
+    default: '1'
+  dotnet-version:
+    description: '.NET version to install'
+    required: false
+    default: '9.0.x'
+  dotnet-quality:
+    description: '.NET quality channel (ga, preview)'
+    required: false
+    default: 'preview'
+  include-dotnet8:
+    description: 'Whether to include .NET 8.x'
+    required: false
+    default: 'true'
+  enable-nuget-cache:
+    description: 'Enable NuGet package caching'
+    required: false
+    default: 'true'
+  cache-key-suffix:
+    description: 'Additional suffix for cache key'
+    required: false
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+        
+    - name: 🔧 Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.include-dotnet8 == 'true' && format('8.0.x{0}{1}', '\n', inputs.dotnet-version) || inputs.dotnet-version }}
+        dotnet-quality: ${{ inputs.dotnet-quality }}
+        
+    - name: ⚙️ Configure Git safe.directory
+      shell: bash
+      run: |
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory $(pwd)
+        
+    - name: ♻️ Setup NuGet cache
+      if: inputs.enable-nuget-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.fsproj', '**/*.vbproj') }}${{ inputs.cache-key-suffix }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+          
+    - name: 🔧 Setup global .NET environment
+      shell: bash
+      run: |
+        echo "DOTNET_NOLOGO=true" >> $GITHUB_ENV
+        echo "DOTNET_CLI_TELEMETRY_OPTOUT=true" >> $GITHUB_ENV
+        echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true" >> $GITHUB_ENV

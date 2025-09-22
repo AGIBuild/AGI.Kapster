@@ -1,0 +1,66 @@
+name: Reusable Build and Test
+
+# Reusable build and test workflow
+on:
+  workflow_call:
+    inputs:
+      configuration:
+        type: string
+        required: false
+        default: 'Release'
+      enable-coverage:
+        type: boolean
+        required: false
+        default: true
+      upload-artifacts:
+        type: boolean
+        required: false
+        default: true
+      artifact-retention-days:
+        type: number
+        required: false
+        default: 7
+    outputs:
+      build-success:
+        description: 'Whether build was successful'
+        value: ${{ jobs.build-test.outputs.build-success }}
+      test-success:
+        description: 'Whether tests passed'
+        value: ${{ jobs.build-test.outputs.test-success }}
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: 🔨 Build & Test
+    runs-on: ubuntu-latest
+    outputs:
+      build-success: ${{ steps.build-test.outputs.build-success }}
+      test-success: ${{ steps.build-test.outputs.test-success }}
+    
+    steps:
+    - name: �️ Setup Environment
+      uses: ./.github/actions/setup-environment
+      with:
+        fetch-depth: 1
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 🔨 Build and Test
+      id: build-test
+      uses: ./.github/actions/build-and-test
+      with:
+        configuration: ${{ inputs.configuration }}
+        enable-coverage: ${{ inputs.enable-coverage }}
+        
+    - name: 📊 Upload test results and coverage
+      if: always() && inputs.upload-artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-test-results-${{ inputs.configuration }}
+        path: |
+          artifacts/test-results/
+          artifacts/coverage/
+        retention-days: ${{ inputs.artifact-retention-days }}

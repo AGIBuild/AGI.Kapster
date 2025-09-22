@@ -1,0 +1,46 @@
+name: 'Publish Package'
+description: 'Build and package applications for specific runtime'
+author: 'AGI.Captor Team'
+
+inputs:
+  runtime-id:
+    description: 'Target runtime identifier (win-x64, linux-x64, osx-x64, osx-arm64)'
+    required: true
+  configuration:
+    description: 'Build configuration'
+    required: false
+    default: 'Release'
+  skip-tests:
+    description: 'Skip running tests before publish'
+    required: false
+    default: 'true'
+  package:
+    description: 'Create platform-specific packages'
+    required: false
+    default: 'true'
+
+outputs:
+  artifact-path:
+    description: 'Path to published artifacts'
+    value: artifacts/publish/${{ inputs.runtime-id }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: 🚀 Publish for ${{ inputs.runtime-id }}
+      shell: pwsh
+      run: |
+        $publishArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
+        if ("${{ inputs.skip-tests }}" -eq "true") {
+          $publishArgs += " --skip-tests"
+        }
+        
+        ./build.ps1 Clean
+        ./build.ps1 Publish $publishArgs
+        
+    - name: 📦 Create packages
+      if: inputs.package == 'true'
+      shell: pwsh
+      run: |
+        $packageArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
+        ./build.ps1 Package $packageArgs

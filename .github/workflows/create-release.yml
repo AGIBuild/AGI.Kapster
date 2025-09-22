@@ -21,15 +21,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: �️ Setup Environment
+        uses: ./.github/actions/setup-environment
         with:
           fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
 
       - name: Validate locked version
         id: set-version
@@ -48,7 +43,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run CheckVersionLocked
-        run: ./build.sh CheckVersionLocked
+        shell: pwsh
+        run: ./build.ps1 CheckVersionLocked
 
       - name: Ensure tag not exists
         run: |
