@@ -882,11 +882,11 @@ class BuildTasks : NukeBuild
         var timePart = display.Substring(secondDot + 1); // H + mmss
         if (monthDay.Length < 3) throw new Exception("monthDay part too short");
         var dayStr = monthDay[^2..];
-        var monthStr = monthDay.Substring(0, monthDay.Length - 2);
+        var monthStr = monthDay[..^2];
         if (timePart.Length < 5) throw new Exception("time part too short");
         var secondStr = timePart[^2..];
-        var minuteStr = timePart.Substring(timePart.Length - 4, 2);
-        var hourStr = timePart.Substring(0, timePart.Length - 4);
+        var minuteStr = timePart[^4..^2];
+        var hourStr = timePart[..^4];
         var month = int.Parse(monthStr);
         var day = int.Parse(dayStr);
         var hour = int.Parse(hourStr);
