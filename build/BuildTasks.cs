@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Xml.Linq;
 using Nuke.Common;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
@@ -49,6 +52,11 @@ class BuildTasks : NukeBuild
 
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
     [GitVersion(NoFetch = true, NoCache = true)] GitVersion GitVersion;
+
+    [Parameter("Manual new version (format: yyyy.MMdd.HHmmss or compact yyyy.MMd.HHmmss without leading zero segments). If omitted auto-generate.")] readonly string NewVersion; // updated
+
+    AbsolutePath VersionFile => RootDirectory / "version.json"; // added
+    static (string Display, string Assembly, string File, string Info)? _versionCache; // added
 
     // Ensure GitVersion is injected correctly; provide fallback if not.
     GitVersion GetGitVersionOrFallback()
@@ -169,20 +177,14 @@ class BuildTasks : NukeBuild
     /// Build the solution
     /// </summary>
     Target Build => _ => _
+        .Description("Compile solution")
         .DependsOn(Restore)
         .Executes(() =>
         {
-            var version = GetVersionInfo();
-
             DotNetBuild(s => s
                 .SetProjectFile(Solution)
                 .SetConfiguration(Configuration)
-                .SetAssemblyVersion(version.AssemblyVersion)
-                .SetFileVersion(version.FileVersion)
-                .SetInformationalVersion(version.InformationalVersion)
                 .EnableNoRestore());
-
-            Console.WriteLine($"✅ Build completed - Version: {version.InformationalVersion}");
         });
 
     /// <summary>
@@ -245,58 +247,17 @@ class BuildTasks : NukeBuild
     /// Publish applications for specified runtime identifiers
     /// </summary>
     Target Publish => _ => _
-        .DependsOn(SkipTests ? Build : Test)
+        .Description("Publish binaries")
+        .DependsOn(Test)
         .Executes(() =>
         {
-            if (MainProject == null)
-            {
-                throw new InvalidOperationException("Main project (AGI.Captor.Desktop) not found");
-            }
-
-            var version = GetVersionInfo();
-
-            foreach (var rid in PublishRuntimeIdentifiers)
-            {
-                var outputDir = PublishDirectory / rid;
-                outputDir.CreateOrCleanDirectory();
-
-                Console.WriteLine($"📦 Publishing for {rid}...");
-
-                try
-                {
-                    // 检查项目是否启用了AOT编译
-                    var publishAot = MainProject?.GetProperty("PublishAot")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-                    var effectiveTrim = publishAot || Trim; // AOT编译时必须启用Trim
-
-                    if (publishAot && !Trim)
-                    {
-                        Console.WriteLine($"⚠️  AOT compilation enabled, trimming will be automatically enabled for {rid}");
-                    }
-
-                    DotNetPublish(s => s
-                        .SetProject(MainProject)
-                        .SetConfiguration(Configuration)
-                        .SetFramework(TargetFramework)
-                        .SetRuntime(rid)
-                        .SetSelfContained(SelfContained)
-                        .SetPublishSingleFile(SingleFile)
-                        .SetPublishTrimmed(effectiveTrim)
-                        .SetOutput(outputDir)
-                        .SetAssemblyVersion(version.AssemblyVersion)
-                        .SetFileVersion(version.FileVersion)
-                        .SetInformationalVersion(version.InformationalVersion)
-                        .EnableNoRestore());
-
-                    Console.WriteLine($"✅ Published {rid} to: {outputDir}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Failed to publish {rid}: {ex.Message}");
-                    throw;
-                }
-            }
-
-            Console.WriteLine($"🎉 All publishing completed successfully! Check: {PublishDirectory}");
+            var publishDir = RootDirectory / "artifacts" / "publish";
+            // Version is not injected here; must be locked via UpgradeVersion beforehand.
+            DotNetPublish(s => s
+                .SetProject(MainProject)
+                .SetConfiguration(Configuration)
+                .EnableNoRestore()
+                .SetOutput(publishDir));
         });
 
     /// <summary>
@@ -346,12 +307,13 @@ class BuildTasks : NukeBuild
                 }
             }
 
-            var version = GetVersionInfo();
+            var version = GetFixedVersionOrFallback();
             Console.WriteLine();
             Console.WriteLine("🏷️ Version Information:");
-            Console.WriteLine($"Assembly: {version.AssemblyVersion}");
-            Console.WriteLine($"File: {version.FileVersion}");
-            Console.WriteLine($"Informational: {version.InformationalVersion}");
+            Console.WriteLine($"Display: {version.Display}");
+            Console.WriteLine($"Assembly: {version.Assembly}");
+            Console.WriteLine($"File: {version.File}");
+            Console.WriteLine($"Informational: {version.Info}");
 
             Console.WriteLine();
             Console.WriteLine("✅ Environment check completed!");
@@ -389,7 +351,7 @@ class BuildTasks : NukeBuild
     /// Create installation packages for all supported platforms
     /// </summary>
     Target Package => _ => _
-        .DependsOn(Publish)
+        .DependsOn(Publish, CheckVersionLocked)
         .Produces(PackageOutputDirectory / "*")
         .Executes(() =>
         {
@@ -441,8 +403,8 @@ class BuildTasks : NukeBuild
     {
         try
         {
-            var version = GetVersionInfo();
-            var packageName = $"AGI.Captor-{version.FileVersion}-{rid}.msi";
+            var version = GetFixedVersionOrFallback();
+            var packageName = $"AGI.Captor-{version.File}-{rid}.msi";
             var packagePath = PackageOutputDirectory / packageName;
 
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
@@ -473,27 +435,27 @@ class BuildTasks : NukeBuild
             if (wixPath == null)
             {
                 Console.WriteLine("⚠️ WiX Toolset not found. Creating portable ZIP instead...");
-                CreatePortableZip(publishPath, rid, version.FileVersion);
+                CreatePortableZip(publishPath, rid, version.File);
                 return;
             }
 
             // Use WiX v4+ syntax
             if (wixPath == "wix")
             {
-                CreateMsiWithWixV4(publishPath, rid, packagePath, version);
+                CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
             }
             else
             {
                 Console.WriteLine("⚠️ WiX v3 detected but v4+ required for MSI creation. Creating portable ZIP...");
-                CreatePortableZip(publishPath, rid, version.FileVersion);
+                CreatePortableZip(publishPath, rid, version.File);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Windows package creation failed: {ex.Message}");
             // Fallback to portable ZIP
-            var version = GetVersionInfo();
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            var version = GetFixedVersionOrFallback();
+            CreatePortableZip(publishPath, rid, version.File);
         }
     }
 
@@ -617,7 +579,7 @@ class BuildTasks : NukeBuild
     {
         try
         {
-            var version = GetVersionInfo();
+                var version = GetFixedVersionOrFallback();
             var requestedFormats = MacOSFormats?.Split(',')
                 .Select(f => f.Trim().ToUpperInvariant())
                 .ToArray() ?? new[] { "PKG", "DMG" };
@@ -633,7 +595,7 @@ class BuildTasks : NukeBuild
                 {
                     Console.WriteLine("📦 Creating standard PKG and DMG packages...");
 
-                    var args = $"{publishPath} {version.FileVersion}";
+                        var args = $"{publishPath} {version.File}";
                     if (!string.IsNullOrWhiteSpace(MacSigningIdentity))
                         args += $" \"{MacSigningIdentity}\"";
 
@@ -647,7 +609,7 @@ class BuildTasks : NukeBuild
                     // Move packages to output directory
                     if (requestedFormats.Contains("PKG"))
                     {
-                        var pkgPattern = $"AGI.Captor-{version.FileVersion}.pkg";
+                            var pkgPattern = $"AGI.Captor-{version.File}.pkg";
                         foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
                         {
                             var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -658,7 +620,7 @@ class BuildTasks : NukeBuild
 
                     if (requestedFormats.Contains("DMG"))
                     {
-                        var dmgPattern = $"AGI.Captor-{version.FileVersion}.dmg";
+                            var dmgPattern = $"AGI.Captor-{version.File}.dmg";
                         foreach (var file in Directory.GetFiles(MacPackagingDirectory, dmgPattern))
                         {
                             var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -687,7 +649,7 @@ class BuildTasks : NukeBuild
                     {
                         Console.WriteLine("🏪 Creating App Store package...");
 
-                        var args = $"{publishPath} {version.FileVersion} \"{MacSigningIdentity}\"";
+                            var args = $"{publishPath} {version.File} \"{MacSigningIdentity}\"";
 
                         using var process = ProcessTasks.StartProcess(
                             "bash",
@@ -697,7 +659,7 @@ class BuildTasks : NukeBuild
                         process.AssertZeroExitCode();
 
                         // Move App Store package to output directory
-                        var appStorePkgPattern = $"AGI.Captor-{version.FileVersion}-AppStore.pkg";
+                            var appStorePkgPattern = $"AGI.Captor-{version.File}-AppStore.pkg";
                         foreach (var file in Directory.GetFiles(MacPackagingDirectory, appStorePkgPattern))
                         {
                             var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -719,14 +681,14 @@ class BuildTasks : NukeBuild
                 (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG")))
             {
                 Console.WriteLine("🔐 Starting notarization process...");
-                RunMacNotarization(version.FileVersion);
+                    RunMacNotarization(version.File);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ macOS package creation failed: {ex.Message}");
-            var version = GetVersionInfo();
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+                var version = GetFixedVersionOrFallback();
+                CreatePortableZip(publishPath, rid, version.File);
         }
     }
 
@@ -763,7 +725,7 @@ class BuildTasks : NukeBuild
     {
         try
         {
-            var version = GetVersionInfo();
+            var version = GetFixedVersionOrFallback();
             var arch = rid.Contains("arm") ? "arm64" : "amd64";
 
             Console.WriteLine($"🐧 Creating Linux packages for {rid}...");
@@ -774,13 +736,13 @@ class BuildTasks : NukeBuild
             {
                 using var debProcess = ProcessTasks.StartProcess(
                     "bash",
-                    $"{debScript} {publishPath} {version.FileVersion} {arch}",
+                    $"{debScript} {publishPath} {version.File} {arch}",
                     LinuxPackagingDirectory);
 
                 debProcess.AssertZeroExitCode();
 
                 // Move DEB to output directory
-                var debPattern = $"agi-captor_{version.FileVersion}_{arch}.deb";
+                var debPattern = $"agi-captor_{version.File}_{arch}.deb";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, debPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -797,13 +759,13 @@ class BuildTasks : NukeBuild
 
                 using var rpmProcess = ProcessTasks.StartProcess(
                     "bash",
-                    $"{rpmScript} {publishPath} {version.FileVersion} {rpmArch}",
+                    $"{rpmScript} {publishPath} {version.File} {rpmArch}",
                     LinuxPackagingDirectory);
 
                 rpmProcess.AssertZeroExitCode();
 
                 // Move RPM to output directory
-                var rpmPattern = $"agi-captor-{version.FileVersion}-1.{rpmArch}.rpm";
+                var rpmPattern = $"agi-captor-{version.File}-1.{rpmArch}.rpm";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, rpmPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -815,8 +777,246 @@ class BuildTasks : NukeBuild
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Linux package creation failed: {ex.Message}");
-            var version = GetVersionInfo();
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            var version = GetFixedVersionOrFallback();
+            CreatePortableZip(publishPath, rid, version.File);
         }
     }
+
+    (string Display, string Assembly, string File, string Info) GetFixedVersionOrFallback()
+    {
+        if (_versionCache.HasValue) return _versionCache.Value;
+        // Try version.json
+        if (File.Exists(VersionFile))
+        {
+            try
+            {
+                using var fs = File.OpenRead(VersionFile);
+                var doc = JsonDocument.Parse(fs);
+                var display = doc.RootElement.GetProperty("version").GetString();
+                var assembly = doc.RootElement.GetProperty("assemblyVersion").GetString();
+                var file = doc.RootElement.GetProperty("fileVersion").GetString();
+                var info = doc.RootElement.GetProperty("informationalVersion").GetString();
+                if (!string.IsNullOrWhiteSpace(display))
+                {
+                    _versionCache = (display!, assembly ?? display!, file ?? display!, info ?? display!);
+                    Console.WriteLine($"ℹ️ Using version.json version: {display}");
+                    return _versionCache.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to parse version.json: {ex.Message}");
+            }
+        }
+        // Try csproj
+        if (MainProject != null && System.IO.File.Exists(MainProject.Path))
+        {
+            try
+            {
+                var xdoc = XDocument.Load(MainProject.Path);
+                var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
+                string Read(string name) => xdoc.Descendants(ns + name).FirstOrDefault()?.Value;
+                var v = Read("Version");
+                if (!string.IsNullOrWhiteSpace(v))
+                {
+                    var av = Read("AssemblyVersion");
+                    var fv = Read("FileVersion");
+                    var iv = Read("InformationalVersion");
+                    _versionCache = (
+                        v!,
+                        string.IsNullOrWhiteSpace(av) ? v! : av!,
+                        string.IsNullOrWhiteSpace(fv) ? v! : fv!,
+                        string.IsNullOrWhiteSpace(iv) ? v! : iv!
+                    );
+                    Console.WriteLine($"ℹ️ Using csproj version: {v}");
+                    return _versionCache.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to read csproj version: {ex.Message}");
+            }
+        }
+        // Fallback GitVersion
+        var gv = GetVersionInfo();
+        _versionCache = (gv.InformationalVersion, gv.AssemblyVersion, gv.FileVersion, gv.InformationalVersion);
+        Console.WriteLine($"ℹ️ Using fallback GitVersion: {gv.InformationalVersion}");
+        return _versionCache.Value;
+    }
+
+    // New compact display format request: example given 2025.922.74759
+    // Rules we adopt:
+    //  Display = Year "." (Month without leading zero)(Day always 2 digits) "." (Hour without leading zero)(Minute always 2 digits)(Second always 2 digits)
+    //  Example: 2025-09-22 07:47:59 UTC => 2025.922.74759
+    //  Month 9 + Day 22 => 922 ; Hour 7 + Minute 47 + Second 59 => 74759
+    //  For months >=10: 2025-11-03 15:04:05 => Month 11 + Day 03 => 1103 ; Hour 15 + 04 + 05 => 150405 => 2025.1103.150405
+    //  Regex pattern: ^\d{4}\.[1-9]\d?\d{2}\.[0-9]{1,2}\d{4}$
+    //                 Broken down: Year '.' (Month 1-12 no leading zero)(Day two digits) '.' (Hour 0-23 no leading zero) (Minute two digits) (Second two digits)
+
+    string GenerateTimestampVersion()
+    {
+        var utc = DateTime.UtcNow;
+        var monthPart = utc.Month.ToString(); // no leading zero
+        var dayPart = utc.Day.ToString("00");
+        var hourPart = utc.Hour.ToString(); // no leading zero
+        var minutePart = utc.Minute.ToString("00");
+        var secondPart = utc.Second.ToString("00");
+        return $"{utc:yyyy}.{monthPart}{dayPart}.{hourPart}{minutePart}{secondPart}";
+    }
+
+    bool IsValidDisplayVersion(string v)
+        // Pattern: YYYY . (month+day) . (hour+mmss)
+        // month+day: 3 or 4 digits (month 1-9 + dd OR month 10-12 + dd)
+        // hour+mmss: 5 or 6 digits (H + mmss OR HH + mmss)
+        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d{2,3}\\.[0-9]{1,2}\\d{4}$");
+
+    (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
+    {
+        // display: yyyy.Mdd.Hmmss (compact) where second segment = M(1-2 digits)+dd, third = H(1-2)+mmss
+        // Parse year
+        var firstDot = display.IndexOf('.');
+        var secondDot = display.IndexOf('.', firstDot + 1);
+        if (firstDot <= 0 || secondDot <= firstDot) throw new Exception($"Invalid compact version structure: {display}");
+        var year = int.Parse(display.Substring(0, firstDot));
+        var monthDay = display.Substring(firstDot + 1, secondDot - firstDot - 1); // M + dd
+        var timePart = display.Substring(secondDot + 1); // H + mmss
+        if (monthDay.Length < 3) throw new Exception("monthDay part too short");
+        var dayStr = monthDay[^2..];
+        var monthStr = monthDay.Substring(0, monthDay.Length - 2);
+        if (timePart.Length < 5) throw new Exception("time part too short");
+        var secondStr = timePart[^2..];
+        var minuteStr = timePart.Substring(timePart.Length - 4, 2);
+        var hourStr = timePart.Substring(0, timePart.Length - 4);
+        var month = int.Parse(monthStr);
+        var day = int.Parse(dayStr);
+        var hour = int.Parse(hourStr);
+        var minute = int.Parse(minuteStr);
+        var second = int.Parse(secondStr);
+        var secondsOfDay = hour * 3600 + minute * 60 + second;
+        var assembly = $"{year}.{month}.{day}.{secondsOfDay}";
+        var file = assembly;
+        var sha = Environment.GetEnvironmentVariable("GITHUB_SHA");
+        var shortSha = string.IsNullOrWhiteSpace(sha) ? "local" : sha[..Math.Min(8, sha.Length)];
+        var info = $"{display}+sha{shortSha}";
+        return (display, assembly, file, info);
+    }
+
+    void WriteVersionResources((string Display, string Assembly, string File, string Info) model)
+    {
+        // version.json
+        var payload = new
+        {
+            version = model.Display,
+            assemblyVersion = model.Assembly,
+            fileVersion = model.File,
+            informationalVersion = model.Info,
+            generatedUtc = DateTime.UtcNow.ToString("O")
+        };
+        System.IO.File.WriteAllText(VersionFile,
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+
+        // csproj
+        if (MainProject != null && System.IO.File.Exists(MainProject.Path))
+        {
+            var xdoc = XDocument.Load(MainProject.Path);
+            var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
+            XElement Ensure(string name)
+            {
+                var el = xdoc.Descendants(ns + name).FirstOrDefault();
+                if (el != null) return el;
+                var pg = xdoc.Root!.Elements(ns + "PropertyGroup").FirstOrDefault();
+                if (pg == null) { pg = new XElement(ns + "PropertyGroup"); xdoc.Root!.Add(pg); }
+                el = new XElement(ns + name);
+                pg.Add(el);
+                return el;
+            }
+            Ensure("Version").Value = model.Display;
+            Ensure("AssemblyVersion").Value = model.Assembly;
+            Ensure("FileVersion").Value = model.File;
+            Ensure("InformationalVersion").Value = model.Info;
+            xdoc.Save(MainProject.Path);
+        }
+        Console.WriteLine($"📝 Locked version: {model.Display}");
+    }
+
+    Target UpgradeVersion => _ => _
+        .Description("Manually lock a new timestamp version (or use --NewVersion)")
+        .Executes(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(NewVersion))
+            {
+                if (!IsValidDisplayVersion(NewVersion))
+                    throw new Exception($"Provided NewVersion '{NewVersion}' invalid. Expect compact format like 2025.922.74759");
+                Console.WriteLine($"Using provided NewVersion: {NewVersion}");
+            }
+            var display = string.IsNullOrWhiteSpace(NewVersion) ? GenerateTimestampVersion() : NewVersion!;
+            var model = BuildVersionModel(display);
+            WriteVersionResources(model);
+        });
+
+    /// <summary>
+    /// Ensure version.json exists and matches expected schema (Display pattern + assembly/file alignment)
+    /// </summary>
+    Target CheckVersionLocked => _ => _
+        .Description("Validate locked version file exists and is consistent")
+        .Executes(() =>
+        {
+            if (!File.Exists(VersionFile))
+                throw new Exception("version.json not found. Run 'nuke UpgradeVersion' before packaging or releasing.");
+
+            try
+            {
+                using var fs = File.OpenRead(VersionFile);
+                var doc = JsonDocument.Parse(fs);
+                string Read(string name) => doc.RootElement.TryGetProperty(name, out var p) ? p.GetString() : null;
+                var display = Read("version");
+                var assembly = Read("assemblyVersion");
+                var file = Read("fileVersion");
+                var info = Read("informationalVersion");
+
+                if (string.IsNullOrWhiteSpace(display) || !IsValidDisplayVersion(display))
+                    throw new Exception($"Invalid or missing 'version' in version.json: {display} (expected compact yyyy.Mdd.Hmmss e.g. 2025.922.74759)");
+
+                if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file))
+                    throw new Exception("assemblyVersion/fileVersion missing in version.json");
+
+                if (assembly != file)
+                    throw new Exception($"assemblyVersion ({assembly}) != fileVersion ({file}) – expected identical");
+
+                // Basic informational check
+                if (string.IsNullOrWhiteSpace(info) || !info.StartsWith(display))
+                    throw new Exception($"informationalVersion must start with display version: {info}");
+
+                // Cross-check csproj values
+                if (MainProject == null || !File.Exists(MainProject.Path))
+                    throw new Exception("Main project file missing for cross validation");
+
+                var xdoc = XDocument.Load(MainProject.Path);
+                var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
+                string ReadProj(string name) => xdoc.Descendants(ns + name).FirstOrDefault()?.Value;
+                var pVersion = ReadProj("Version");
+                var pAssembly = ReadProj("AssemblyVersion");
+                var pFile = ReadProj("FileVersion");
+                var pInfo = ReadProj("InformationalVersion");
+
+                void MustEqual(string label, string expected, string actual)
+                {
+                    if (string.IsNullOrWhiteSpace(actual))
+                        throw new Exception($"csproj missing {label}");
+                    if (!string.Equals(expected, actual, StringComparison.Ordinal))
+                        throw new Exception($"Mismatch {label}: version.json='{expected}' csproj='{actual}'");
+                }
+
+                MustEqual("Version", display, pVersion);
+                MustEqual("AssemblyVersion", assembly, pAssembly);
+                MustEqual("FileVersion", file, pFile);
+                MustEqual("InformationalVersion", info, pInfo);
+
+                Console.WriteLine($"✅ version.json & csproj validated: {display}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"version.json validation failed: {ex.Message}");
+            }
+        });
 }

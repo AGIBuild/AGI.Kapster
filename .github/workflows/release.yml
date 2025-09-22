@@ -87,6 +87,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+    - name: 🔒 Validate locked version
+      run: |
+        if [ ! -f version.json ]; then echo 'version.json missing'; exit 1; fi
+        ./build.sh CheckVersionLocked || (echo 'CheckVersionLocked failed' && exit 1)
         
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
@@ -102,28 +106,27 @@ jobs:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
-        Write-Host "Building with version: $env:VERSION"
-        Write-Host "Release version: $env:RELEASE_VERSION"
+        Write-Host "Building (version already locked in source). Ignoring injected VERSION=$env:VERSION"
         
         # Choose appropriate build script based on availability
         if (Test-Path "./build.ps1") {
           Write-Host "Using build.ps1 script"
           ./build.ps1 Clean
           ./build.ps1 Restore
-          ./build.ps1 Build --configuration Release --version $env:VERSION
+          ./build.ps1 Build --configuration Release
           ./build.ps1 Test --configuration Release --coverage
         } elseif (Test-Path "./build.sh") {
           Write-Host "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
           ./build.sh Restore
-          ./build.sh Build --configuration Release --version $env:VERSION
+          ./build.sh Build --configuration Release
           ./build.sh Test --configuration Release --coverage
         } else {
           Write-Host "Using dotnet commands directly"
           dotnet clean
           dotnet restore
-          dotnet build --configuration Release --no-restore -p:Version=$env:VERSION
+          dotnet build --configuration Release --no-restore
           dotnet test --configuration Release --no-build --verbosity normal
         }
         
@@ -156,6 +159,11 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+    - name: 🔒 Validate locked version
+      shell: pwsh
+      run: |
+        if (-Not (Test-Path version.json)) { Write-Error 'version.json missing'; exit 1 }
+        ./build.ps1 CheckVersionLocked
         
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
@@ -183,23 +191,22 @@ jobs:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
-        Write-Host "Building Windows ${{ matrix.arch }} with version: $env:VERSION"
-        Write-Host "Release version: $env:RELEASE_VERSION"
+        Write-Host "Building Windows ${{ matrix.arch }} (locked version from version.json)"
         
         # Choose appropriate build script for Windows
         if (Test-Path "./build.ps1") {
           Write-Host "Using build.ps1 script"
           ./build.ps1 Clean
-          ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests --version $env:VERSION
-          ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }} --version $env:VERSION
+          ./build.ps1 Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests
+          ./build.ps1 Package --configuration Release --rids win-${{ matrix.arch }}
         } elseif (Test-Path "./build.sh") {
           Write-Host "Using build.sh script"
           # Use pwsh to call bash script on Windows
-          bash -c "chmod +x ./build.sh && ./build.sh Clean && ./build.sh Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests --version $env:VERSION && ./build.sh Package --configuration Release --rids win-${{ matrix.arch }} --version $env:VERSION"
+          bash -c "chmod +x ./build.sh && ./build.sh Clean && ./build.sh Publish --configuration Release --rids win-${{ matrix.arch }} --skip-tests && ./build.sh Package --configuration Release --rids win-${{ matrix.arch }}"
         } else {
           Write-Host "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r win-${{ matrix.arch }} --self-contained true -o artifacts/publish/win-${{ matrix.arch }} -p:Version=$env:VERSION
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r win-${{ matrix.arch }} --self-contained true -o artifacts/publish/win-${{ matrix.arch }}
           # Create simple zip package as fallback
           New-Item -ItemType Directory -Path artifacts/packages -Force
           Compress-Archive -Path artifacts/publish/win-${{ matrix.arch }}/* -DestinationPath artifacts/packages/AGI.Captor-$env:VERSION-win-${{ matrix.arch }}.zip
@@ -225,6 +232,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+    - name: 🔒 Validate locked version
+      run: |
+        if [ ! -f version.json ]; then echo 'version.json missing'; exit 1; fi
+        ./build.sh CheckVersionLocked
         
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
@@ -240,23 +251,22 @@ jobs:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
-        echo "Building macOS ${{ matrix.arch }} with version: $VERSION"
-        echo "Release version: $RELEASE_VERSION"
+        echo "Building macOS ${{ matrix.arch }} (locked version from version.json)"
         
         # Choose appropriate build script for macOS
         if [ -f "./build.sh" ]; then
           echo "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
-          ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests --version $VERSION
-          ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }} --version $VERSION
+          ./build.sh Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests
+          ./build.sh Package --configuration Release --rids osx-${{ matrix.arch }}
         elif [ -f "./build.ps1" ]; then
           echo "Using build.ps1 script via pwsh"
-          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests --version $env:VERSION; ./build.ps1 Package --configuration Release --rids osx-${{ matrix.arch }} --version $env:VERSION"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids osx-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids osx-${{ matrix.arch }}"
         else
           echo "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r osx-${{ matrix.arch }} --self-contained true -o artifacts/publish/osx-${{ matrix.arch }} -p:Version=$VERSION
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r osx-${{ matrix.arch }} --self-contained true -o artifacts/publish/osx-${{ matrix.arch }}
           # Create package directory
           mkdir -p artifacts/packages
           cd artifacts/publish/osx-${{ matrix.arch }}
@@ -283,6 +293,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+    - name: 🔒 Validate locked version
+      run: |
+        if [ ! -f version.json ]; then echo 'version.json missing'; exit 1; fi
+        ./build.sh CheckVersionLocked
         
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
@@ -298,23 +312,22 @@ jobs:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
-        echo "Building Linux ${{ matrix.arch }} with version: $VERSION"
-        echo "Release version: $RELEASE_VERSION"
+        echo "Building Linux ${{ matrix.arch }} (locked version from version.json)"
         
         # Choose appropriate build script for Linux
         if [ -f "./build.sh" ]; then
           echo "Using build.sh script"
           chmod +x ./build.sh
           ./build.sh Clean
-          ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests --version $VERSION
-          ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }} --version $VERSION
+          ./build.sh Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests
+          ./build.sh Package --configuration Release --rids linux-${{ matrix.arch }}
         elif [ -f "./build.ps1" ]; then
           echo "Using build.ps1 script via pwsh"
-          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests --version $env:VERSION; ./build.ps1 Package --configuration Release --rids linux-${{ matrix.arch }} --version $env:VERSION"
+          pwsh -c "./build.ps1 Clean; ./build.ps1 Publish --configuration Release --rids linux-${{ matrix.arch }} --skip-tests; ./build.ps1 Package --configuration Release --rids linux-${{ matrix.arch }}"
         else
           echo "Using dotnet commands directly"
           dotnet clean
-          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r linux-${{ matrix.arch }} --self-contained true -o artifacts/publish/linux-${{ matrix.arch }} -p:Version=$VERSION
+          dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj -c Release -r linux-${{ matrix.arch }} --self-contained true -o artifacts/publish/linux-${{ matrix.arch }}
           # Create package directory
           mkdir -p artifacts/packages
           cd artifacts/publish/linux-${{ matrix.arch }}
