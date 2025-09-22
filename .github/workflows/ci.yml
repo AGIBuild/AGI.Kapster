@@ -64,7 +64,7 @@ jobs:
       enable-coverage: true
       upload-artifacts: true
 
-  # 使用可重用工作流进行多平台构建
+  # Use reusable workflow for multiplatform build
   build-preview:
     name: 🚀 Build Preview
     uses: ./.github/workflows/_reusable-multiplatform.yml
