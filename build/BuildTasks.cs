@@ -785,20 +785,18 @@ class BuildTasks : NukeBuild
     (string Display, string Assembly, string File, string Info) GetFixedVersionOrFallback()
     {
         if (_versionCache.HasValue) return _versionCache.Value;
-        // Try version.json
+
+        // 1) version.json (authoritative)
         if (File.Exists(VersionFile))
         {
             try
             {
-                using var fs = File.OpenRead(VersionFile);
-                var doc = JsonDocument.Parse(fs);
-                var display = doc.RootElement.GetProperty("version").GetString();
-                var assembly = doc.RootElement.GetProperty("assemblyVersion").GetString();
-                var file = doc.RootElement.GetProperty("fileVersion").GetString();
-                var info = doc.RootElement.GetProperty("informationalVersion").GetString();
+                var json = JsonDocument.Parse(File.ReadAllText(VersionFile));
+                var display = json.RootElement.GetProperty("version").GetString();
                 if (!string.IsNullOrWhiteSpace(display))
                 {
-                    _versionCache = (display!, assembly ?? display!, file ?? display!, info ?? display!);
+                    // unified three-part; ignore other fields if present
+                    _versionCache = (display!, display!, display!, display!);
                     Console.WriteLine($"ℹ️ Using version.json version: {display}");
                     return _versionCache.Value;
                 }
@@ -808,36 +806,27 @@ class BuildTasks : NukeBuild
                 Console.WriteLine($"⚠️ Failed to parse version.json: {ex.Message}");
             }
         }
-        // Try csproj
-        if (MainProject != null && System.IO.File.Exists(MainProject.Path))
+
+        // 2) Project evaluated properties (Nuke's MSBuild evaluation)
+        if (MainProject != null)
         {
             try
             {
-                var xdoc = XDocument.Load(MainProject.Path);
-                var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
-                string Read(string name) => xdoc.Descendants(ns + name).FirstOrDefault()?.Value;
-                var v = Read("Version");
+                var v = MainProject.GetProperty("Version");
                 if (!string.IsNullOrWhiteSpace(v))
                 {
-                    var av = Read("AssemblyVersion");
-                    var fv = Read("FileVersion");
-                    var iv = Read("InformationalVersion");
-                    _versionCache = (
-                        v!,
-                        string.IsNullOrWhiteSpace(av) ? v! : av!,
-                        string.IsNullOrWhiteSpace(fv) ? v! : fv!,
-                        string.IsNullOrWhiteSpace(iv) ? v! : iv!
-                    );
-                    Console.WriteLine($"ℹ️ Using csproj version: {v}");
+                    _versionCache = (v, v, v, v);
+                    Console.WriteLine($"ℹ️ Using project evaluated Version: {v}");
                     return _versionCache.Value;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Failed to read csproj version: {ex.Message}");
+                Console.WriteLine($"⚠️ Failed to read project property Version: {ex.Message}");
             }
         }
-        // Fallback GitVersion
+
+        // 3) Fallback GitVersion (legacy safety net)
         var gv = GetVersionInfo();
         _versionCache = (gv.InformationalVersion, gv.AssemblyVersion, gv.FileVersion, gv.InformationalVersion);
         Console.WriteLine($"ℹ️ Using fallback GitVersion: {gv.InformationalVersion}");
@@ -865,40 +854,19 @@ class BuildTasks : NukeBuild
     }
 
     bool IsValidDisplayVersion(string v)
-        // Pattern: YYYY . (month+day) . (hour+mmss)
-        // month+day: 3 or 4 digits (month 1-9 + dd OR month 10-12 + dd)
-        // hour+mmss: 5 or 6 digits (H + mmss OR HH + mmss)
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.\\d{0,1}\\d{2}\\.[0-9]{1,2}\\d{4}$");
+        // Strict pattern: Year '.' (month+day) '.' (hour+mmss)
+        // month+day: month(1-12 no leading zero) + day(2 digits) => 3-4 digits
+        // hour+mmss: hour(0-23 no leading zero unless 0) + minute(2) + second(2) => 5-6 digits
+        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d{2,3}\\.[0-9]{1,2}\\d{4}$");
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
     {
-        // display: yyyy.Mdd.Hmmss (compact) where second segment = M(1-2 digits)+dd, third = H(1-2)+mmss
-        // Parse year
-        var firstDot = display.IndexOf('.');
-        var secondDot = display.IndexOf('.', firstDot + 1);
-        if (firstDot <= 0 || secondDot <= firstDot) throw new Exception($"Invalid compact version structure: {display}");
-        var year = int.Parse(display.Substring(0, firstDot));
-        var monthDay = display.Substring(firstDot + 1, secondDot - firstDot - 1); // M + dd
-        var timePart = display.Substring(secondDot + 1); // H + mmss
-        if (monthDay.Length < 3) throw new Exception("monthDay part too short");
-        var dayStr = monthDay[^2..];
-        var monthStr = monthDay[..^2];
-        if (timePart.Length < 5) throw new Exception("time part too short");
-        var secondStr = timePart[^2..];
-        var minuteStr = timePart[^4..^2];
-        var hourStr = timePart[..^4];
-        var month = int.Parse(monthStr);
-        var day = int.Parse(dayStr);
-        var hour = int.Parse(hourStr);
-        var minute = int.Parse(minuteStr);
-        var second = int.Parse(secondStr);
-        var secondsOfDay = hour * 3600 + minute * 60 + second;
-        var assembly = $"{year}.{month}.{day}.{secondsOfDay}";
-        var file = assembly;
+        // All versions unified to three-part display string.
+        // assembly/file/informational all identical to display for simplicity.
         var sha = Environment.GetEnvironmentVariable("GITHUB_SHA");
         var shortSha = string.IsNullOrWhiteSpace(sha) ? "local" : sha[..Math.Min(8, sha.Length)];
-        var info = $"{display}+sha{shortSha}";
-        return (display, assembly, file, info);
+        var info = display; // informational also pure three-part (no +sha suffix per requirement)
+        return (display, display, display, info);
     }
 
     void WriteVersionResources((string Display, string Assembly, string File, string Info) model)
@@ -980,12 +948,11 @@ class BuildTasks : NukeBuild
                 if (string.IsNullOrWhiteSpace(assembly) || string.IsNullOrWhiteSpace(file))
                     throw new Exception("assemblyVersion/fileVersion missing in version.json");
 
-                if (assembly != file)
-                    throw new Exception($"assemblyVersion ({assembly}) != fileVersion ({file}) – expected identical");
+                if (assembly != file || assembly != display)
+                    throw new Exception($"assembly/file/display mismatch – all must be identical three-part string: {display}");
 
-                // Basic informational check
-                if (string.IsNullOrWhiteSpace(info) || !info.StartsWith(display))
-                    throw new Exception($"informationalVersion must start with display version: {info}");
+                if (string.IsNullOrWhiteSpace(info) || info != display)
+                    throw new Exception($"informationalVersion must equal display (three-part) value: {info} vs {display}");
 
                 // Cross-check csproj values
                 if (MainProject == null || !File.Exists(MainProject.Path))
@@ -1008,9 +975,9 @@ class BuildTasks : NukeBuild
                 }
 
                 MustEqual("Version", display, pVersion);
-                MustEqual("AssemblyVersion", assembly, pAssembly);
-                MustEqual("FileVersion", file, pFile);
-                MustEqual("InformationalVersion", info, pInfo);
+                MustEqual("AssemblyVersion", display, pAssembly);
+                MustEqual("FileVersion", display, pFile);
+                MustEqual("InformationalVersion", display, pInfo);
 
                 Console.WriteLine($"✅ version.json & csproj validated: {display}");
             }
