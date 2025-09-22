@@ -611,10 +611,31 @@ class BuildTasks : NukeBuild
             return;
         }
 
-        var pkgFile = PackageOutputDirectory / $"AGI.Captor-{version}.pkg";
-        if (File.Exists(pkgFile))
+        // Find all PKG and DMG files to notarize
+        var pkgPattern = $"AGI.Captor-{version}.pkg";
+        var dmgPattern = $"AGI.Captor-{version}.dmg";
+        var filesToNotarize = new List<string>();
+
+        foreach (var file in Directory.GetFiles(PackageOutputDirectory, pkgPattern))
         {
-            var args = $"{pkgFile} {AppleId} {AppPassword} {TeamId}";
+            filesToNotarize.Add(file);
+        }
+        
+        foreach (var file in Directory.GetFiles(PackageOutputDirectory, dmgPattern))
+        {
+            filesToNotarize.Add(file);
+        }
+
+        if (filesToNotarize.Count == 0)
+        {
+            Console.WriteLine("⚠️ No PKG or DMG files found for notarization");
+            return;
+        }
+
+        foreach (var file in filesToNotarize)
+        {
+            Console.WriteLine($"🔐 Notarizing {Path.GetFileName(file)}...");
+            var args = $"{file} {AppleId} {AppPassword} {TeamId}";
 
             using var process = ProcessTasks.StartProcess(
                 "bash",
@@ -622,6 +643,7 @@ class BuildTasks : NukeBuild
                 MacPackagingDirectory);
 
             process.AssertZeroExitCode();
+            Console.WriteLine($"✅ {Path.GetFileName(file)} notarized successfully");
         }
     }
 

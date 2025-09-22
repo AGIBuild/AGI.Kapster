@@ -292,7 +292,7 @@ jobs:
             codesign --verify --verbose=2 "$f"
           done
           echo "✅ macOS codesign completed"
-      - name: 📨 macOS Notarize (PKG)
+      - name: 📨 macOS Notarize (PKG & DMG)
         if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
@@ -303,14 +303,25 @@ jobs:
           if [ -z "$APPLE_ID" ] || [ -z "$APP_PASSWORD" ] || [ -z "$TEAM_ID" ]; then echo "Skipping notarization (MACOS_NOTARIZE_* env not set)"; exit 0; fi
           RID="osx-${{ matrix.arch }}"
           DIR="artifacts/packages/by-rid/$RID"
-          PKG=$(ls "$DIR"/*.pkg 2>/dev/null | head -n1 || true)
-          if [ -z "$PKG" ]; then echo "No PKG found for notarization"; exit 0; fi
-          echo "Submitting $PKG for notarization";
-          xcrun notarytool submit "$PKG" --apple-id "$APPLE_ID" --password "$APP_PASSWORD" --team-id "$TEAM_ID" --wait
-          echo "Stapling ticket...";
-          xcrun stapler staple "$PKG"
-          xcrun stapler validate "$PKG"
-          echo "✅ Notarization completed"
+          
+          # Notarize all PKG and DMG files
+          NOTARIZED_COUNT=0
+          for f in "$DIR"/*.pkg "$DIR"/*.dmg; do
+            [ -f "$f" ] || continue
+            echo "Submitting $(basename "$f") for notarization..."
+            xcrun notarytool submit "$f" --apple-id "$APPLE_ID" --password "$APP_PASSWORD" --team-id "$TEAM_ID" --wait
+            echo "Stapling ticket to $(basename "$f")..."
+            xcrun stapler staple "$f"
+            xcrun stapler validate "$f"
+            echo "✅ $(basename "$f") notarized and stapled"
+            NOTARIZED_COUNT=$((NOTARIZED_COUNT + 1))
+          done
+          
+          if [ $NOTARIZED_COUNT -eq 0 ]; then
+            echo "No PKG or DMG files found for notarization"
+          else
+            echo "✅ Notarization completed for $NOTARIZED_COUNT file(s)"
+          fi
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
