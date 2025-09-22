@@ -54,7 +54,7 @@ jobs:
         Write-Host "🏗️ Build: $buildNumber"
         Write-Host "🏷️ Version: $version"
 
-  # 使用可重用工作流进行构建和测试
+  # Use reusable workflow for build and test
   test-and-quality:
     name: 🧪 Test & Quality
     uses: ./.github/workflows/_reusable-build.yml
