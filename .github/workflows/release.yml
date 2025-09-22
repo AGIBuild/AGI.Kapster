@@ -274,6 +274,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { Write-Host "Verification failed"; exit 1 }
           }
           Write-Host "✅ Windows MSI signing completed"
+          Remove-Item $pfxPath -Force
       - name: 🔐 macOS Codesign (PKG & DMG)
         if: startsWith(matrix.os, 'macos')
         shell: bash
