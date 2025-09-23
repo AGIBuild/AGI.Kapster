@@ -168,8 +168,22 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        arch: [x64, arm64]
+        include:
+          - os: windows-latest
+            arch: x64
+            rid: win-x64
+          - os: windows-latest
+            arch: arm64
+            rid: win-arm64
+          - os: macos-latest
+            arch: x64
+            rid: osx-x64
+          - os: macos-latest
+            arch: arm64
+            rid: osx-arm64
+          - os: ubuntu-latest
+            arch: x64
+            rid: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
       - name: 📥 Checkout repository
@@ -188,7 +202,7 @@ jobs:
       - name: 📦 Publish & Package
         uses: ./.github/actions/publish-package
         with:
-          runtime-id: ${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'osx' || 'linux' }}-${{ matrix.arch }}
+          runtime-id: ${{ matrix.rid }}
           configuration: 'Release'
         env:
           VERSION: ${{ needs.prepare-release.outputs.version-number }}
@@ -199,7 +213,7 @@ jobs:
         shell: pwsh
         run: |
           if (-not $env:CODE_SIGN_WINDOWS_PFX_BASE64 -or -not $env:CODE_SIGN_WINDOWS_PFX_PASSWORD) { Write-Host "Skipping signing (missing CODE_SIGN_WINDOWS_* env)"; exit 0 }
-          $rid = "win-${{ matrix.arch }}"
+          $rid = "${{ matrix.rid }}"
           $dir = "artifacts/packages/by-rid/$rid"
           if (-not (Test-Path $dir)) { Write-Host "No directory $dir"; exit 1 }
           $pfxPath = "$env:RUNNER_TEMP/code-signing.pfx"
@@ -223,7 +237,7 @@ jobs:
           set -e
           SIGN_IDENTITY="$MACOS_SIGN_IDENTITY"
           if [ -z "$SIGN_IDENTITY" ]; then echo "Skipping codesign (MACOS_SIGN_IDENTITY not set)"; exit 0; fi
-          RID="osx-${{ matrix.arch }}"
+          RID="${{ matrix.rid }}"
           DIR="artifacts/packages/by-rid/$RID"
           echo "Codesign assets in $DIR"
           for f in "$DIR"/*.pkg "$DIR"/*.dmg; do
@@ -242,7 +256,7 @@ jobs:
           APP_PASSWORD="$MACOS_NOTARIZE_PASSWORD"
           TEAM_ID="$MACOS_NOTARIZE_TEAM_ID"
           if [ -z "$APPLE_ID" ] || [ -z "$APP_PASSWORD" ] || [ -z "$TEAM_ID" ]; then echo "Skipping notarization (MACOS_NOTARIZE_* env not set)"; exit 0; fi
-          RID="osx-${{ matrix.arch }}"
+          RID="${{ matrix.rid }}"
           DIR="artifacts/packages/by-rid/$RID"
           
           # Notarize all PKG and DMG files
@@ -266,7 +280,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}-release
+          name: ${{ matrix.os }}-${{ matrix.rid }}-release
           path: artifacts/packages/
           retention-days: 90
 
@@ -307,7 +321,6 @@ jobs:
           @{ Rid='osx-x64';    Pattern='*-osx-x64-portable.zip';    Friendly='macOS Intel Portable ZIP' }
           @{ Rid='osx-arm64';  Pattern='*-osx-arm64-portable.zip';  Friendly='macOS Apple Silicon Portable ZIP' }
           @{ Rid='linux-x64';  Pattern='*-linux-x64-portable.zip'; Friendly='Linux x64 Portable ZIP' }
-          @{ Rid='linux-arm64';Pattern='*-linux-arm64-portable.zip';Friendly='Linux ARM64 Portable ZIP' }
         )
         $missing = @()
         foreach ($e in $expected) {
@@ -364,7 +377,7 @@ jobs:
           END{ if(feat)print "\n### ✨ Features"feat; if(fix)print "\n### 🐛 Fixes"fix; if(ref)print "\n### ♻️ Refactors"ref; if(perf)print "\n### 🚀 Performance"perf; if(docs)print "\n### 📝 Docs"docs; if(builds)print "\n### 🏗️ Build System"builds; }' commits.txt > categorized.md
         if [ ! -s categorized.md ]; then echo -e "\n### Changes\n- Internal adjustments" > categorized.md; fi
         {
-          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "- AGI.Captor-*-linux-arm64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor_*_arm64.deb (Debian/Ubuntu ARM64)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern $f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "$actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash" "if ($expected -ieq $actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "_Range: ${PREV_TAG:-Initial} → $TAG_" ;
+          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern $f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "$actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash" "if ($expected -ieq $actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "_Range: ${PREV_TAG:-Initial} → $TAG_" ;
           cat categorized.md;
         } > custom-release-body.md
         head -n 60 custom-release-body.md
