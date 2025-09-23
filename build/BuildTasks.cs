@@ -710,6 +710,9 @@ class BuildTasks : NukeBuild
                     Console.WriteLine($"✅ Created: {targetPath}");
                 }
             }
+
+            // Always create portable ZIP for Linux
+            CreatePortableZip(publishPath, rid, version.File);
         }
         catch (Exception ex)
         {
