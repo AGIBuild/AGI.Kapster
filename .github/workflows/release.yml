@@ -71,7 +71,7 @@ jobs:
           $isPrerelease = if ($version -match "-(alpha|beta|rc|preview)") { "true" } else { "false" }
           Write-Host "Using tag version: $version"
         } else {
-          Write-Host "ERROR: Unexpected trigger condition" >&2
+          Write-Error "Unexpected trigger condition"
           exit 1
         }
         
