@@ -196,8 +196,8 @@ fakeroot dpkg-deb --build "$DEB_DIR" "$SCRIPT_DIR/$DEB_NAME"
 
 # 验证包
 echo "🔍 验证 DEB 包..."
-dpkg-deb --info "$SCRIPT_DIR/$DEB_NAME"
-dpkg-deb --contents "$SCRIPT_DIR/$DEB_NAME"
+dpkg-deb --info "$SCRIPT_DIR/$DEB_NAME" >/dev/null 2>&1
+dpkg-deb --contents "$SCRIPT_DIR/$DEB_NAME" >/dev/null 2>&1
 
 # 清理临时文件
 rm -rf "$TEMP_DIR"

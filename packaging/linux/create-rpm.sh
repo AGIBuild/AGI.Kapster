@@ -144,7 +144,7 @@ rpmbuild --define "_topdir $TEMP_DIR" \
          --define "_sourcedir $TEMP_DIR" \
          --define "_rpmdir $SCRIPT_DIR" \
          --define "_buildrootdir $TEMP_DIR/buildroot" \
-         -bb "$TEMP_DIR/$PACKAGE_NAME.spec"
+         -bb "$TEMP_DIR/$PACKAGE_NAME.spec" >/dev/null 2>&1
 
 # 移动生成的RPM文件
 mv "$SCRIPT_DIR/$ARCH/$RPM_NAME" "$SCRIPT_DIR/"
@@ -152,8 +152,8 @@ rmdir "$SCRIPT_DIR/$ARCH" 2>/dev/null || true
 
 # 验证包
 echo "🔍 验证 RPM 包..."
-rpm -qpi "$SCRIPT_DIR/$RPM_NAME"
-rpm -qpl "$SCRIPT_DIR/$RPM_NAME"
+rpm -qpi "$SCRIPT_DIR/$RPM_NAME" >/dev/null 2>&1
+rpm -qpl "$SCRIPT_DIR/$RPM_NAME" >/dev/null 2>&1
 
 # 清理临时文件
 rm -rf "$TEMP_DIR"
