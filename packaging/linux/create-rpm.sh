@@ -93,12 +93,13 @@ Features include:
 - Cross-platform compatibility
 
 %install
-mkdir -p %{buildroot}/usr/bin 2>/dev/null || true
-mkdir -p %{buildroot}/usr/share/applications 2>/dev/null || true
-mkdir -p %{buildroot}/usr/share/pixmaps 2>/dev/null || true
-mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME 2>/dev/null || true
-
-cp -r $RPM_ROOT/* %{buildroot}/ 2>/dev/null || true
+{
+  mkdir -p %{buildroot}/usr/bin
+  mkdir -p %{buildroot}/usr/share/applications
+  mkdir -p %{buildroot}/usr/share/pixmaps
+  mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME
+  cp -r $RPM_ROOT/* %{buildroot}/
+} >/dev/null 2>&1 || true
 
 %files
 /usr/bin/agi-captor
