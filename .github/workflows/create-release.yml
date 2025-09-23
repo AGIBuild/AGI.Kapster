@@ -42,6 +42,10 @@ jobs:
           fi
           echo "Using version $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: Set git user identity
+        run: |
+          git config --global user.name "AGI.Captor Bot"
+          git config --global user.email "xiewuhen@live.com"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run CheckVersionLocked
