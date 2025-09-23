@@ -154,19 +154,11 @@ jobs:
         VERSION: ${{ needs.prepare-release.outputs.version-number }}
         RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
 
-    - name: 📊 Upload test results
+    - name: 📊 Upload test results and coverage
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: release-test-results
-        path: artifacts/test-results/
-        retention-days: 30
-        
-    - name: 📈 Upload coverage
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: release-coverage
+        name: release-test-results-and-coverage
         path: artifacts/coverage/
         retention-days: 30
 
