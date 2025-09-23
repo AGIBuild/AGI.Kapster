@@ -97,26 +97,29 @@ jobs:
       with:
         ref: release
         fetch-depth: 0
-        
-    - name: ✅ Tag validation confirmation
-      if: ${{ github.ref_type == 'tag' }}
-      shell: pwsh
-      run: |
-        Write-Host "✅ Working with release branch for tag validation"
 
-    - name: 🔒 Validate version.json consistency
+    - name: 🔒 Validate release consistency
       shell: pwsh
       run: |
-        if (-Not (Test-Path version.json)) { Write-Host 'version.json missing'; exit 1 }
+        # Validate version.json exists and is properly formatted
+        if (-Not (Test-Path version.json)) { Write-Host '❌ version.json missing'; exit 1 }
         $json = Get-Content version.json -Raw | ConvertFrom-Json
-        if (-not $json.version) { Write-Host 'version.json missing version field'; exit 1 }
+        if (-not $json.version) { Write-Host '❌ version.json missing version field'; exit 1 }
+        
+        # Validate version format
         $locked = $json.version
-        $tagVersion = "${{ steps.version.outputs.version }}"  # includes leading v
+        if ($locked -notmatch '^[0-9]{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$') { 
+          Write-Host "❌ Locked version format invalid: $locked"; exit 1 
+        }
+        
+        # Validate tag-version consistency
+        $tagVersion = "${{ steps.version.outputs.version }}"
         $tagNumber = $tagVersion -replace '^v',''
-        if ($locked -ne $tagNumber) { Write-Host "❌ Mismatch: version.json=$locked tag/version=$tagNumber"; exit 1 }
-        Write-Host "✅ version.json matches tag/version: $locked"
-        if ($locked -notmatch '^[0-9]{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$') { Write-Host "❌ Locked version format invalid: $locked"; exit 1 }
-        Write-Host "✅ Locked version format valid."
+        if ($locked -ne $tagNumber) { 
+          Write-Host "❌ Mismatch: version.json=$locked tag/version=$tagNumber"; exit 1 
+        }
+        
+        Write-Host "✅ Release validation passed: version=$locked, tag=$tagVersion"
 
   build-and-test:
     name: 🧪 Build & Test
