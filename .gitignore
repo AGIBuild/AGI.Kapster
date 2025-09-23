@@ -395,6 +395,7 @@ Temporary Items
 # Distribution/Build directories
 dist/
 publish/
+logs/
 
 # Package outputs
 artifacts/packages/
