@@ -97,6 +97,10 @@ jobs:
       with:
         ref: release
         fetch-depth: 0
+        
+    - name: ✅ Tag validation confirmation
+      if: ${{ github.ref_type == 'tag' }}
+      shell: pwsh
       run: |
         Write-Host "✅ Working with release branch for tag validation"
 
