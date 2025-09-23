@@ -31,10 +31,10 @@ RPM_ROOT="$TEMP_DIR/rpm-root"
 echo "🔨 创建 RPM 包结构..."
 
 # 创建RPM目录结构
-mkdir -p "$RPM_ROOT/usr/bin"
-mkdir -p "$RPM_ROOT/usr/share/applications"
-mkdir -p "$RPM_ROOT/usr/share/pixmaps"
-mkdir -p "$RPM_ROOT/usr/share/$PACKAGE_NAME"
+mkdir -p "$RPM_ROOT/usr/bin" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/applications" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/pixmaps" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/$PACKAGE_NAME" 2>/dev/null || true
 
 # 复制应用程序文件
 cp -r "$PUBLISH_DIR"/* "$RPM_ROOT/usr/share/$PACKAGE_NAME/"
@@ -93,12 +93,12 @@ Features include:
 - Cross-platform compatibility
 
 %install
-mkdir -p %{buildroot}/usr/bin
-mkdir -p %{buildroot}/usr/share/applications
-mkdir -p %{buildroot}/usr/share/pixmaps
-mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME
+mkdir -p %{buildroot}/usr/bin 2>/dev/null || true
+mkdir -p %{buildroot}/usr/share/applications 2>/dev/null || true
+mkdir -p %{buildroot}/usr/share/pixmaps 2>/dev/null || true
+mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME 2>/dev/null || true
 
-cp -r $RPM_ROOT/* %{buildroot}/
+cp -r $RPM_ROOT/* %{buildroot}/ 2>/dev/null || true
 
 %files
 /usr/bin/agi-captor

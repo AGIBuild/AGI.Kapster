@@ -31,15 +31,15 @@ DEB_DIR="$TEMP_DIR/deb"
 echo "🔨 创建 DEB 包结构..."
 
 # 创建DEB目录结构
-mkdir -p "$DEB_DIR/DEBIAN"
-mkdir -p "$DEB_DIR/usr/bin"
-mkdir -p "$DEB_DIR/usr/share/applications"
-mkdir -p "$DEB_DIR/usr/share/pixmaps"
-mkdir -p "$DEB_DIR/usr/share/$PACKAGE_NAME"
-mkdir -p "$DEB_DIR/usr/share/doc/$PACKAGE_NAME"
+mkdir -p "$DEB_DIR/DEBIAN" 2>/dev/null || true
+mkdir -p "$DEB_DIR/usr/bin" 2>/dev/null || true
+mkdir -p "$DEB_DIR/usr/share/applications" 2>/dev/null || true
+mkdir -p "$DEB_DIR/usr/share/pixmaps" 2>/dev/null || true
+mkdir -p "$DEB_DIR/usr/share/$PACKAGE_NAME" 2>/dev/null || true
+mkdir -p "$DEB_DIR/usr/share/doc/$PACKAGE_NAME" 2>/dev/null || true
 
 # 复制应用程序文件
-cp -r "$PUBLISH_DIR"/* "$DEB_DIR/usr/share/$PACKAGE_NAME/"
+cp -r "$PUBLISH_DIR"/* "$DEB_DIR/usr/share/$PACKAGE_NAME/" 2>/dev/null || true
 chmod +x "$DEB_DIR/usr/share/$PACKAGE_NAME/AGI.Captor.Desktop"
 
 # 创建启动脚本
