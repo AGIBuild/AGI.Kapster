@@ -168,7 +168,27 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         shell: pwsh
         run: |
-          try { $wixVersion = & wix --version 2>$null; Write-Host "WiX: $wixVersion" } catch { dotnet tool install --global wix }
+          # Check if WiX is already available
+          try { 
+            $wixVersion = & wix --version 2>$null
+            Write-Host "✅ WiX already installed: $wixVersion"
+          } catch {
+            Write-Host "📦 Installing WiX toolset..."
+            dotnet tool install --global wix --version 4.0.0
+            # Add to PATH
+            $wixPath = "$env:USERPROFILE\.dotnet\tools"
+            if (Test-Path $wixPath) {
+              $env:PATH = "$wixPath;$env:PATH"
+              Write-Host "Added WiX to PATH: $wixPath"
+            }
+            # Verify installation
+            try {
+              $wixVersion = & wix --version 2>$null
+              Write-Host "✅ WiX installed successfully: $wixVersion"
+            } catch {
+              Write-Host "⚠️ WiX installation verification failed"
+            }
+          }
           
       - name: 📦 Publish & Package
         uses: ./.github/actions/publish-package
