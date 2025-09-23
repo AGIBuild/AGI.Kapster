@@ -1,6 +1,6 @@
 name: Main CI/CD
 
-# 主开发分支CI - 持续集成和预发布构建
+# 主开发分支集成和预发布构建
 on:
   push:
     branches: [ main ]
@@ -27,12 +27,12 @@ jobs:
       build-number: ${{ steps.version.outputs.build-number }}
       
     steps:
-    - name: � Checkout repository
+    - name: 📥 Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
-    - name: �🛠️ Setup Environment
+    - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}

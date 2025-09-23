@@ -48,7 +48,12 @@ jobs:
             os: macos-latest
     
     steps:
-    - name: �️ Setup Environment
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        
+    - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
       with:
         fetch-depth: 1
