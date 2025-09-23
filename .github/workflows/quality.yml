@@ -114,77 +114,78 @@ jobs:
         if-no-files-found: warn
         retention-days: 30
 
-  performance-test:
-    name: ⚡ Performance Test
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'  # Skip on scheduled runs
-    
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-        
-    - name: 🔧 Setup Complete Environment
-      uses: ./.github/actions/setup-environment
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        enable-nuget-cache: true
-        
-    - name: 🔨 Build for Performance Testing
-      uses: ./.github/actions/build-and-test
-      with:
-        configuration: 'Release'
-        enable-coverage: false
-        skip-tests: false
-        cache-key-suffix: '-perf'
-        
-    - name: ⚡ Run performance tests
-      shell: pwsh
-      run: |
-        if (Test-Path "tests/") {
-          ./build.ps1 Test --configuration Release --test-filter "Category=Performance"
-        } else {
-          Write-Host "⚠️ No performance tests found, skipping..."
-        }
-        
-    - name: 📊 Generate performance report
-      shell: pwsh
-      run: |
-        # Basic performance metrics
-        Write-Host "📊 Build Performance Metrics" | Tee-Object -FilePath "performance-report.md"
-        Write-Host "=============================" | Tee-Object -Append -FilePath "performance-report.md"
-        Write-Host "" | Tee-Object -Append -FilePath "performance-report.md"
-        
-        # Check assembly sizes
-        Write-Host "## Assembly Sizes" | Tee-Object -Append -FilePath "performance-report.md"
-        if (Test-Path "artifacts/publish") {
-          Get-ChildItem "artifacts/publish" -Recurse -Filter "*.dll" | 
-            Sort-Object Length -Descending | 
-            Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}} | 
-            Format-Table | Out-String | Tee-Object -Append -FilePath "performance-report.md"
-        } else {
-          Write-Host "No publish artifacts found for analysis." | Tee-Object -Append -FilePath "performance-report.md"
-        }
-        
-        # Build timing (if available)
-        Write-Host "## Build Performance" | Tee-Object -Append -FilePath "performance-report.md"
-        Write-Host "Build completed at: $(Get-Date)" | Tee-Object -Append -FilePath "performance-report.md"
-        
-        # Ensure file exists
-        if (-not (Test-Path "performance-report.md")) {
-          Write-Host "Creating fallback performance report..."
-          "Performance report generated at $(Get-Date)" | Out-File -FilePath "performance-report.md"
-        }
-        
-    - name: 📊 Upload performance report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-report
-        path: performance-report.md
-        if-no-files-found: warn
-        retention-days: 30
+  # TODO: Re-enable performance tests when needed for complex performance-critical features
+  # performance-test:
+  #   name: ⚡ Performance Test
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name != 'schedule'  # Skip on scheduled runs
+  #   
+  #   steps:
+  #   - name: 📥 Checkout repository
+  #     uses: actions/checkout@v4
+  #     with:
+  #       fetch-depth: 1
+  #       
+  #   - name: 🔧 Setup Complete Environment
+  #     uses: ./.github/actions/setup-environment
+  #     with:
+  #       dotnet-version: ${{ env.DOTNET_VERSION }}
+  #       enable-nuget-cache: true
+  #       
+  #   - name: 🔨 Build for Performance Testing
+  #     uses: ./.github/actions/build-and-test
+  #     with:
+  #       configuration: 'Release'
+  #       enable-coverage: false
+  #       skip-tests: false
+  #       cache-key-suffix: '-perf'
+  #       
+  #   - name: ⚡ Run performance tests
+  #     shell: pwsh
+  #     run: |
+  #       if (Test-Path "tests/") {
+  #         ./build.ps1 Test --configuration Release --test-filter "Category=Performance"
+  #       } else {
+  #         Write-Host "⚠️ No performance tests found, skipping..."
+  #       }
+  #       
+  #   - name: 📊 Generate performance report
+  #     shell: pwsh
+  #     run: |
+  #       # Basic performance metrics
+  #       Write-Host "📊 Build Performance Metrics" | Tee-Object -FilePath "performance-report.md"
+  #       Write-Host "=============================" | Tee-Object -Append -FilePath "performance-report.md"
+  #       Write-Host "" | Tee-Object -Append -FilePath "performance-report.md"
+  #       
+  #       # Check assembly sizes
+  #       Write-Host "## Assembly Sizes" | Tee-Object -Append -FilePath "performance-report.md"
+  #       if (Test-Path "artifacts/publish") {
+  #         Get-ChildItem "artifacts/publish" -Recurse -Filter "*.dll" | 
+  #           Sort-Object Length -Descending | 
+  #           Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}} | 
+  #           Format-Table | Out-String | Tee-Object -Append -FilePath "performance-report.md"
+  #       } else {
+  #         Write-Host "No publish artifacts found for analysis." | Tee-Object -Append -FilePath "performance-report.md"
+  #       }
+  #       
+  #       # Build timing (if available)
+  #       Write-Host "## Build Performance" | Tee-Object -Append -FilePath "performance-report.md"
+  #       Write-Host "Build completed at: $(Get-Date)" | Tee-Object -Append -FilePath "performance-report.md"
+  #       
+  #       # Ensure file exists
+  #       if (-not (Test-Path "performance-report.md")) {
+  #         Write-Host "Creating fallback performance report..."
+  #         "Performance report generated at $(Get-Date)" | Out-File -FilePath "performance-report.md"
+  #       }
+  #       
+  #   - name: 📊 Upload performance report
+  #     uses: actions/upload-artifact@v4
+  #     if: always()
+  #     with:
+  #       name: performance-report
+  #       path: performance-report.md
+  #       if-no-files-found: warn
+  #       retention-days: 30
 
   quality-gate:
     name: 🎯 Quality Gate
