@@ -49,31 +49,19 @@ class Program
         Log.Information("Starting AGI.Captor in {Environment} environment", environment);
 
         // Configure with fallback protection
-        var configBuilder = new ConfigurationBuilder();
-        
-        // Add base configuration with fallback protection
         var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-        if (File.Exists(appsettingsPath))
-        {
-            configBuilder.AddJsonFile(appsettingsPath, optional: false, reloadOnChange: true);
-        }
-        else
+        if (!File.Exists(appsettingsPath))
         {
             // Create default configuration if file doesn't exist
             CreateDefaultConfiguration(appsettingsPath);
-            configBuilder.AddJsonFile(appsettingsPath, optional: false, reloadOnChange: true);
         }
         
-        // Add environment-specific configuration (optional)
-        var envAppsettingsPath = Path.Combine(AppContext.BaseDirectory, $"appsettings.{environment}.json");
-        if (File.Exists(envAppsettingsPath))
-        {
-            configBuilder.AddJsonFile(envAppsettingsPath, optional: true, reloadOnChange: true);
-        }
-        
-        configBuilder.AddEnvironmentVariables();
-        
-        builder.Configuration = configBuilder.Build();
+        // Add base configuration with fallback protection
+        builder.Configuration
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables();
 
         // Use user data directory for logs to avoid permission issues
         var userDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
