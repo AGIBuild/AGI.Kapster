@@ -73,7 +73,6 @@ jobs:
     name: 🚀 Build Preview
     uses: ./.github/workflows/_reusable-multiplatform.yml
     needs: [build-info, test-and-quality]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     with:
       configuration: 'Release'
       skip-tests: true
@@ -83,17 +82,31 @@ jobs:
     name: 📋 Preview Summary
     runs-on: ubuntu-latest
     needs: [build-info, test-and-quality, build-preview]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always()
     
     steps:
     - name: 📊 Build Status Summary
       shell: pwsh
       run: |
-        Write-Host "🚀 Main Branch Preview Build Complete"
+        $eventType = "${{ github.event_name }}"
+        $ref = "${{ github.ref }}"
+        
+        if ($eventType -eq "push" -and $ref -eq "refs/heads/main") {
+          Write-Host "🚀 Main Branch Preview Build Complete"
+        } elseif ($eventType -eq "pull_request") {
+          Write-Host "🚀 Pull Request Preview Build Complete"
+        } else {
+          Write-Host "🚀 Preview Build Complete"
+        }
         Write-Host "======================================="
         Write-Host "Version: ${{ needs.build-info.outputs.version }}"
         Write-Host "Build: ${{ needs.build-info.outputs.build-number }}"
         Write-Host "Tests: ${{ needs.test-and-quality.result }}"
         Write-Host "Preview Builds: ${{ needs.build-preview.result }}"
         Write-Host ""
-        Write-Host "✅ Ready for release branch creation!"
+        
+        if ($eventType -eq "push" -and $ref -eq "refs/heads/main") {
+          Write-Host "✅ Ready for release branch creation!"
+        } else {
+          Write-Host "✅ Preview build validation complete!"
+        }

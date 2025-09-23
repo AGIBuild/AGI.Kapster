@@ -15,10 +15,6 @@ inputs:
     description: '.NET quality channel (ga, preview)'
     required: false
     default: 'preview'
-  include-dotnet8:
-    description: 'Whether to include .NET 8.x'
-    required: false
-    default: 'true'
   enable-nuget-cache:
     description: 'Enable NuGet package caching'
     required: false
@@ -34,9 +30,7 @@ runs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
-          ${{ inputs.dotnet-version }}
+        dotnet-version: ${{ inputs.dotnet-version }}
         dotnet-quality: ${{ inputs.dotnet-quality }}
         
     - name: ⚙️ Configure Git safe.directory
