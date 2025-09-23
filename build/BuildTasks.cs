@@ -372,7 +372,15 @@ class BuildTasks : NukeBuild
             // Use WiX v4+ syntax
             if (wixPath == "wix")
             {
-                CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
+                try
+                {
+                    CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ MSI creation failed: {ex.Message}. Creating portable ZIP instead...");
+                    CreatePortableZip(publishPath, rid, version.File);
+                }
             }
             else
             {

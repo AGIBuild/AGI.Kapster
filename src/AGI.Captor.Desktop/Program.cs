@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
 using Serilog.Settings.Configuration;
+using System.Reflection;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
@@ -48,11 +49,40 @@ class Program
         var environment = builder.Environment.EnvironmentName ?? "Production";
         Log.Information("Starting AGI.Captor in {Environment} environment", environment);
 
-        builder.Configuration
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables();
+        // Configure from embedded resources first, then fallback to files
+        var configBuilder = new ConfigurationBuilder();
+        
+        // Try to load from embedded resources
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var embeddedConfig = LoadEmbeddedJsonResource(assembly, "appsettings.json");
+        if (embeddedConfig != null)
+        {
+            configBuilder.AddJsonStream(new MemoryStream(embeddedConfig));
+        }
+        
+        // Try to load environment-specific embedded resource
+        var embeddedEnvConfig = LoadEmbeddedJsonResource(assembly, $"appsettings.{environment}.json");
+        if (embeddedEnvConfig != null)
+        {
+            configBuilder.AddJsonStream(new MemoryStream(embeddedEnvConfig));
+        }
+        
+        // Fallback to file-based configuration if embedded resources not available
+        var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        if (File.Exists(appsettingsPath))
+        {
+            configBuilder.AddJsonFile(appsettingsPath, optional: false, reloadOnChange: true);
+        }
+        
+        var envAppsettingsPath = Path.Combine(AppContext.BaseDirectory, $"appsettings.{environment}.json");
+        if (File.Exists(envAppsettingsPath))
+        {
+            configBuilder.AddJsonFile(envAppsettingsPath, optional: true, reloadOnChange: true);
+        }
+        
+        configBuilder.AddEnvironmentVariables();
+        
+        builder.Configuration = configBuilder.Build();
 
         // Use user data directory for logs to avoid permission issues
         var userDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -191,4 +221,38 @@ class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+
+    /// <summary>
+    /// Loads an embedded JSON resource from the assembly
+    /// </summary>
+    /// <param name="assembly">The assembly to load from</param>
+    /// <param name="resourceName">The name of the resource</param>
+    /// <returns>Byte array of the resource content, or null if not found</returns>
+    private static byte[]? LoadEmbeddedJsonResource(Assembly assembly, string resourceName)
+    {
+        try
+        {
+            var fullResourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name => name.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase));
+            
+            if (fullResourceName == null)
+            {
+                return null;
+            }
+
+            using var stream = assembly.GetManifestResourceStream(fullResourceName);
+            if (stream == null)
+            {
+                return null;
+            }
+
+            using var memoryStream = new MemoryStream();
+            stream.CopyTo(memoryStream);
+            return memoryStream.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
