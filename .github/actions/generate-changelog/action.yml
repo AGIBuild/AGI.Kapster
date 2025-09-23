@@ -1,0 +1,146 @@
+name: 'Generate Changelog'
+description: 'Generate professional changelog using conventional commits'
+author: 'AGI.Captor Team'
+
+inputs:
+  version:
+    description: 'Release version (e.g., v1.2.3)'
+    required: true
+  previous-tag:
+    description: 'Previous tag for comparison'
+    required: false
+    default: ''
+  output-file:
+    description: 'Output file path'
+    required: false
+    default: 'CHANGELOG.md'
+
+outputs:
+  changelog:
+    description: 'Generated changelog content'
+    value: ${{ steps.generate.outputs.changelog }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📝 Generate Changelog
+      id: generate
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        VERSION="${{ inputs.version }}"
+        PREV_TAG="${{ inputs.previous-tag }}"
+        OUTPUT_FILE="${{ inputs.output-file }}"
+        
+        # Get previous tag if not provided
+        if [ -z "$PREV_TAG" ]; then
+          PREV_TAG=$(git describe --tags --abbrev=0 ${VERSION}^ 2>/dev/null || echo "")
+        fi
+        
+        # Determine range
+        if [ -n "$PREV_TAG" ]; then
+          RANGE="$PREV_TAG..$VERSION"
+        else
+          RANGE="$VERSION"
+        fi
+        
+        echo "📋 Generating changelog for range: $RANGE"
+        
+        # Create temporary files
+        COMMITS_FILE=$(mktemp)
+        CHANGELOG_FILE=$(mktemp)
+        
+        # Get commits
+        git log --format='%s' $RANGE > "$COMMITS_FILE" || true
+        
+        # Generate changelog using conventional commits
+        awk '
+        BEGIN {
+          feat = ""
+          fix = ""
+          refactor = ""
+          perf = ""
+          docs = ""
+          build = ""
+          chore = ""
+          breaking = ""
+        }
+        /^feat[:(]/ {
+          if (index($0, "BREAKING CHANGE") > 0) {
+            breaking = breaking "\n- " substr($0, 6)
+          } else {
+            feat = feat "\n- " substr($0, 6)
+          }
+        }
+        /^fix[:(]/ { fix = fix "\n- " substr($0, 5) }
+        /^refactor[:(]/ { refactor = refactor "\n- " substr($0, 10) }
+        /^perf[:(]/ { perf = perf "\n- " substr($0, 6) }
+        /^docs[:(]/ { docs = docs "\n- " substr($0, 6) }
+        /^build[:(]/ { build = build "\n- " substr($0, 7) }
+        /^chore[:(]/ { chore = chore "\n- " substr($0, 7) }
+        END {
+          print "## 🎉 " VERSION
+          print ""
+          if (breaking) {
+            print "### 💥 Breaking Changes"
+            print breaking
+            print ""
+          }
+          if (feat) {
+            print "### ✨ Features"
+            print feat
+            print ""
+          }
+          if (fix) {
+            print "### 🐛 Bug Fixes"
+            print fix
+            print ""
+          }
+          if (perf) {
+            print "### 🚀 Performance"
+            print perf
+            print ""
+          }
+          if (refactor) {
+            print "### ♻️ Refactors"
+            print refactor
+            print ""
+          }
+          if (docs) {
+            print "### 📝 Documentation"
+            print docs
+            print ""
+          }
+          if (build) {
+            print "### 🏗️ Build System"
+            print build
+            print ""
+          }
+          if (chore) {
+            print "### 🔧 Chores"
+            print chore
+            print ""
+          }
+        }' VERSION="$VERSION" "$COMMITS_FILE" > "$CHANGELOG_FILE"
+        
+        # Add header if file is empty
+        if [ ! -s "$CHANGELOG_FILE" ]; then
+          echo "## 🎉 $VERSION" > "$CHANGELOG_FILE"
+          echo "" >> "$CHANGELOG_FILE"
+          echo "### Changes" >> "$CHANGELOG_FILE"
+          echo "- Internal improvements and optimizations" >> "$CHANGELOG_FILE"
+        fi
+        
+        # Copy to output file
+        cp "$CHANGELOG_FILE" "$OUTPUT_FILE"
+        
+        # Set output
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat "$CHANGELOG_FILE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        # Cleanup
+        rm -f "$COMMITS_FILE" "$CHANGELOG_FILE"
+        
+        echo "✅ Changelog generated: $OUTPUT_FILE"

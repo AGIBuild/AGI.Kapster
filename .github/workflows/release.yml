@@ -330,31 +330,29 @@ jobs:
           Write-Host "  • $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
         }
     
-    - name: 📝 Generate categorized changelog & release body
+    - name: 📝 Generate changelog
+      id: changelog
+      uses: ./.github/actions/generate-changelog
+      with:
+        version: ${{ needs.prepare-release.outputs.version }}
+        output-file: changelog.md
+        
+    - name: 📝 Generate release body
       shell: bash
       env:
         VERSION: ${{ needs.prepare-release.outputs.version }}
       run: |
         set -euo pipefail
         TAG="$VERSION"
-        PREV_TAG=$(git describe --tags --abbrev=0 ${TAG}^ 2>/dev/null || true)
-        if [ -n "$PREV_TAG" ]; then RANGE="$PREV_TAG..$TAG"; else RANGE="$TAG"; fi
-        echo "Generating changelog range: $RANGE"
-        git log --format='%s' $RANGE > commits.txt || true
-        awk 'BEGIN{IGNORECASE=1} \
-          /^feat[:(]/ {feat=feat"\n- "substr($0,6)} \
-          /^fix[:(]/ {fix=fix"\n- "substr($0,5)} \
-          /^refactor[:(]/ {ref=ref"\n- "substr($0,10)} \
-          /^perf[:(]/ {perf=perf"\n- "substr($0,6)} \
-          /^docs[:(]/ {docs=docs"\n- "substr($0,6)} \
-          /^build[:(]/ {builds=builds"\n- "substr($0,7)} \
-          END{ if(feat)print "\n### ✨ Features"feat; if(fix)print "\n### 🐛 Fixes"fix; if(ref)print "\n### ♻️ Refactors"ref; if(perf)print "\n### 🚀 Performance"perf; if(docs)print "\n### 📝 Docs"docs; if(builds)print "\n### 🏗️ Build System"builds; }' commits.txt > categorized.md
-        if [ ! -s categorized.md ]; then echo -e "\n### Changes\n- Internal adjustments" > categorized.md; fi
+        
+        # Create release body with package info and changelog
         {
-          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "\$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "\$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern \$f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "\$actual = (Get-FileHash \$f.FullName -Algorithm SHA256).Hash" "if (\$expected -ieq \$actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "_Range: ${PREV_TAG:-Initial} → $TAG_" ;
-          cat categorized.md;
+          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "\$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "\$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern \$f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "\$actual = (Get-FileHash \$f.FullName -Algorithm SHA256).Hash" "if (\$expected -ieq \$actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "";
+          cat changelog.md;
         } > custom-release-body.md
-        head -n 60 custom-release-body.md
+        
+        echo "📋 Generated release body:"
+        head -n 20 custom-release-body.md
     
     - name: 🚀 Update GitHub Release
       uses: softprops/action-gh-release@v2
@@ -363,7 +361,7 @@ jobs:
         tag_name: ${{ needs.prepare-release.outputs.version }}
         name: AGI.Captor ${{ needs.prepare-release.outputs.version }}
         prerelease: ${{ needs.prepare-release.outputs.is-prerelease }}
-        generate_release_notes: false
+        generate_release_notes: true  # 使用GitHub官方生成
         body_path: custom-release-body.md
         token: ${{ secrets.GH_PAT }}
 
