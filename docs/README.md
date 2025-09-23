@@ -2,28 +2,50 @@
 
 ## Build and Deployment
 
+### CI/CD System
+- **[GitHub Actions Workflows](../.github/README.md)** - Complete CI/CD automation system
+  - Composite actions architecture
+  - Multi-platform publishing
+  - Workflow execution flow
+  - Performance optimizations
+
 ### Version Management
-- **[Versioning Strategy](versioning-strategy.md)** - Locked time-based versioning strategy (GitVersion removed)
+- **[Versioning Strategy](versioning-strategy.md)** - Locked time-based versioning strategy
   - Branch strategy and version rules
   - Semantic versioning format
   - Commit message conventions
   - CI/CD workflow integration
 
-- **[Commands Reference](commands-reference.md)** - Quick reference for common commands
-  - Build system commands
-  - Git workflow commands
-  - Testing and packaging
-
 ### Build System
-- **[Build System](build-system.md)** - Nuke-based build automation
+- **[Build System](build-system.md)** - NUKE-based build automation with PowerShell
   - Build targets and configuration
   - Cross-platform build support
+  - GitHub Actions integration
   - Packaging and distribution
 
-- **[Packaging Guide](packaging-guide.md)** - Platform-specific packaging instructions
+- **[Commands Reference](commands-reference.md)** - Quick reference for build commands
+  - PowerShell build script usage
+  - NUKE target execution
+  - Testing and packaging commands
+
+### Testing and Quality
+- **[Testing Architecture](testing-architecture.md)** - Comprehensive testing strategy
+  - Test organization and structure
+  - Coverage reporting and CI integration
+  - Dependency injection for testing
+  - Mocking strategies with NSubstitute
+
+### Packaging and Release
+- **[Packaging Guide](packaging-guide.md)** - Multi-platform packaging system
+  - Automated GitHub Actions packaging
   - Windows MSI creation
   - Linux DEB/RPM packages
   - macOS PKG and App Store
+  
+- **[Release Workflow](release-workflow.md)** - Automated release process
+  - GitHub Actions release automation
+  - Multi-platform artifact generation
+  - Release asset management
 
 ## Architecture and Design Documents
 
@@ -46,8 +68,8 @@
   - Migration guide for developers
   - Lessons learned
 
-### Project Planning
-- **[Plan A Task Breakdown](planA-task-breakdown.md)** - Original project plan and task breakdown
+### Project Planning and Status
+- **[Project Status](project-status.md)** - Current development status and roadmap
 
 ### Testing and Quality
 - **[Testing Architecture](testing-architecture.md)** - Comprehensive testing strategy and patterns

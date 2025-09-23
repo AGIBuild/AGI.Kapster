@@ -1,63 +1,64 @@
-# AGI.Captor 安装包制作指南
+# AGI.Captor Packaging Guide
 
-## 概述
+## 📋 Overview
 
-AGI.Captor 项目已配置完整的跨平台安装包制作系统，支持 Windows (MSI)、macOS (PKG/DMG)、Linux (DEB/RPM) 三大平台的安装包创建。
+AGI.Captor provides automated multi-platform packaging through GitHub Actions, supporting Windows (MSI), macOS (PKG), and Linux (DEB/RPM) packages.
 
-## 支持的平台
+## 🎯 Supported Platforms
 
-| 平台 | 架构 | 安装包格式 | 生成工具 |
-|------|------|-----------|---------|
-| Windows | x64, ARM64 | MSI | WiX Toolset v4+ |
-| macOS | Intel (x64), Apple Silicon (ARM64) | PKG + DMG | pkgbuild + hdiutil |
-| Linux | x64, ARM64 | DEB + RPM | dpkg-deb + rpmbuild |
+| Platform | Architecture | Package Format | Build Tool |
+|----------|--------------|----------------|------------|
+| Windows | x64, ARM64 | MSI | WiX Toolset v4 |
+| macOS | Intel (x64), Apple Silicon (ARM64) | PKG | pkgbuild |
+| Linux | x64, ARM64 | DEB/RPM | dpkg-deb, rpmbuild |
 
-## 构建命令
+## 🚀 Automated Packaging
 
-### 构建所有平台安装包
+### GitHub Actions Integration
+Packaging is fully automated through GitHub Actions workflows:
+
+1. **CI Pipeline**: Basic build verification
+2. **Quality Pipeline**: Multi-platform build validation  
+3. **Release Pipeline**: Complete package generation and distribution
+
+### Build Commands
 ```powershell
-# 构建所有支持的平台
-## 概述
-
-AGI.Captor 提供统一的跨平台打包体系，支持 Windows (MSI)、macOS (PKG/DMG)、Linux (DEB/RPM)。
-
-新版发布流水线特性：
-- 时间序列锁定版本（`version.json`）作为产物命名与校验根源。
-- 按运行时标识（RID）进行分目录隔离：`artifacts/packages/by-rid/<rid>/...`。
-- 发布阶段进行 **RID 完整性验证**（缺失即失败）。
-- 聚合产物到 `artifacts/packages/final-release/` 并生成 `SHASUMS-<version>.txt`。
-- 分类变更日志 + SHA256 清单同时上传至 Release。
+# Build all platform packages
 .\build.ps1 Package
 
-## 构建产物结构
+# Build specific platform
+.\build.ps1 Package --runtime-id win-x64
+.\build.ps1 Package --runtime-id linux-x64
+.\build.ps1 Package --runtime-id osx-arm64
 
-矩阵打包输出（示例版本 `2025.121.915304`）：
-```
-artifacts/packages/by-rid/
-├── win-x64/
-│   └── AGI.Captor-2025.121.915304-win-x64.msi
-├── win-arm64/
-│   └── AGI.Captor-2025.121.915304-win-arm64.msi
-├── osx-x64/
-│   ├── AGI.Captor-2025.121.915304-osx-x64.pkg
-│   └── AGI.Captor-2025.121.915304-osx-x64.dmg
-├── osx-arm64/
-│   ├── AGI.Captor-2025.121.915304-osx-arm64.pkg
-│   └── AGI.Captor-2025.121.915304-osx-arm64.dmg
-├── linux-x64/
-│   ├── AGI.Captor-2025.121.915304-linux-x64.deb
-│   └── AGI.Captor-2025.121.915304-linux-x64.rpm
-└── linux-arm64/
-    ├── AGI.Captor-2025.121.915304-linux-arm64.deb
-    └── AGI.Captor-2025.121.915304-linux-arm64.rpm
-
-artifacts/packages/final-release/
-├── (复制聚合的全部上列文件)
-└── SHASUMS-2025.121.915304.txt
+# Build with specific configuration
+.\build.ps1 Package --configuration Release
 ```
 
-`SHASUMS-<version>.txt` 内容格式：
+## 📦 Package Structure
+
+### Output Organization
 ```
+artifacts/
+├── publish/               # Runtime-specific binaries
+│   ├── win-x64/
+│   ├── linux-x64/
+│   └── osx-x64/
+└── packages/              # Platform-specific installers
+    ├── AGI.Captor-{version}-win-x64.msi
+    ├── AGI.Captor-{version}-linux-x64.deb
+    └── AGI.Captor-{version}-osx-x64.pkg
+```
+
+### Package Naming Convention
+```
+AGI.Captor-{version}-{runtime-id}.{extension}
+```
+
+Examples:
+- `AGI.Captor-2025.9.23.1200-win-x64.msi`
+- `AGI.Captor-2025.9.23.1200-linux-x64.deb`  
+- `AGI.Captor-2025.9.23.1200-osx-arm64.pkg`
 <sha256>  AGI.Captor-2025.121.915304-win-x64.msi
 <sha256>  AGI.Captor-2025.121.915304-win-arm64.msi
 ...
