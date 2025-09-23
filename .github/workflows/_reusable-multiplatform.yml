@@ -51,7 +51,6 @@ jobs:
         
     - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
-      with:
         
     - name: 🚀 Publish and Package
       uses: ./.github/actions/publish-package
