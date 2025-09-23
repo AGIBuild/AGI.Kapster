@@ -310,12 +310,12 @@ jobs:
           }
         }
         $expected = @(
-          @{ Rid='win-x64';    Pattern='*-win-x64.msi';    Friendly='Windows x64 MSI' }
-          @{ Rid='win-arm64';  Pattern='*-win-arm64.msi';  Friendly='Windows ARM64 MSI' }
-          @{ Rid='osx-x64';    Pattern='*-osx-x64.pkg';    Friendly='macOS Intel PKG' }
-          @{ Rid='osx-arm64';  Pattern='*-osx-arm64.pkg';  Friendly='macOS Apple Silicon PKG' }
-          @{ Rid='linux-x64';  Pattern='*-linux-x64.deb'; Friendly='Linux x64 DEB' }
-          @{ Rid='linux-arm64';Pattern='*-linux-arm64.deb';Friendly='Linux ARM64 DEB' }
+          @{ Rid='win-x64';    Pattern='*-win-x64-portable.zip';    Friendly='Windows x64 Portable ZIP' }
+          @{ Rid='win-arm64';  Pattern='*-win-arm64-portable.zip';  Friendly='Windows ARM64 Portable ZIP' }
+          @{ Rid='osx-x64';    Pattern='*-osx-x64-portable.zip';    Friendly='macOS Intel Portable ZIP' }
+          @{ Rid='osx-arm64';  Pattern='*-osx-arm64-portable.zip';  Friendly='macOS Apple Silicon Portable ZIP' }
+          @{ Rid='linux-x64';  Pattern='*-linux-x64-portable.zip'; Friendly='Linux x64 Portable ZIP' }
+          @{ Rid='linux-arm64';Pattern='*-linux-arm64-portable.zip';Friendly='Linux ARM64 Portable ZIP' }
         )
         $missing = @()
         foreach ($e in $expected) {
@@ -372,7 +372,7 @@ jobs:
           END{ if(feat)print "\n### ✨ Features"feat; if(fix)print "\n### 🐛 Fixes"fix; if(ref)print "\n### ♻️ Refactors"ref; if(perf)print "\n### 🚀 Performance"perf; if(docs)print "\n### 📝 Docs"docs; if(builds)print "\n### 🏗️ Build System"builds; }' commits.txt > categorized.md
         if [ ! -s categorized.md ]; then echo -e "\n### Changes\n- Internal adjustments" > categorized.md; fi
         {
-          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Installation Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64.msi" "- AGI.Captor-*-win-arm64.msi" "" "**macOS:**" "- AGI.Captor-*-osx-x64.pkg" "- AGI.Captor-*-osx-arm64.pkg" "" "**Linux:**" "- AGI.Captor-*-linux-x64.deb" "- AGI.Captor-*-linux-arm64.deb" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64.deb SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "$f = Get-Item .\\AGI.Captor-*win-x64.msi" "$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern $f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "$actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash" "if ($expected -ieq $actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "_Range: ${PREV_TAG:-Initial} → $TAG_" ;
+          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "- AGI.Captor-*-linux-arm64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor_*_arm64.deb (Debian/Ubuntu ARM64)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern $f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "$actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash" "if ($expected -ieq $actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "_Range: ${PREV_TAG:-Initial} → $TAG_" ;
           cat categorized.md;
         } > custom-release-body.md
         head -n 60 custom-release-body.md
