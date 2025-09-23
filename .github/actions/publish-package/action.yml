@@ -30,20 +30,24 @@ runs:
     - name: 🚀 Publish for ${{ inputs.runtime-id }}
       shell: pwsh
       run: |
-        $publishArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
+        $publishArgs = @("Publish", "--configuration", "${{ inputs.configuration }}", "--rids", "${{ inputs.runtime-id }}")
         if ("${{ inputs.skip-tests }}" -eq "true") {
-          $publishArgs += " --skip-tests"
+          $publishArgs += "--skip-tests"
         }
         
+        Write-Host "Executing: ./build.ps1 Clean"
         ./build.ps1 Clean
-        ./build.ps1 Publish $publishArgs
+        
+        Write-Host "Executing: ./build.ps1 $($publishArgs -join ' ')"
+        & ./build.ps1 @publishArgs
         
     - name: 📦 Create packages
       if: inputs.package == 'true'
       shell: pwsh
       run: |
-        $packageArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
-        ./build.ps1 Package $packageArgs
+        $packageArgs = @("Package", "--configuration", "${{ inputs.configuration }}", "--rids", "${{ inputs.runtime-id }}")
+        Write-Host "Executing: ./build.ps1 $($packageArgs -join ' ')"
+        & ./build.ps1 @packageArgs
         
     - name: 📂 Verify publish artifacts
       shell: pwsh
