@@ -137,7 +137,6 @@ jobs:
     - name: 🔧 Setup Complete Environment
       uses: ./.github/actions/setup-environment
       with:
-        fetch-depth: 0
         dotnet-version: ${{ env.DOTNET_VERSION }}
         enable-nuget-cache: true
         cache-key-suffix: '-release'
