@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
 using Serilog.Settings.Configuration;
-using System.Reflection;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
@@ -49,31 +48,23 @@ class Program
         var environment = builder.Environment.EnvironmentName ?? "Production";
         Log.Information("Starting AGI.Captor in {Environment} environment", environment);
 
-        // Configure from embedded resources first, then fallback to files
+        // Configure with fallback protection
         var configBuilder = new ConfigurationBuilder();
         
-        // Try to load from embedded resources
-        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-        var embeddedConfig = LoadEmbeddedJsonResource(assembly, "appsettings.json");
-        if (embeddedConfig != null)
-        {
-            configBuilder.AddJsonStream(new MemoryStream(embeddedConfig));
-        }
-        
-        // Try to load environment-specific embedded resource
-        var embeddedEnvConfig = LoadEmbeddedJsonResource(assembly, $"appsettings.{environment}.json");
-        if (embeddedEnvConfig != null)
-        {
-            configBuilder.AddJsonStream(new MemoryStream(embeddedEnvConfig));
-        }
-        
-        // Fallback to file-based configuration if embedded resources not available
+        // Add base configuration with fallback protection
         var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         if (File.Exists(appsettingsPath))
         {
             configBuilder.AddJsonFile(appsettingsPath, optional: false, reloadOnChange: true);
         }
+        else
+        {
+            // Create default configuration if file doesn't exist
+            CreateDefaultConfiguration(appsettingsPath);
+            configBuilder.AddJsonFile(appsettingsPath, optional: false, reloadOnChange: true);
+        }
         
+        // Add environment-specific configuration (optional)
         var envAppsettingsPath = Path.Combine(AppContext.BaseDirectory, $"appsettings.{environment}.json");
         if (File.Exists(envAppsettingsPath))
         {
@@ -223,36 +214,44 @@ class Program
             .LogToTrace();
 
     /// <summary>
-    /// Loads an embedded JSON resource from the assembly
+    /// Creates a default configuration file if it doesn't exist
     /// </summary>
-    /// <param name="assembly">The assembly to load from</param>
-    /// <param name="resourceName">The name of the resource</param>
-    /// <returns>Byte array of the resource content, or null if not found</returns>
-    private static byte[]? LoadEmbeddedJsonResource(Assembly assembly, string resourceName)
+    /// <param name="filePath">Path where to create the configuration file</param>
+    private static void CreateDefaultConfiguration(string filePath)
     {
         try
         {
-            var fullResourceName = assembly.GetManifestResourceNames()
-                .FirstOrDefault(name => name.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase));
-            
-            if (fullResourceName == null)
+            var defaultConfig = new
             {
-                return null;
-            }
+                Application = new
+                {
+                    Name = "AGI.Captor",
+                    Version = "1.2.0",
+                    Description = "Modern Cross-Platform Screenshot and Annotation Tool"
+                },
+                AutoUpdate = new
+                {
+                    Enabled = true,
+                    CheckFrequencyHours = 24,
+                    InstallAutomatically = true,
+                    NotifyBeforeInstall = false,
+                    UsePreReleases = false,
+                    RepositoryOwner = "AGIBuild",
+                    RepositoryName = "AGI.Captor"
+                }
+            };
 
-            using var stream = assembly.GetManifestResourceStream(fullResourceName);
-            if (stream == null)
+            var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, new System.Text.Json.JsonSerializerOptions
             {
-                return null;
-            }
+                WriteIndented = true
+            });
 
-            using var memoryStream = new MemoryStream();
-            stream.CopyTo(memoryStream);
-            return memoryStream.ToArray();
+            File.WriteAllText(filePath, json);
+            Log.Information("Created default configuration file: {FilePath}", filePath);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            Log.Warning(ex, "Failed to create default configuration file: {FilePath}", filePath);
         }
     }
 }
