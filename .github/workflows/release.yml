@@ -123,44 +123,14 @@ jobs:
 
   build-and-test:
     name: 🧪 Build & Test
-    runs-on: ubuntu-latest
     needs: prepare-release
-    
-    steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: 🔧 Setup Complete Environment
-      uses: ./.github/actions/setup-environment
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-        enable-nuget-cache: true
-        cache-key-suffix: '-release'
-        
-    - name: 🔒 Validate locked version
-      shell: pwsh
-      run: |
-        if (-not (Test-Path version.json)) { Write-Host 'version.json missing'; exit 1 }
-        ./build.ps1 CheckVersionLocked
-        
-    - name: 🧪 Full Build and Test
-      uses: ./.github/actions/build-and-test
-      with:
-        configuration: 'Release'
-        enable-coverage: true
-      env:
-        VERSION: ${{ needs.prepare-release.outputs.version-number }}
-        RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
-
-    - name: 📊 Upload test results and coverage
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: release-test-results-and-coverage
-        path: artifacts/coverage/
-        retention-days: 30
+    uses: ./.github/workflows/_reusable-build.yml
+    with:
+      configuration: 'Release'
+      enable-coverage: true
+      upload-artifacts: true
+      artifact-retention-days: 30
+    secrets: inherit
 
   build-packages:
     name: 📦 Build & Package
