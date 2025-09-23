@@ -29,7 +29,6 @@ jobs:
       - name: 🛠️ Setup Environment
         uses: ./.github/actions/setup-environment
         with:
-          fetch-depth: 0
 
       - name: Validate locked version
         id: set-version
