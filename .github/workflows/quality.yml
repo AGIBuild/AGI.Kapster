@@ -44,11 +44,13 @@ jobs:
         enable-coverage: true
         
     - name: 📊 Upload coverage to Codecov
+      if: always()
       uses: codecov/codecov-action@v4
       with:
         directory: artifacts/coverage/
         fail_ci_if_error: false
-        verbose: true
+        verbose: false
+      continue-on-error: true
         
     - name: 📤 Upload test results
       uses: actions/upload-artifact@v4
@@ -58,6 +60,7 @@ jobs:
         path: |
           artifacts/test-results/
           artifacts/coverage/
+        if-no-files-found: warn
         retention-days: 30
 
   security-scan:
@@ -108,6 +111,7 @@ jobs:
         path: |
           security-audit.log
           outdated-packages.log
+        if-no-files-found: warn
         retention-days: 30
 
   performance-test:
@@ -159,17 +163,27 @@ jobs:
             Sort-Object Length -Descending | 
             Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}} | 
             Format-Table | Out-String | Tee-Object -Append -FilePath "performance-report.md"
+        } else {
+          Write-Host "No publish artifacts found for analysis." | Tee-Object -Append -FilePath "performance-report.md"
         }
         
         # Build timing (if available)
         Write-Host "## Build Performance" | Tee-Object -Append -FilePath "performance-report.md"
         Write-Host "Build completed at: $(Get-Date)" | Tee-Object -Append -FilePath "performance-report.md"
         
+        # Ensure file exists
+        if (-not (Test-Path "performance-report.md")) {
+          Write-Host "Creating fallback performance report..."
+          "Performance report generated at $(Get-Date)" | Out-File -FilePath "performance-report.md"
+        }
+        
     - name: 📊 Upload performance report
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: performance-report
         path: performance-report.md
+        if-no-files-found: warn
         retention-days: 30
 
   quality-gate:
