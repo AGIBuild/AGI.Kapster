@@ -361,7 +361,7 @@ jobs:
         tag_name: ${{ needs.prepare-release.outputs.version }}
         name: AGI.Captor ${{ needs.prepare-release.outputs.version }}
         prerelease: ${{ needs.prepare-release.outputs.is-prerelease }}
-        generate_release_notes: true  # 使用GitHub官方生成
+        generate_release_notes: true  # Use GitHub official generation
         body_path: custom-release-body.md
         token: ${{ secrets.GH_PAT }}
 
