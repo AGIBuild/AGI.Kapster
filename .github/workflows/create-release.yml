@@ -65,11 +65,34 @@ jobs:
             exit 1
           fi
 
+      - name: Verify release branch state
+        run: |
+          # Ensure we're on release branch
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [ "$CURRENT_BRANCH" != "release" ]; then
+            echo "Error: Not on release branch (current: $CURRENT_BRANCH)" >&2
+            exit 1
+          fi
+          
+          # Get current commit hash
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "Creating release on release branch commit: $CURRENT_COMMIT"
+          
+          # Verify version.json matches current state
+          VERSION_IN_FILE=$(jq -r '.version' version.json)
+          if [ "$VERSION_IN_FILE" != "$VERSION" ]; then
+            echo "Error: version.json version ($VERSION_IN_FILE) doesn't match expected ($VERSION)" >&2
+            exit 1
+          fi
+          
+          echo "✅ Release branch verification passed"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2          
         with:
           tag_name: v${{ env.VERSION }}
           name: AGI.Captor v${{ env.VERSION }}
+          target_commitish: release
           draft: false
           prerelease: ${{ github.event.inputs.prerelease }}
           token: ${{ secrets.GH_PAT }}   
