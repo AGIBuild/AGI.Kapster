@@ -16,15 +16,11 @@ jobs:
         with:
           fetch-depth: 0
           
-      - name: 🔧 Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: 🔧 Setup .NET Only
+        uses: ./.github/actions/setup-dotnet-only
         with:
           dotnet-version: '9.0.x'
           dotnet-quality: 'preview'
-
-      - name: Restore tools
-        shell: pwsh
-        run: dotnet tool restore || true
 
       - name: Validate version.json exists
         shell: pwsh
