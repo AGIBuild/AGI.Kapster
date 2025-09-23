@@ -52,7 +52,6 @@ jobs:
     - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
       with:
-        fetch-depth: 1
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: 🚀 Publish and Package
