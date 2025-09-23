@@ -10,10 +10,6 @@ inputs:
     description: 'Build configuration'
     required: false
     default: 'Release'
-  skip-tests:
-    description: 'Skip running tests before publish'
-    required: false
-    default: 'true'
   package:
     description: 'Create platform-specific packages'
     required: false
@@ -31,9 +27,6 @@ runs:
       shell: pwsh
       run: |
         $publishArgs = @("Publish", "--configuration", "${{ inputs.configuration }}", "--rids", "${{ inputs.runtime-id }}")
-        if ("${{ inputs.skip-tests }}" -eq "true") {
-          $publishArgs += "--skip-tests"
-        }
         
         Write-Host "Executing: ./build.ps1 Clean"
         ./build.ps1 Clean

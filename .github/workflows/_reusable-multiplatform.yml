@@ -12,10 +12,6 @@ on:
         type: string
         required: false
         default: '["win-x64", "linux-x64", "osx-x64", "osx-arm64"]'
-      skip-tests:
-        type: boolean
-        required: false
-        default: true
       create-packages:
         type: boolean
         required: false
@@ -64,7 +60,6 @@ jobs:
       with:
         runtime-id: ${{ matrix.platform }}
         configuration: ${{ inputs.configuration }}
-        skip-tests: ${{ inputs.skip-tests }}
         package: ${{ inputs.create-packages }}
         
     - name: 📦 Upload artifacts

@@ -176,16 +176,27 @@ class BuildTasks : NukeBuild
         });
 
     Target Publish => _ => _
-        .Description("Publish binaries")
-        .DependsOn(Test)
+        .Description("Publish binaries for specified runtime(s)")
+        .DependsOn(Build)
         .Executes(() =>
         {
-            var publishDir = RootDirectory / "artifacts" / "publish";
-            DotNetPublish(s => s
-                .SetProject(MainProject)
-                .SetConfiguration(Configuration)
-                .EnableNoRestore()
-                .SetOutput(publishDir));
+            foreach (var rid in PublishRuntimeIdentifiers)
+            {
+                var publishPath = PublishDirectory / rid;
+                Console.WriteLine($"📦 Publishing for {rid} to {publishPath}");
+                
+                DotNetPublish(s => s
+                    .SetProject(MainProject)
+                    .SetConfiguration(Configuration)
+                    .SetRuntime(rid)
+                    .SetSelfContained(SelfContained)
+                    .SetPublishSingleFile(SingleFile)
+                    .SetPublishTrimmed(Trim)
+                    .EnableNoRestore()
+                    .SetOutput(publishPath));
+                    
+                Console.WriteLine($"✅ Published {rid} successfully to {publishPath}");
+            }
         });
 
     Target Info => _ => _

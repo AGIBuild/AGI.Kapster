@@ -75,7 +75,6 @@ jobs:
     needs: [build-info, test-and-quality]
     with:
       configuration: 'Release'
-      skip-tests: true
       create-packages: false
 
   preview-summary:
