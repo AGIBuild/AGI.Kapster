@@ -65,14 +65,14 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2          
         with:
           tag_name: v${{ env.VERSION }}
-          release_name: Release v${{ env.VERSION }}
+          name: AGI.Captor v${{ env.VERSION }}
           draft: false
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-        env:
-          token: ${{ secrets.GH_PAT }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          token: ${{ secrets.GH_PAT }}   
+
       - name: Summary
         run: |
           echo "Release created: v$VERSION" >> $GITHUB_STEP_SUMMARY
