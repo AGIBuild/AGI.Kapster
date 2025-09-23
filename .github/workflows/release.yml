@@ -1,9 +1,9 @@
 name: Release Build & Publish
 
-# 发布分支和标签的正式发布构建
+# Release build and publish workflow
 on:
   push:
-    tags: [ 'v*' ]  # 只在版本标签推送时触发
+    tags: [ 'v*' ]  # Trigger on version tags
   workflow_dispatch:
     inputs:
       tag:
@@ -25,7 +25,7 @@ env:
   DOTNET_VERSION: '9.0.x'
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  # Optional code signing / notarization placeholders (override via repository/environment secrets if desired)
+  # Optional code signing / notarization placeholders
   CODE_SIGN_WINDOWS_PFX_BASE64: ''
   CODE_SIGN_WINDOWS_PFX_PASSWORD: ''
   MACOS_SIGN_IDENTITY: ''
@@ -199,6 +199,7 @@ jobs:
         shell: pwsh
         run: |
           try { $wixVersion = & wix --version 2>$null; Write-Host "WiX: $wixVersion" } catch { dotnet tool install --global wix }
+          
       - name: 📦 Publish & Package
         uses: ./.github/actions/publish-package
         with:
@@ -214,7 +215,7 @@ jobs:
         run: |
           if (-not $env:CODE_SIGN_WINDOWS_PFX_BASE64 -or -not $env:CODE_SIGN_WINDOWS_PFX_PASSWORD) { Write-Host "Skipping signing (missing CODE_SIGN_WINDOWS_* env)"; exit 0 }
           $rid = "${{ matrix.rid }}"
-          $dir = "artifacts/packages/by-rid/$rid"
+          $dir = "artifacts/packages"
           if (-not (Test-Path $dir)) { Write-Host "No directory $dir"; exit 1 }
           $pfxPath = "$env:RUNNER_TEMP/code-signing.pfx"
           Write-Host "Decoding PFX..."
@@ -224,12 +225,13 @@ jobs:
           foreach ($msi in $msis) {
             Write-Host "Signing $($msi.Name)"
             & signtool sign /f $pfxPath /p $env:CODE_SIGN_WINDOWS_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 $msi.FullName
-            if ($LASTEXITCODE -ne 0) { Write-Host "Sign failed"; exit 1 }
+            if ($LASTEXITCODE -ne 0) { Write-Host "Sign fail"; exit 1 }
             & signtool verify /pa /all $msi.FullName | Out-Null
             if ($LASTEXITCODE -ne 0) { Write-Host "Verification failed"; exit 1 }
           }
           Write-Host "✅ Windows MSI signing completed"
           Remove-Item $pfxPath -Force
+          
       - name: 🔐 macOS Codesign (PKG & DMG)
         if: startsWith(matrix.os, 'macos')
         shell: bash
@@ -238,7 +240,7 @@ jobs:
           SIGN_IDENTITY="$MACOS_SIGN_IDENTITY"
           if [ -z "$SIGN_IDENTITY" ]; then echo "Skipping codesign (MACOS_SIGN_IDENTITY not set)"; exit 0; fi
           RID="${{ matrix.rid }}"
-          DIR="artifacts/packages/by-rid/$RID"
+          DIR="artifacts/packages"
           echo "Codesign assets in $DIR"
           for f in "$DIR"/*.pkg "$DIR"/*.dmg; do
             [ -f "$f" ] || continue
@@ -247,6 +249,7 @@ jobs:
             codesign --verify --verbose=2 "$f"
           done
           echo "✅ macOS codesign completed"
+          
       - name: 📨 macOS Notarize (PKG & DMG)
         if: startsWith(matrix.os, 'macos')
         shell: bash
@@ -257,7 +260,7 @@ jobs:
           TEAM_ID="$MACOS_NOTARIZE_TEAM_ID"
           if [ -z "$APPLE_ID" ] || [ -z "$APP_PASSWORD" ] || [ -z "$TEAM_ID" ]; then echo "Skipping notarization (MACOS_NOTARIZE_* env not set)"; exit 0; fi
           RID="${{ matrix.rid }}"
-          DIR="artifacts/packages/by-rid/$RID"
+          DIR="artifacts/packages"
           
           # Notarize all PKG and DMG files
           NOTARIZED_COUNT=0
@@ -277,6 +280,7 @@ jobs:
           else
             echo "✅ Notarization completed for $NOTARIZED_COUNT file(s)"
           fi
+          
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -404,10 +408,9 @@ jobs:
       uses: geekyeggo/delete-artifact@v5
       with:
         name: |
-          windows-x64-release
-          windows-arm64-release
-          macos-x64-release
-          macos-arm64-release
-          linux-x64-release
-          linux-arm64-release
+          windows-latest-win-x64-release
+          windows-latest-win-arm64-release
+          macos-latest-osx-x64-release
+          macos-latest-osx-arm64-release
+          ubuntu-latest-linux-x64-release
         failOnError: false
