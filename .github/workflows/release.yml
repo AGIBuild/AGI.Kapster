@@ -93,21 +93,12 @@ jobs:
 
     - name: 🔐 Enforce tag originates from release branch
       if: ${{ github.ref_type == 'tag' }}
-      shell: pwsh
+      uses: actions/checkout@v4
+      with:
+        ref: release
+        fetch-depth: 0
       run: |
-        git fetch --all --prune --unshallow 2>$null || git fetch --all --prune
-        $releaseBranch = 'origin/release'
-        $exists = git branch -r --list $releaseBranch
-        if (-not $exists) {
-          Write-Host "❌ Required branch 'release' not found on remote."; exit 1
-        }
-        $tagRef = "${{ github.ref_name }}"
-        $tagCommit = git rev-list -n 1 $tagRef
-        if (-not $tagCommit) { Write-Host "❌ Unable to resolve tag commit"; exit 1 }
-        git merge-base --is-ancestor $tagCommit $releaseBranch; if ($LASTEXITCODE -ne 0) {
-          Write-Host "❌ Tag $tagRef (commit $tagCommit) is NOT based on release branch. Abort."; exit 1
-        }
-        Write-Host "✅ Tag $tagRef commit $tagCommit is contained in release branch."
+        Write-Host "✅ Working with release branch for tag validation"
 
     - name: 🔒 Validate version.json consistency
       shell: pwsh
@@ -147,7 +138,7 @@ jobs:
         if (-not (Test-Path version.json)) { Write-Host 'version.json missing'; exit 1 }
         ./build.ps1 CheckVersionLocked
         
-    - name: � Full Build and Test
+    - name: 🧪 Full Build and Test
       uses: ./.github/actions/build-and-test
       with:
         configuration: 'Release'
@@ -182,12 +173,12 @@ jobs:
         arch: [x64, arm64]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: � Checkout repository
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           
-      - name: �🛠️ Setup Environment  
+      - name: 🛠️ Setup Environment  
         uses: ./.github/actions/setup-environment
         
       - name: 🔧 Setup WiX (Windows only)

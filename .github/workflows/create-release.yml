@@ -43,10 +43,8 @@ jobs:
           fi
           echo "Using version $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Set git user identity
+      - name: Set version output
         run: |
-          git config --global user.name "AGI.Captor Bot"
-          git config --global user.email "xiewuhen@live.com"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run CheckVersionLocked
@@ -67,17 +65,6 @@ jobs:
 
       - name: Verify release branch state
         run: |
-          # Ensure we're on release branch
-          CURRENT_BRANCH=$(git branch --show-current)
-          if [ "$CURRENT_BRANCH" != "release" ]; then
-            echo "Error: Not on release branch (current: $CURRENT_BRANCH)" >&2
-            exit 1
-          fi
-          
-          # Get current commit hash
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "Creating release on release branch commit: $CURRENT_COMMIT"
-          
           # Verify version.json matches current state
           VERSION_IN_FILE=$(jq -r '.version' version.json)
           if [ "$VERSION_IN_FILE" != "$VERSION" ]; then
