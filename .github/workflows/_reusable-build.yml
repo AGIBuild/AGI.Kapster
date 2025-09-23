@@ -68,4 +68,5 @@ jobs:
         path: |
           artifacts/test-results/
           artifacts/coverage/
+        if-no-files-found: warn
         retention-days: ${{ inputs.artifact-retention-days }}

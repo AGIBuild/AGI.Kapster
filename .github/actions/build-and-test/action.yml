@@ -58,3 +58,14 @@ runs:
           $testArgs += " --coverage"
         }
         ./build.ps1 Test $testArgs
+        
+    - name: 📂 Verify artifacts directories
+      shell: pwsh
+      run: |
+        Write-Host "Checking artifacts directories..."
+        if (Test-Path "artifacts") {
+          Write-Host "✅ artifacts/ directory exists"
+          Get-ChildItem "artifacts" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Host "❌ artifacts/ directory not found"
+        }

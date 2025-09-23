@@ -44,3 +44,21 @@ runs:
       run: |
         $packageArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
         ./build.ps1 Package $packageArgs
+        
+    - name: 📂 Verify publish artifacts
+      shell: pwsh
+      run: |
+        $publishPath = "artifacts/publish/${{ inputs.runtime-id }}"
+        Write-Host "Checking publish directory: $publishPath"
+        if (Test-Path $publishPath) {
+          Write-Host "✅ $publishPath directory exists"
+          Get-ChildItem $publishPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Host "❌ $publishPath directory not found"
+          Write-Host "Available directories in artifacts/:"
+          if (Test-Path "artifacts") {
+            Get-ChildItem "artifacts" -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
+          } else {
+            Write-Host "  No artifacts directory found"
+          }
+        }

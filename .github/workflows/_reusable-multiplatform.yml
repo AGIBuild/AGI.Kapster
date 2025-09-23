@@ -72,4 +72,5 @@ jobs:
       with:
         name: build-${{ matrix.platform }}
         path: artifacts/publish/${{ matrix.platform }}/
+        if-no-files-found: warn
         retention-days: ${{ inputs.artifact-retention-days }}
