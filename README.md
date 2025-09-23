@@ -10,32 +10,27 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![CI/CD](https://github.com/AGIBuild/AGI.Captor/actions/workflows/ci.yml/badge.svg)
 
-[🌍 中文文档](README_CN.md) | [🤝 Contributing](CONTRIBUTING.md)
+[🌍 中文文档](README_CN.md) | [🤝 Contributing](CONTRIBUTING.md) | [🧪 Testing](TESTING.md)
 
-## ✨ Key Features
+## ✨ Features
 
-### 🎯 Smart Screen Capture
-- **Global Hotkeys**: Customizable shortcuts for instant capture (`Alt+A` default)
-- **Region Selection**: Precise pixel-level selection with visual feedback
-- **Multi-Monitor Support**: Seamless operation across multiple displays
-- **Element Detection**: Automatic UI element detection (Windows only)
+### 🎯 Smart Capture
+- **Global Hotkeys**: Customizable shortcuts (`Alt+A` default)
+- **Region Selection**: Pixel-perfect selection with visual feedback
+- **Multi-Monitor Support**: Seamless across multiple displays
+- **Element Detection**: Automatic UI element detection (Windows)
 
-### 🎨 Professional Annotation Tools
-- **Drawing Tools**: Arrow, rectangle, ellipse, text, freehand drawing, emoji
-- **Style Customization**: Colors, thickness, fonts, and sizes
-- **Undo/Redo System**: Multi-step operation history
-- **Layer Management**: Independent annotation editing and deletion
+### 🎨 Annotation Tools
+- **Drawing Tools**: Arrow, rectangle, ellipse, text, freehand, emoji
+- **Style Customization**: Colors, thickness, fonts, sizes
+- **Undo/Redo**: Multi-step operation history
+- **Layer Management**: Independent annotation editing
 
-### 💾 Flexible Export Options
+### 💾 Export Options
 - **Multiple Formats**: PNG, JPEG, BMP, TIFF, WebP with quality control
-- **Quick Actions**: Copy to clipboard (`Enter`/Double-click) or save to file (`Ctrl+S`)
-- **Batch Processing**: Export multiple captures with consistent settings
+- **Quick Actions**: Copy to clipboard (`Enter`) or save (`Ctrl+S`)
+- **Batch Processing**: Export multiple captures consistently
 - **Clipboard Integration**: Advanced clipboard operations
-
-### ⚙️ Modern Architecture
-- **Background Operation**: System tray integration with minimal resources
-- **Cross-Platform**: Windows, macOS, and Linux (planned) support
-- **Dependency Injection**: Clean architecture with comprehensive testing
 
 ## 🚀 Quick Start
 
@@ -51,53 +46,64 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 
 #### Pre-built Packages (Recommended)
 Download from [GitHub Releases](../../releases/latest):
-- **Windows**: `AGI.Captor-win-x64.msi` or `AGI.Captor-win-x64.zip`
-- **macOS**: `AGI.Captor-osx-x64.pkg` (Intel) or `AGI.Captor-osx-arm64.pkg` (Apple Silicon)
-- **Linux**: `agi-captor-linux-x64.deb` or `agi-captor-linux-x64.rpm`
+
+**Windows:**
+- `AGI.Captor-win-x64.msi` - Windows Installer
+- `AGI.Captor-win-x64-portable.zip` - Portable version
+
+**macOS:**
+- `AGI.Captor-osx-x64.pkg` - Intel Mac
+- `AGI.Captor-osx-arm64.pkg` - Apple Silicon
+
+**Linux:**
+- `agi-captor_*_amd64.deb` - Debian/Ubuntu
+- `agi-captor-*-1.x86_64.rpm` - Red Hat/CentOS/Fedora
+- `AGI.Captor-linux-x64-portable.zip` - Portable version
 
 #### Build from Source
 ```bash
 git clone https://github.com/AGIBuild/AGI.Captor.git
 cd AGI.Captor
 ./build.ps1                    # Build and test
-./build.ps1 Publish           # Create executable
+./build.ps1 Publish           # Create packages
 ```
 
 ### First Launch
 
-1. **Start Application**: Launch from Start Menu/Applications or run executable
-2. **Grant Permissions**: Allow screen recording permissions (macOS)
-3. **Take Screenshot**: Use `Alt+A` hotkey or click system tray icon
+1. **Start Application**: Launch from Start Menu/Applications
+2. **Grant Permissions**: Allow screen recording (macOS)
+3. **Take Screenshot**: Use `Alt+A` hotkey or system tray icon
 4. **Annotate**: Use toolbar tools to add annotations
 5. **Export**: Press `Enter` to copy or `Ctrl+S` to save
 
-## 📖 User Guide
+## ⌨️ Hotkeys
 
-### Hotkey Commands
-| Action | Default | Description |
-|--------|---------|-------------|
+### Capture Commands
+| Action | Hotkey | Description |
+|--------|--------|-------------|
 | **Capture Screen** | `Alt+A` | Start screen capture |
-| **Quick Export** | `Ctrl+S` | Save to file |
-| **Copy to Clipboard** | `Enter` / Double-click | Copy current capture |
-| **Cancel Operation** | `Escape` | Cancel current operation |
+| **Save to File** | `Ctrl+S` | Save current capture |
+| **Copy to Clipboard** | `Enter` | Copy to clipboard |
+| **Cancel** | `Escape` | Cancel operation |
 
 ### Annotation Tools
 | Tool | Hotkey | Description |
 |------|--------|-------------|
-| **Arrow** | `A` | Draw directional arrows |
-| **Rectangle** | `R` | Draw rectangle frames |
-| **Ellipse** | `E` | Draw ellipses and circles |
-| **Text** | `T` | Add text annotations |
-| **Freehand** | `F` | Free drawing tool |
-| **Emoji** | `M` | Insert emoji symbols |
+| **Arrow** | `A` | Draw arrows |
+| **Rectangle** | `R` | Draw rectangles |
+| **Ellipse** | `E` | Draw ellipses |
+| **Text** | `T` | Add text |
+| **Freehand** | `F` | Free drawing |
+| **Emoji** | `M` | Insert emoji |
 
-## 🤝 Contributing
+## 🛠️ Development
 
-We welcome community contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+### Requirements
+- .NET 9.0 SDK
+- Visual Studio 2022 or JetBrains Rider
 
 ### Development Setup
 ```bash
-# Clone and build
 git clone https://github.com/AGIBuild/AGI.Captor.git
 cd AGI.Captor
 dotnet restore
@@ -107,9 +113,14 @@ dotnet restore
 dotnet run --project src/AGI.Captor.Desktop
 ```
 
-### Requirements
-- .NET 9.0 SDK
-- Visual Studio 2022 or JetBrains Rider
+### Testing
+```bash
+# Run all tests
+./build.ps1 Test
+
+# Run with coverage
+./build.ps1 Test -Coverage
+```
 
 ## 📄 License
 
