@@ -12,10 +12,6 @@ on:
         type: string
         required: false
         default: '["win-x64", "linux-x64", "osx-x64", "osx-arm64"]'
-      skip-tests:
-        type: boolean
-        required: false
-        default: true
       create-packages:
         type: boolean
         required: false
@@ -48,18 +44,19 @@ jobs:
             os: macos-latest
     
     steps:
-    - name: �️ Setup Environment
-      uses: ./.github/actions/setup-environment
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 🛠️ Setup Environment
+      uses: ./.github/actions/setup-environment
         
     - name: 🚀 Publish and Package
       uses: ./.github/actions/publish-package
       with:
         runtime-id: ${{ matrix.platform }}
         configuration: ${{ inputs.configuration }}
-        skip-tests: ${{ inputs.skip-tests }}
         package: ${{ inputs.create-packages }}
         
     - name: 📦 Upload artifacts
@@ -67,4 +64,5 @@ jobs:
       with:
         name: build-${{ matrix.platform }}
         path: artifacts/publish/${{ matrix.platform }}/
+        if-no-files-found: warn
         retention-days: ${{ inputs.artifact-retention-days }}

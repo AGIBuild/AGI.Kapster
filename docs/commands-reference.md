@@ -1,379 +1,388 @@
-# AGI.Captor 常用命令快速参考
+# Commands Reference
 
-## 🚀 快速开始
+## Build Commands
 
+### PowerShell Build Script
 ```powershell
-# 克隆项目
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+# Basic build
+.\build.ps1
 
-# 获取项目信息
-./build.ps1 Info
+# Specific target
+.\build.ps1 [Target]
 
-# 完整构建
-./build.ps1 Clean Build Test
+# With parameters
+.\build.ps1 [Target] --parameter value
 ```
 
-## 🔧 构建命令
+### Available Targets
 
-### 基础构建命令
+#### Core Targets
 ```powershell
-# 清理构建输出
-## 🏷️ 版本管理（锁定时间序列模型）
+# Clean build artifacts
+.\build.ps1 Clean
 
-### 基本操作
+# Restore NuGet packages
+.\build.ps1 Restore
+
+# Build all projects
+.\build.ps1 Build
+
+# Run unit tests
+.\build.ps1 Test
+
+# Build and test (default)
+.\build.ps1
+```
+
+#### Publishing Targets
 ```powershell
-# 升级并锁定版本（写入 version.json，三段展示 + 派生四段 assembly/file）
-./build.ps1 UpgradeVersion --lock
+# Publish for current platform
+.\build.ps1 Publish
 
-# 查看锁定版本
-Get-Content version.json | ConvertFrom-Json | Select-Object version,assemblyVersion,fileVersion,informationalVersion
+# Publish for specific runtime
+.\build.ps1 Publish --runtime win-x64
+.\build.ps1 Publish --runtime osx-x64
+.\build.ps1 Publish --runtime linux-x64
 
-# 仅查看展示版本
-(Get-Content version.json | ConvertFrom-Json).version
+# Create packages
+.\build.ps1 Package
 ```
 
-### 版本字段说明
-```text
-version               -> 展示版 (YYYY.MDD.Hmmss)
-assemblyVersion       -> 派生四段 (YYYY.(M*100+D).H.(m*100+s))
-fileVersion           -> 同 assemblyVersion
-informationalVersion  -> 与 version 一致（可扩展附加 build metadata）
-```
-
-### 示例
-```
-version: 2025.922.90115
-assemblyVersion: 2025.922.9.115
-fileVersion: 2025.922.9.115
-informationalVersion: 2025.922.90115
-```
-
-### 常见检查
+#### Version Management
 ```powershell
-# 验证派生规则（简单快速）
-$j = Get-Content version.json | ConvertFrom-Json
-$v = $j.version.Split('.')
-$year = [int]$v[0]; $mdd=[int]$v[1]; $hmmss=[int]$v[2]
-$hour = [int]($hmmss.ToString().Substring(0, if($hmmss -ge 100000){2}else{1}))
-$mmss = $hmmss.ToString().Substring($hour -lt 10 ? 1 : 2)
-$minute = [int]$mmss.Substring(0,2); $sec=[int]$mmss.Substring(2,2)
-$derived = "$year.$mdd.$hour." + ($minute*100 + $sec)
-if($derived -ne $j.assemblyVersion){ Write-Host "❌ 派生不匹配" } else { Write-Host "✅ 派生匹配" }
+# Display version information
+.\build.ps1 Info
+
+# Generate new time-based version
+.\build.ps1 UpgradeVersion
+
+# Verify version consistency
+.\build.ps1 CheckVersionLocked
 ```
 
-### 组合命令
+## Development Workflow
+
+### Daily Development
 ```powershell
-# 完整的开发构建
-./build.ps1 Clean Build Test
+# Start development session
+.\build.ps1 Clean Build
 
-# 完整的发布构建
-./build.ps1 Clean Build Test Publish Package
+# Run tests during development
+.\build.ps1 Test
 
-# 仅构建和测试（快速验证）
-./build.ps1 Build Test --skip-slow-tests
+# Full validation before commit
+.\build.ps1 Clean Test
 ```
 
-### 平台特定构建
-### 提交规范
+### Release Preparation
+```powershell
+# Update version
+.\build.ps1 UpgradeVersion
+
+# Verify build for all targets
+.\build.ps1 Clean Build Test Package
+
+# Create release artifacts
+.\build.ps1 Publish --runtime win-x64
+.\build.ps1 Publish --runtime osx-x64
+.\build.ps1 Publish --runtime linux-x64
+```
+
+## .NET CLI Commands
+
+### Project Management
 ```bash
-# 功能提交
-git commit -m "feat: add auto-update feature"
+# Build solution
+dotnet build AGI.Captor.sln
 
-# 修复提交
-git commit -m "fix: resolve memory leak"
+# Run tests
+dotnet test AGI.Captor.sln
 
-# 破坏性变更（正文解释迁移）
-git commit -m "feat!: new API design" -m "BREAKING: 旧 API 将在下版本移除"
-
-# 文档更新
-git commit -m "docs: update README"
-```
-./build.ps1 Publish --rids win-x64,linux-x64,osx-x64,osx-arm64
-# 1. 生成预览构建 (未改变锁定 version.json)
-
-# 3. 构建使用锁定的时间序列版本
-
-# 2. 修复问题并提交
-git commit -m "fix: critical security issue"
-```powershell
-dotnet gitversion
-
-# 获取特定版本字段
-dotnet gitversion /showvariable SemVer
-dotnet gitversion /showvariable FullSemVer
-dotnet gitversion /showvariable InformationalVersion
-dotnet gitversion /showvariable Major
-dotnet gitversion /showvariable Minor
-dotnet gitversion /showvariable Patch
-
-# 显示配置信息
-dotnet gitversion /showconfig
-
-# 详细调试信息
-dotnet gitversion /verbosity Diagnostic
+# Publish application
+dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj
 ```
 
-### 版本字段说明
-```powershell
-# 常用版本字段
-SemVer                 # 1.3.0-alpha.1
-FullSemVer            # 1.3.0-alpha.1+Branch.main.Sha.abc1234
-InformationalVersion  # 1.3.0-alpha.1+Branch.main.Sha.abc1234
-AssemblySemVer        # 1.3.0.0
-MajorMinorPatch       # 1.3.0
-BranchName           # main
-Sha                  # abc1234567890
-ShortSha             # abc1234
-```
-
-## 🌿 Git 工作流
-
-### 分支操作
+### Package Management
 ```bash
-# 创建功能分支
-git checkout -b features/new-feature
+# Restore packages
+dotnet restore
 
-# 创建发布分支
-git checkout -b release/1.3.0
+# Add package
+dotnet add package [PackageName]
 
-# 创建热修复分支
-git checkout -b hotfix/critical-fix
-
-# 切换到主分支
-git checkout main
-
-# 删除本地分支
-git branch -d features/old-feature
-
-# 删除远程分支
-git push origin --delete features/old-feature
+# Update packages
+dotnet list package --outdated
+dotnet add package [PackageName] --version [Version]
 ```
 
-### 标签操作
+## GitHub CLI Commands
+
+### Release Management
 ```bash
-# 创建标签
-git tag v1.3.0
+# List releases
+gh release list
 
-# 创建带注释的标签
-git tag -a v1.3.0 -m "Release version 1.3.0"
+# Create release
+gh release create v2024.9.23.1 --title "Release 2024.9.23.1"
 
-# 推送标签
-git push origin v1.3.0
-
-# 推送所有标签
-git push origin --tags
-
-# 删除本地标签
-git tag -d v1.3.0
-
-# 删除远程标签
-git push origin --delete v1.3.0
+# View release
+gh release view v2024.9.23.1
 ```
 
-### 提交规范
+### Workflow Management
 ```bash
-# 功能提交
+# List workflow runs
+gh run list
 
-# 修复提交
+# View workflow run
+gh run view [run-id]
 
-# 破坏性变更
-
-# 文档更新（不增量版本）
+# Trigger workflow
+gh workflow run release.yml
 ```
 
-## 🧪 测试命令
+### Repository Commands
+```bash
+# Clone repository
+gh repo clone AGIBuild/AGI.Captor
 
-### 单元测试
-```powershell
-# 运行所有测试
-./build.ps1 Test
+# Create pull request
+gh pr create --title "Feature: New overlay mode"
 
-# 运行特定测试项目
-dotnet test tests/AGI.Captor.Tests/
-
-# 运行特定测试类
-dotnet test --filter "ClassName=UpdateServiceTests"
-
-# 运行特定测试方法
-dotnet test --filter "MethodName=ShouldCheckForUpdates"
-
-# 详细输出
-dotnet test --verbosity normal
+# View pull requests
+gh pr list
 ```
 
-### 覆盖率测试
+## Git Commands
+
+### Branch Management
+```bash
+# Create feature branch
+git checkout -b feature/new-feature
+
+# Switch to release branch
+git checkout release
+
+# Merge feature branch
+git merge feature/new-feature
+```
+
+### Version Tagging
+```bash
+# Create version tag
+git tag v2024.9.23.1
+
+# Push tag
+git push origin v2024.9.23.1
+
+# List tags
+git tag -l
+
+# Delete tag
+git tag -d v2024.9.23.1
+git push origin --delete v2024.9.23.1
+```
+
+### Repository Operations
+```bash
+# Check status
+git status
+
+# View commit history
+git log --oneline -10
+
+# View changes
+git diff
+git diff --cached
+```
+
+## Testing Commands
+
+### Unit Testing
 ```powershell
-# 生成覆盖率报告
-./build.ps1 Test --coverage
+# Run all tests
+.\build.ps1 Test
 
-# 查看覆盖率报告
-start artifacts/coverage/index.html
+# Run tests with coverage
+.\build.ps1 Test --collect-coverage
 
-# 仅生成覆盖率数据
+# Run specific test
+dotnet test --filter "TestClassName"
+```
+
+### Test Reporting
+```bash
+# Generate coverage report
 dotnet test --collect:"XPlat Code Coverage"
+
+# View coverage results
+# Coverage reports are in TestResults/ directory
 ```
 
-## 📦 打包命令
+## Debugging Commands
 
-### 应用打包
+### Build Diagnostics
 ```powershell
-# 创建所有平台安装包
-./build.ps1 Package
+# Verbose build output
+.\build.ps1 Build --verbosity detailed
 
-# Windows MSI
-./build.ps1 Package --runtime win-x64
+# Diagnostic output
+.\build.ps1 Build --verbosity diagnostic
 
-# Linux DEB
-./build.ps1 Package --runtime linux-x64 --format deb
-
-# Linux RPM
-./build.ps1 Package --runtime linux-x64 --format rpm
-
-# macOS PKG
-./build.ps1 Package --runtime osx-x64 --format pkg
-
-# macOS App Store
-./build.ps1 Package --runtime osx-x64 --format appstore
+# Build with specific configuration
+.\build.ps1 Build --configuration Debug
 ```
 
-### 手动打包
-```bash
-# Windows
-cd packaging/windows
-dotnet build AGI.Captor.wixproj
-
-# Linux DEB
-cd packaging/linux
-./create-deb.sh
-
-# Linux RPM
-cd packaging/linux
-./create-rpm.sh
-
-# macOS PKG
-cd packaging/macos
-./create-pkg.sh
-
-# macOS App Store
-cd packaging/macos
-./create-appstore.sh
-```
-
-## 🔍 调试命令
-
-### 日志查看
+### Environment Information
 ```powershell
-# 查看应用日志
-Get-Content logs/app-*.log -Tail 50
+# Display build info
+.\build.ps1 Info
 
-# 实时监控日志
-Get-Content logs/app-*.log -Wait
-
-# 查看构建日志
-Get-Content artifacts/logs/build.log
-```
-
-### 诊断信息
-```powershell
-# 系统信息
+# Check .NET installation
 dotnet --info
 
-# 环境变量
-Get-ChildItem Env: | Where-Object Name -like "*DOTNET*"
-
-# 工具版本
-dotnet tool list --global
-dotnet tool list --local
+# List installed SDKs
+dotnet --list-sdks
 ```
 
-## 🚀 发布流程
+## Package Management
 
-### 开发发布（预览版）
+### NuGet Commands
 ```bash
-# 1. 推送到main分支
-git push origin main
+# Clear NuGet cache
+dotnet nuget locals all --clear
 
-# 2. GitHub Actions 自动构建
-# 3. 生成预览版本 (1.3.0-alpha.X)
+# List package sources
+dotnet nuget list source
+
+# Search packages
+dotnet search [PackageName]
 ```
 
-### 正式发布
+### Project Dependencies
 ```bash
-# 1. 创建发布分支
-git checkout -b release/1.3.0
-git push origin release/1.3.0
+# List project references
+dotnet list reference
 
-# 2. 创建发布标签
-git tag v1.3.0
-git push origin v1.3.0
+# Add project reference
+dotnet add reference ../OtherProject/OtherProject.csproj
 
-# 3. GitHub Actions 自动发布
-# 4. 生成正式版本 (1.3.0)
+# List package dependencies
+dotnet list package
 ```
 
-### 热修复发布
+## Platform-Specific Commands
+
+### Windows
+```powershell
+# Build MSI installer (requires WiX)
+.\build.ps1 Package --runtime win-x64
+
+# Install/uninstall service
+sc create AGI.Captor binPath="path\to\exe"
+sc delete AGI.Captor
+```
+
+### macOS
 ```bash
-# 1. 从主分支创建热修复分支
-git checkout -b hotfix/critical-fix
+# Build PKG installer
+./build.ps1 Package --runtime osx-x64
 
-# 2. 修复问题并提交
-
-# 3. 推送分支
-git push origin hotfix/critical-fix
-
-# 4. 合并到main和release分支
-git checkout main
-git merge hotfix/critical-fix
-git checkout release/1.3.0
-git merge hotfix/critical-fix
-
-# 5. 创建热修复标签
-git tag v1.3.1
-git push origin v1.3.1
+# Install/uninstall PKG
+sudo installer -pkg AGI.Captor.pkg -target /
+pkgutil --pkgs | grep agicaptor
 ```
 
-## 📚 一键脚本
+### Linux
+```bash
+# Build DEB package
+./build.ps1 Package --runtime linux-x64
 
-### 创建便捷脚本
-```powershell
-# scripts/dev-build.ps1
-./build.ps1 Clean Build Test --coverage
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ 开发构建成功!" -ForegroundColor Green
-    start artifacts/coverage/index.html
-} else {
-    Write-Host "❌ 构建失败!" -ForegroundColor Red
-}
-
-# scripts/release-build.ps1
-./build.ps1 Clean Build Test Publish Package
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ 发布构建成功!" -ForegroundColor Green
-    Get-ChildItem artifacts/publish/
-} else {
-    Write-Host "❌ 构建失败!" -ForegroundColor Red
-}
+# Install/uninstall DEB
+sudo dpkg -i agi-captor.deb
+sudo dpkg -r agi-captor
 ```
 
+## Troubleshooting Commands
 
-### 性能优化
+### Common Issues
 ```powershell
-# 并行构建
-./build.ps1 Build --parallel
+# Clear all build artifacts
+.\build.ps1 Clean
 
-# 跳过慢速测试
-./build.ps1 Test --skip-slow-tests
+# Reset NuGet packages
+Remove-Item -Recurse -Force packages/
+.\build.ps1 Restore
 
-# 仅构建特定项目
-dotnet build src/AGI.Captor.Desktop/
+# Check for build errors
+.\build.ps1 Build --verbosity diagnostic
 ```
 
----
-
-💡 **提示**: 将常用命令添加到 PowerShell 配置文件中，创建别名以提高效率：
-
+### Performance Diagnostics
 ```powershell
-# 添加到 $PROFILE
-New-Alias -Name build -Value "./build.ps1"
+# Build with timing
+.\build.ps1 Build --verbosity diagnostic | Select-String "Time Elapsed"
+
+# Memory usage during build
+Get-Process dotnet | Select-Object Name, CPU, WorkingSet
+```
+
+### Version Issues
+```powershell
+# Check version consistency
+.\build.ps1 CheckVersionLocked
+
+# Force version regeneration
+.\build.ps1 UpgradeVersion --force
+
+# View version history
+git log --oneline version.json
+```
+
+## CI/CD Commands
+
+### Local CI Simulation
+```powershell
+# Simulate CI build
+.\build.ps1 Clean Restore Build Test Package
+
+# Test publish workflow
+.\build.ps1 Publish --runtime win-x64 --output ./artifacts/win-x64
+```
+
+### GitHub Actions Integration
+```yaml
+# In workflow file
+- name: Build and Test
+  run: .\build.ps1 Test
+  
+- name: Create Packages
+  run: .\build.ps1 Package --runtime ${{ matrix.runtime }}
+```
+
+## Quick Reference
+
+### Most Common Commands
+```powershell
+# Daily development
+.\build.ps1                    # Build and test
+.\build.ps1 Clean              # Clean artifacts
+.\build.ps1 Test               # Run tests only
+
+# Release workflow
+.\build.ps1 UpgradeVersion     # New version
+.\build.ps1 Package            # Create packages
+git tag v$(cat version.json | jq -r .version)  # Create tag
+```
+
+### Emergency Commands
+```powershell
+# Complete reset
+git clean -fdx
+.\build.ps1 Restore Build Test
+
+# Rollback release
+git tag -d v2024.9.23.1
+git push origin --delete v2024.9.23.1
+gh release delete v2024.9.23.1
 ```

@@ -43,10 +43,14 @@ jobs:
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
       
     steps:
-    - name: � Setup Complete Environment
-      uses: ./.github/actions/setup-environment
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        
+    - name: 🔧 Setup Complete Environment
+      uses: ./.github/actions/setup-environment
+      with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         enable-nuget-cache: true
         
@@ -125,10 +129,14 @@ jobs:
     needs: prepare-release
     
     steps:
-    - name: � Setup Complete Environment
-      uses: ./.github/actions/setup-environment
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        
+    - name: 🔧 Setup Complete Environment
+      uses: ./.github/actions/setup-environment
+      with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         enable-nuget-cache: true
         cache-key-suffix: '-release'
@@ -174,7 +182,12 @@ jobs:
         arch: [x64, arm64]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: 🛠️ Setup Environment  
+      - name: � Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          
+      - name: �🛠️ Setup Environment  
         uses: ./.github/actions/setup-environment
         
       - name: 🔧 Setup WiX (Windows only)

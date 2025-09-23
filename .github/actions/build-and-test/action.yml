@@ -46,15 +46,32 @@ runs:
     - name: 🔨 Build project
       id: build
       shell: pwsh
-      run: ./build.ps1 Build --configuration ${{ inputs.configuration }}
+      run: |
+        Write-Host "Executing: ./build.ps1 Build --configuration ${{ inputs.configuration }}"
+        ./build.ps1 Build --configuration ${{ inputs.configuration }}
         
     - name: 🧪 Run tests
       id: test
       if: inputs.skip-tests != 'true'
       shell: pwsh
       run: |
-        $testArgs = "--configuration ${{ inputs.configuration }}"
+        $testArgs = @("Test", "--configuration", "${{ inputs.configuration }}")
         if ("${{ inputs.enable-coverage }}" -eq "true") {
-          $testArgs += " --coverage"
+          $testArgs += "--coverage"
         }
-        ./build.ps1 Test $testArgs
+        
+        Write-Host "Executing: ./build.ps1 $($testArgs -join ' ')"
+        & ./build.ps1 @testArgs
+        
+        Write-Host "Test execution completed with exit code: $LASTEXITCODE"
+        
+    - name: 📂 Verify artifacts directories
+      shell: pwsh
+      run: |
+        Write-Host "Checking artifacts directories..."
+        if (Test-Path "artifacts") {
+          Write-Host "✅ artifacts/ directory exists"
+          Get-ChildItem "artifacts" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Host "❌ artifacts/ directory not found"
+        }

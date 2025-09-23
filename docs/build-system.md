@@ -1,141 +1,262 @@
-# 🚀 AGI.Captor 构建流程更新说明
+# Build System
 
-## 📋 概览
+## Overview
 
-AGI.Captor 项目已成功升级为使用 **Nuke 构建系统**，实现了更现代化的 CI/CD 流程。
+AGI.Captor uses a modern **NUKE Build System** integrated with **GitHub Actions** for automated CI/CD workflows, providing cross-platform build automation with PowerShell integration.
 
-## 🔧 新构建系统特性
+## Architecture
 
-### 本地构建命令
+### Local Build Commands
 ```powershell
 # Windows (PowerShell)
-.\build.ps1 [Target]
+.\build.ps1 [Target] [Parameters]
 
-# Linux/macOS (Bash)
-./build.sh [Target]
+# Cross-platform using .NET
+dotnet run --project build -- [Target] [Parameters]
 ```
 
-### 可用构建目标
-- `Clean` - 清理构建输出
-- `Restore` - 恢复 NuGet 包
-- `Build` - 编译项目
-- `Test` - 运行所有测试
-- `Publish` - 针对指定 RID 发布自包含构建
-- `Package` - 创建安装包（输出至 `artifacts/packages/by-rid/<rid>`）
-- `Info` - 显示构建信息（含当前锁定版本）
-- `UpgradeVersion` - 生成并锁定新时间序列版本（更新 `version.json`）
-- `CheckVersionLocked` - 验证版本文件是否已锁定且格式正确
+### Available Build Targets
+- `Clean` - Clean build output directories
+- `Restore` - Restore NuGet packages with caching
+- `Build` - Compile all projects for current platform
+- `Test` - Run unit tests with coverage collection
+- `Publish` - Create runtime-specific self-contained builds
+- `Package` - Generate platform-specific installers
+- `UpgradeVersion` - Generate and lock new time-based version
+- `Info` - Display build information and version details
 
-### 示例用法
-```powershell
-# 基础构建
-./build.ps1 Clean Restore Build Test
+### GitHub Actions Integration
+The build system integrates with GitHub Actions through:
+- **Composite Actions**: Reusable workflow components for .NET setup
+- **Parameter Arrays**: PowerShell parameter passing to NUKE targets
+- **Artifact Management**: Structured output organization and caching
+- **Multi-Platform Support**: Windows, macOS, and Linux builds
 
-# 发布特定 RID 自包含包
-./build.ps1 Publish --rids win-x64
+## CI/CD Workflow Architecture
 
-# 打包多个平台
-./build.ps1 Package --rids win-x64,osx-arm64,linux-x64
+| Workflow | Purpose | Trigger | Key Features |
+| -------- | ------- | ------- | ------------ |
+| `ci.yml` | Main CI pipeline | Push/PR | Build validation, test execution |
+| `quality.yml` | Quality gates | Scheduled | Coverage reporting, dependency audit |
+| `release.yml` | Release automation | Tag push | Multi-platform packages, GitHub releases |
+| `verify-version.yml` | Version validation | PR | Ensure version.json consistency |
+| `create-release.yml` | Manual release | Workflow dispatch | Controlled release creation |
 
-# 升级并锁定版本
-./build.ps1 UpgradeVersion --lock
+### Composite Actions
+- **setup-environment**: Complete environment setup with checkout and .NET 9.0
+- **setup-dotnet-only**: Lightweight .NET setup without checkout
+- **setup-dotnet-env**: .NET setup with Git configuration
+- **build-and-test**: Standardized build and test execution
+- **publish-package**: Multi-platform publishing and packaging
+
+## Build Process Flow
+
+### 1. Environment Setup
+```mermaid
+graph LR
+    A[Checkout Code] --> B[Setup .NET 9.0]
+    B --> C[Configure NuGet Cache]
+    C --> D[Set Environment Variables]
 ```
 
-## 🎯 CI/CD 工作流（更新：锁定版本 + 验证式发布 + 可选签名）
-
-| 工作流 | 作用 | 关键特性 |
-| ------ | ---- | -------- |
-| `ci.yml` | 主分支与 PR 持续集成 | 构建/测试/覆盖率/静态分析，不产生 Release 产物 |
-| `verify-version.yml` | PR 版本守卫 | 校验 `version.json` 锁定格式与变更合法性 |
-| `release.yml` | 标签驱动发布 | 版本一致性校验、祖先校验、矩阵打包、完整性验证、SHA256 清单、分类变更日志、可选代码签名/公证 |
-
-### 发布流程（手动控制）
-1. 在 `release` 分支执行：`./build.ps1 UpgradeVersion --lock`
-2. 提交并推送（含更新后的 `version.json`）
-3. 创建标签：`git tag v<version>` 并推送
-4. 触发 `release.yml`：跨平台构建 + 打包 + （可选）签名 + 校验 + 生成 Release
-
-### 发布阶段安全/一致性验证
-- 标签名 == `version.json` 中锁定版本
-- 标签指向 commit 必须为 `release` 分支祖先
-- 所有预期 RID 目录存在（缺失即失败）
-- 生成并发布 `SHASUMS-<version>.txt`（跨平台 SHA256 清单）
-- 禁用 GitHub 自动 Release Notes，使用自定义分类变更日志
-- （可选）Windows/MSI 签名、macOS codesign、公证
-
-## 🔐 可选代码签名与公证（CI 环境）
-
-`release.yml` 中不会硬编码 Secrets，而是读取以下环境变量：
-
-| 功能 | 环境变量 | 说明 | 触发条件 |
-| ---- | -------- | ---- | -------- |
-| Windows MSI 签名 | `CODE_SIGN_WINDOWS_PFX_BASE64` | Base64 PFX 内容 | 非空即执行 |
-| Windows MSI 签名 | `CODE_SIGN_WINDOWS_PFX_PASSWORD` | PFX 密码 | 同上 |
-| macOS codesign | `MACOS_SIGN_IDENTITY` | Developer ID Application 标识 | 非空即执行 |
-| macOS notarize | `MACOS_NOTARIZE_APPLE_ID` | Apple 账号 | 三项均非空 |
-| macOS notarize | `MACOS_NOTARIZE_PASSWORD` | App-Specific Password | 同上 |
-| macOS notarize | `MACOS_NOTARIZE_TEAM_ID` | 团队 ID | 同上 |
-
-只需在 GitHub `Secrets / Actions` 中添加对应条目并映射到环境（Environment / Org / Repo 级）即可启用；删除或留空即自动跳过。
-
-### 本地签名 vs CI 签名
-| 场景 | 推荐方式 |
-| ---- | -------- |
-| 开发调试 | 不签名，直接运行便携包 / 未签名安装包 |
-| 预发布内测 | 仅 Windows 签名（减少 Apple 公证等待） |
-| 正式发布 | 全量：Windows 签名 + macOS 签名 + 公证 |
-
-### 验证命令示例
-```powershell
-# Windows
-signtool verify /pa /all artifacts\packages\by-rid\win-x64\*.msi
+### 2. Build Pipeline
+```mermaid
+graph TD
+    A[Clean] --> B[Restore]
+    B --> C[Build]
+    C --> D[Test]
+    D --> E[Publish]
+    E --> F[Package]
 ```
+
+### 3. Multi-Platform Matrix
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, windows-latest, macos-latest]
+    runtime: [linux-x64, win-x64, osx-x64]
+```
+
+## Platform-Specific Features
+
+### Windows
+- **MSI Packaging**: WiX Toolset integration
+- **Code Signing**: Authenticode support (when configured)
+- **PowerShell Scripts**: Native PowerShell build automation
+
+### macOS
+- **PKG Creation**: macOS installer packages
+- **App Notarization**: Apple Developer integration (when configured)
+- **Universal Binaries**: x64 and ARM64 support
+
+### Linux
+- **DEB Packages**: Debian/Ubuntu package creation
+- **RPM Packages**: Red Hat/CentOS package creation
+- **AppImage**: Portable application format
+
+## Performance Optimizations
+
+### Caching Strategy
+- **NuGet Packages**: Cached by lock file hash
+- **Build Artifacts**: Cached by source hash
+- **Docker Layers**: Optimized layer caching
+
+### Parallel Execution
+- **Multi-Target Builds**: Parallel compilation
+- **Test Execution**: Parallel test runners
+- **Package Creation**: Concurrent packaging
+
+### Resource Management
+- **Memory Limits**: Configured for GitHub Actions runners
+- **Disk Space**: Automatic cleanup of temporary files
+- **Network**: Optimized package restore
+
+## Configuration
+
+### Version Management
+```json
+{
+  "version": "2024.9.23.1547",
+  "assemblyVersion": "2024.9.23.1547",
+  "fileVersion": "2024.9.23.1547",
+  "informationalVersion": "2024.9.23.1547"
+}
+```
+
+### Build Configuration
+```xml
+<PropertyGroup>
+  <TargetFramework>net9.0</TargetFramework>
+  <UseAppHost>true</UseAppHost>
+  <PublishSingleFile>true</PublishSingleFile>
+  <PublishTrimmed>false</PublishTrimmed>
+</PropertyGroup>
+```
+
+### Environment Variables
 ```bash
-# macOS
-codesign --verify --deep --strict --verbose=2 *.app
-spctl --assess --type exec -vv *.app
-xcrun stapler validate *.pkg
+DOTNET_NOLOGO=true
+DOTNET_CLI_TELEMETRY_OPTOUT=true
+NUGET_PACKAGES=/github/workspace/.nuget/packages
 ```
 
-## 🧪 质量基线
-- 单元/集成测试必须 100% 通过
-- 构建脚本仅读取锁定版本（无动态 Git 计算）
-- 发布前产物清单与 SHA256 严格匹配
+## Development Workflow
 
-## 🔄 版本管理策略
-- Display 格式：`YYYY.M.D.HHmm`（四段，月日无前导零，最后一段固定 4 位时间）
-- 通过 `UpgradeVersion --lock` 原子更新并写入：所有版本字段统一
-- 禁止手动编辑 `version.json` / `.csproj` 中相关字段（Nuke 自动同步）
-- 统一规则：所有版本字段（`version`/`assemblyVersion`/`fileVersion`/`informationalVersion`）使用相同值
-- 约束：所有版本段值 <= 65535，确保 CLR 合法；分钟级精度降低冲突概率。
+### Local Development
+```bash
+# Full build and test
+./build.ps1
 
-## 🛠 典型问题排查
-| 问题 | 可能原因 | 处理 |
-| ---- | -------- | ---- |
-| 发布失败：版本不匹配 | 标签与文件不一致 | 重新打标签或修复版本文件 |
-| 缺少某平台产物 | 打包脚本异常/权限问题 | 查看该矩阵 Job 日志，重试 |
-| MSI 未签名 | 未注入签名变量 | 补充 `CODE_SIGN_WINDOWS_*` 变量重新发布 |
-| PKG 未公证 | Apple 账号变量缺失 | 注入 3 个 `MACOS_NOTARIZE_*` 变量 |
+# Specific target
+./build.ps1 Test
 
-## 📁 目录结构关键输出
-```
-artifacts/
-  packages/
-    by-rid/
-      win-x64/
-      win-arm64/
-      osx-x64/
-      osx-arm64/
-      linux-x64/
-      linux-arm64/
-  publish/ (自包含构建输出)
+# With parameters
+./build.ps1 Publish --runtime win-x64
 ```
 
-## 🔍 相关文档
-- `versioning-strategy.md`
-- `release-workflow.md`
-- `packaging/README.md`
-- `testing-architecture.md`
+### CI Integration
+```yaml
+- name: Build and Test
+  uses: ./.github/actions/build-and-test
+  with:
+    target: 'Test'
+    verbosity: 'minimal'
+```
 
----
-最后更新：2025-09-22 · 已集成可选代码签名与公证逻辑
+### Release Process
+```bash
+# Version upgrade
+./build.ps1 UpgradeVersion
+
+# Create release tag
+git tag v2024.9.23.1547
+git push origin v2024.9.23.1547
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Build Failures
+```bash
+# Clear all caches
+./build.ps1 Clean
+
+# Restore with verbose logging
+./build.ps1 Restore --verbosity detailed
+```
+
+#### Version Conflicts
+```bash
+# Check current version
+./build.ps1 Info
+
+# Verify version consistency
+./build.ps1 CheckVersionLocked
+```
+
+#### Package Issues
+```bash
+# Rebuild packages
+./build.ps1 Clean Package
+
+# Verify package contents
+./build.ps1 Package --verbosity diagnostic
+```
+
+### Debug Mode
+```bash
+# Enable debug output
+./build.ps1 [Target] --verbosity diagnostic
+
+# Skip version checks
+./build.ps1 [Target] --skip-version-check
+```
+
+## Best Practices
+
+### Local Development
+- Run `./build.ps1 Test` before committing
+- Use `./build.ps1 Info` to verify version state
+- Keep build output clean with regular `Clean` targets
+
+### CI/CD Pipeline
+- Use composite actions for consistency
+- Cache aggressively but invalidate appropriately
+- Monitor build performance and optimize bottlenecks
+
+### Version Management
+- Always lock versions before creating tags
+- Use time-based versioning for predictability
+- Validate version consistency in PRs
+
+## Integration Examples
+
+### Custom Build Scripts
+```powershell
+# Custom PowerShell wrapper
+param(
+    [string]$Target = "Build",
+    [string]$Configuration = "Release"
+)
+
+./build.ps1 $Target --configuration $Configuration --verbosity minimal
+```
+
+### GitHub Actions Usage
+```yaml
+- name: Full Build Pipeline
+  uses: ./.github/actions/build-and-test
+  with:
+    target: 'Test'
+    configuration: 'Release'
+    collect-coverage: 'true'
+```
+
+### Docker Integration
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+COPY . /src
+WORKDIR /src
+RUN ./build.ps1 Publish --runtime linux-x64
+```

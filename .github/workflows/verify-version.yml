@@ -11,13 +11,16 @@ jobs:
       contents: read
 
     steps:
-      - name: �️ Setup Environment
-        uses: ./.github/actions/setup-environment
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Restore tools
-        run: dotnet tool restore || true
+          
+      - name: 🔧 Setup .NET Only
+        uses: ./.github/actions/setup-dotnet-only
+        with:
+          dotnet-version: '9.0.x'
+          dotnet-quality: 'preview'
 
       - name: Validate version.json exists
         shell: pwsh
@@ -33,24 +36,27 @@ jobs:
 
       - name: Detect direct csproj version edits (PR only)
         if: github.event_name == 'pull_request'
+        shell: pwsh
         run: |
           # If csproj version tags changed without version.json change -> fail
-          set -e
-          CHANGED_CSproj=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -Ei '\.csproj$' || true)
-          if [ -n "$CHANGED_CSproj" ]; then
-            if ! git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^version.json$'; then
-              echo "Detected .csproj change(s) without version.json update:" >&2
-              echo "$CHANGED_CSproj" >&2
+          $changedCsproj = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object { $_ -match '\.csproj$' }
+          if ($changedCsproj) {
+            $versionJsonChanged = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object { $_ -eq 'version.json' }
+            if (-not $versionJsonChanged) {
+              Write-Host "Detected .csproj change(s) without version.json update:" -ForegroundColor Red
+              $changedCsproj | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
               exit 1
-            fi
+            }
             # If both changed, ensure version.json timestamp version increments vs base
-            BASE_VER=$(git show origin/${{ github.base_ref }}:version.json 2>/dev/null | jq -r '.version' || echo '')
-            NEW_VER=$(jq -r '.version' version.json)
-            if [ -n "$BASE_VER" ] && [ "$BASE_VER" = "$NEW_VER" ]; then
-              echo "version.json not updated (same version) though .csproj modified." >&2
+            $baseVer = ""
+            try { $baseVer = git show origin/${{ github.base_ref }}:version.json | ConvertFrom-Json | Select-Object -ExpandProperty version } catch { }
+            $newVer = (Get-Content version.json | ConvertFrom-Json).version
+            if ($baseVer -and ($baseVer -eq $newVer)) {
+              Write-Host "version.json not updated (same version) though .csproj modified." -ForegroundColor Red
               exit 1
-            fi
-          fi
+            }
+          }
 
       - name: Summary
-        run: echo "Version verification passed."
+        shell: pwsh
+        run: Write-Host "✅ Version verification passed." -ForegroundColor Green

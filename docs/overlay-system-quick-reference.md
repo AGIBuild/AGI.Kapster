@@ -1,106 +1,285 @@
 # Overlay System Quick Reference
 
-## Key Files to Know
+## Core Interfaces
 
-### Core UI
-- `src/AGI.Captor.Desktop/Overlays/OverlayWindow.axaml.cs` - Main overlay window implementation
+### IOverlayController
+**Purpose**: Main overlay lifecycle management  
+**Implementation**: `SimplifiedOverlayManager`  
 
-### Service Layer
-- `src/AGI.Captor.Desktop/Services/Overlay/SimplifiedOverlayManager.cs` - Manages all overlay windows
-- `src/AGI.Captor.Desktop/Program.cs` - DI registration (lines 86-111)
-
-### Platform Implementations
-- **Overlay Windows**: `Services/Overlay/Platforms/Windows*.cs`, `Mac*.cs`
-- **Screen Capture**: `Services/Capture/Platforms/Windows*.cs`, `Mac*.cs`
-- **Clipboard**: `Services/Clipboard/Platforms/Windows*.cs`, `Mac*.cs`
-- **Element Detection**: `Services/ElementDetection/Windows*.cs`, `Platforms/Null*.cs`
-- **Rendering**: `Rendering/Overlays/Windows*.cs`
-
-## Common Tasks
-
-### 1. Adding a New Platform
 ```csharp
-// In Program.cs
-else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+Task ShowAllAsync();        // Show overlays on all screens
+Task CloseAllAsync();       // Close all active overlays
+bool IsActive { get; }      // Check if any overlays are active
+```
+
+### IOverlayWindow
+**Purpose**: Platform-specific overlay window  
+**Implementations**: `WindowsOverlayWindow`, `MacOverlayWindow`
+
+```csharp
+Task ShowAsync();           // Display overlay window
+Task CloseAsync();          // Close overlay window
+Screen Screen { get; }      // Associated screen
+```
+
+### IScreenCaptureStrategy
+**Purpose**: Platform-specific screen capture  
+**Implementations**: `WindowsScreenCaptureStrategy`, `MacScreenCaptureStrategy`
+
+```csharp
+Task<SKBitmap> CaptureRegionAsync(PixelRect region);     // Capture specific region
+Task<SKBitmap> CaptureFullScreenAsync(Screen screen);    // Capture entire screen
+```
+
+## Key Events
+
+### RegionSelected
+```csharp
+public class RegionSelectedEventArgs : EventArgs
 {
-    builder.Services.AddTransient<IOverlayWindow, LinuxOverlayWindow>();
-    builder.Services.AddTransient<IElementDetector, NullElementDetector>();
-    builder.Services.AddSingleton<IScreenCaptureStrategy, LinuxScreenCaptureStrategy>();
-    // ... other services
+    public PixelRect Region { get; }           // Selected screen region
+    public SKBitmap? CapturedImage { get; }    // Captured bitmap (optional)
+    public bool IsEditableSelection { get; }   // Whether to keep overlay open
+    public DateTime Timestamp { get; }         // Selection timestamp
 }
 ```
 
-### 2. Handling Screenshot Capture
+**Event Flow**: `OverlayWindow` → `OverlayManager` → `Application`
+
+### Cancelled
+Triggered when user cancels selection (ESC key or click outside)
+
+## Service Registration
+
+### Dependency Injection Setup
 ```csharp
-// Screenshot is captured in SimplifiedOverlayManager.OnRegionSelected
-var bitmap = await _captureStrategy.CaptureRegionAsync(e.Region);
-await _clipboardStrategy.SetImageAsync(bitmap);
+// Core services
+services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
+
+// Platform-specific (Windows)
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
+    services.AddTransient<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
+}
+
+// Platform-specific (macOS)
+else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+{
+    services.AddTransient<IOverlayWindow, MacOverlayWindow>();
+    services.AddTransient<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
+}
 ```
 
-### 3. Preventing Overlay Close
+## Common Usage Patterns
+
+### Basic Overlay Display
 ```csharp
-// In OverlayWindow, set IsEditableSelection = true
-RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
+var overlayController = serviceProvider.GetRequiredService<IOverlayController>();
+
+// Show overlays on all screens
+await overlayController.ShowAllAsync();
+
+// Handle region selection
+overlayController.RegionSelected += async (sender, args) =>
+{
+    // Process captured region
+    await ProcessCapturedRegion(args.Region, args.CapturedImage);
+    
+    // Close overlays if not editable
+    if (!args.IsEditableSelection)
+    {
+        await overlayController.CloseAllAsync();
+    }
+};
 ```
 
-### 4. Closing All Overlays
+### Screen Capture Integration
 ```csharp
-var overlayController = serviceProvider.GetService<IOverlayController>();
-overlayController.CloseAll();
-```
+var captureStrategy = serviceProvider.GetRequiredService<IScreenCaptureStrategy>();
 
-## Important Flags and Properties
+// Capture specific region
+var region = new PixelRect(100, 100, 300, 200);
+var bitmap = await captureStrategy.CaptureRegionAsync(region);
 
-### RegionSelectedEventArgs
-- `Region` - The selected area
-- `IsFullScreen` - Full screen capture?
-- `DetectedElement` - Element info if available
-- **`IsEditableSelection`** - If true, keeps overlay open for annotation
-
-### CaptureMode Enum
-- `FullScreen` - Entire screen
-- `Window` - Specific window
-- `Region` - User-selected area
-- `Element` - UI element
-
-## Event Flow Diagram
-```
-User Action → OverlayWindow → Platform Wrapper → SimplifiedOverlayManager
-                    ↓                   ↓                    ↓
-              Raise Event     Check IsEditable      Capture & Close
-
-If IsEditableSelection = true: Event stops at Platform Wrapper
-If IsEditableSelection = false: Event flows to Manager → Close all
+// Capture full screen
+var screen = Screen.AllScreens.First();
+var fullScreenBitmap = await captureStrategy.CaptureFullScreenAsync(screen);
 ```
 
 ## Platform Differences
 
-| Feature | Windows | macOS |
-|---------|---------|-------|
-| Screen Enum | Temp anchor window | Primary window ref |
-| Element Detection | ✅ UI Automation | ❌ Not implemented |
-| Screen Capture | Win32 BitBlt | screencapture cmd |
-| Clipboard | Win32 API | Avalonia API |
+| Feature | Windows | macOS | Notes |
+|---------|---------|-------|-------|
+| **Screen Capture** | BitBlt API | screencapture command | Windows faster, macOS more compatible |
+| **Element Detection** | UI Automation | Limited | Windows has full element detection |
+| **Multi-Screen** | Full support | Full support | Both handle multiple monitors |
+| **Permissions** | None required | Screen Recording permission | macOS requires user approval |
+| **Performance** | High | Medium | Windows uses native APIs |
 
-## Debugging Tips
+## Debugging
 
-1. **Check logs**: All important actions log with `Log.Debug()` or `Log.Information()`
-2. **Event not firing?**: Check `IsEditableSelection` flag
-3. **Window not closing?**: Verify `IOverlayController.CloseAll()` is called
-4. **Platform issue?**: Check platform-specific implementation in `Platforms/` folder
+### Check Overlay Status
+```csharp
+var overlayController = serviceProvider.GetRequiredService<IOverlayController>();
+Console.WriteLine($"Overlays active: {overlayController.IsActive}");
+```
 
-## Critical Rules
+### Screen Information
+```csharp
+foreach (var screen in Screen.AllScreens)
+{
+    Console.WriteLine($"Screen: {screen.DeviceName}");
+    Console.WriteLine($"Bounds: {screen.Bounds}");
+    Console.WriteLine($"Primary: {screen.Primary}");
+}
+```
 
-1. **Never** call `window.Close()` directly - use `IOverlayController.CloseAll()`
-2. **Always** check `IsEditableSelection` before forwarding events
-3. **Platform services** are registered in `Program.cs` based on OS
-4. **Bitmap conversion** use `BitmapConverter` class
+### Event Debugging
+```csharp
+overlayController.RegionSelected += (sender, args) =>
+{
+    Console.WriteLine($"Region selected: {args.Region}");
+    Console.WriteLine($"Editable: {args.IsEditableSelection}");
+    Console.WriteLine($"Has image: {args.CapturedImage != null}");
+};
 
-## Service Lifetimes
+overlayController.Cancelled += (sender, args) =>
+{
+    Console.WriteLine("Overlay cancelled by user");
+};
+```
 
-- `IOverlayWindow` - **Transient** (new instance each time)
-- `IElementDetector` - **Transient** (stateful)
-- `IScreenCaptureStrategy` - **Singleton** (stateless)
-- `IOverlayRenderer` - **Singleton** (stateless)
-- `IClipboardStrategy` - **Singleton** (stateless)
-- `IOverlayController` - **Singleton** (manages state)
+## Common Issues & Solutions
+
+### Issue: macOS Black Screen
+**Problem**: Secondary monitors show black overlay  
+**Solution**: Enhanced screen coverage validation implemented  
+**Code**: Check `MacOverlayWindow.EnsureProperScreenCoverage()`
+
+### Issue: Event Handler Memory Leaks
+**Problem**: Event handlers not unsubscribed  
+**Solution**: Proper disposal pattern  
+**Code**: Use `using` statements and explicit cleanup
+
+### Issue: Windows Element Detection Fails
+**Problem**: UI Automation fails on some apps  
+**Solution**: Graceful degradation to manual selection  
+**Code**: Try/catch with fallback to region selection
+
+## File Locations
+
+### Core Implementation
+```
+src/AGI.Captor.Desktop/
+├── Services/
+│   ├── Overlay/
+│   │   ├── SimplifiedOverlayManager.cs      # Main controller
+│   │   └── Platforms/
+│   │       ├── WindowsOverlayWindow.cs      # Windows implementation
+│   │       └── MacOverlayWindow.cs          # macOS implementation
+│   └── Capture/
+│       └── Platforms/
+│           ├── WindowsScreenCaptureStrategy.cs
+│           └── MacScreenCaptureStrategy.cs
+```
+
+### UI Components
+```
+src/AGI.Captor.Desktop/
+├── Rendering/
+│   └── Overlays/
+│       ├── OverlayWindow.axaml              # Avalonia overlay window
+│       ├── OverlayWindow.axaml.cs           # Window code-behind
+│       └── OverlayViewModel.cs              # Window view model
+```
+
+### Tests
+```
+tests/AGI.Captor.Tests/
+├── Services/
+│   └── Overlay/
+│       ├── OverlayManagerTests.cs          # Manager unit tests
+│       └── OverlayWindowTests.cs           # Window unit tests
+└── Integration/
+    └── OverlayIntegrationTests.cs          # End-to-end tests
+```
+
+## Performance Tips
+
+### Memory Management
+```csharp
+// Dispose bitmaps after use
+using var bitmap = await captureStrategy.CaptureRegionAsync(region);
+// Process bitmap
+// Automatic disposal on scope exit
+```
+
+### Event Subscription Cleanup
+```csharp
+public void Dispose()
+{
+    if (_overlayController != null)
+    {
+        _overlayController.RegionSelected -= OnRegionSelected;
+        _overlayController.Cancelled -= OnCancelled;
+    }
+}
+```
+
+### Efficient Screen Enumeration
+```csharp
+// Cache screen list if called frequently
+private static readonly Screen[] CachedScreens = Screen.AllScreens.ToArray();
+```
+
+## Testing Helpers
+
+### Mock Overlay Controller
+```csharp
+var mockController = Substitute.For<IOverlayController>();
+mockController.IsActive.Returns(false);
+mockController.ShowAllAsync().Returns(Task.CompletedTask);
+```
+
+### Test Event Triggering
+```csharp
+var eventArgs = new RegionSelectedEventArgs(
+    new PixelRect(0, 0, 100, 100),
+    capturedImage: null,
+    isEditableSelection: false
+);
+
+// Trigger event for testing
+mockController.RegionSelected += Raise.EventWith(mockController, eventArgs);
+```
+
+### Integration Test Setup
+```csharp
+var services = new ServiceCollection();
+services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
+services.AddTransient<IOverlayWindow, MockOverlayWindow>();
+var provider = services.BuildServiceProvider();
+```
+
+## Quick Commands
+
+### Show Overlays
+```csharp
+await overlayController.ShowAllAsync();
+```
+
+### Close All Overlays
+```csharp
+await overlayController.CloseAllAsync();
+```
+
+### Capture Region
+```csharp
+var bitmap = await captureStrategy.CaptureRegionAsync(region);
+```
+
+### Check Platform Capabilities
+```csharp
+bool canDetectElements = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+```

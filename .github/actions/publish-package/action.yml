@@ -10,10 +10,6 @@ inputs:
     description: 'Build configuration'
     required: false
     default: 'Release'
-  skip-tests:
-    description: 'Skip running tests before publish'
-    required: false
-    default: 'true'
   package:
     description: 'Create platform-specific packages'
     required: false
@@ -30,17 +26,36 @@ runs:
     - name: 🚀 Publish for ${{ inputs.runtime-id }}
       shell: pwsh
       run: |
-        $publishArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
-        if ("${{ inputs.skip-tests }}" -eq "true") {
-          $publishArgs += " --skip-tests"
-        }
+        $publishArgs = @("Publish", "--configuration", "${{ inputs.configuration }}", "--rids", "${{ inputs.runtime-id }}")
         
+        Write-Host "Executing: ./build.ps1 Clean"
         ./build.ps1 Clean
-        ./build.ps1 Publish $publishArgs
+        
+        Write-Host "Executing: ./build.ps1 $($publishArgs -join ' ')"
+        & ./build.ps1 @publishArgs
         
     - name: 📦 Create packages
       if: inputs.package == 'true'
       shell: pwsh
       run: |
-        $packageArgs = "--configuration ${{ inputs.configuration }} --rids ${{ inputs.runtime-id }}"
-        ./build.ps1 Package $packageArgs
+        $packageArgs = @("Package", "--configuration", "${{ inputs.configuration }}", "--rids", "${{ inputs.runtime-id }}")
+        Write-Host "Executing: ./build.ps1 $($packageArgs -join ' ')"
+        & ./build.ps1 @packageArgs
+        
+    - name: 📂 Verify publish artifacts
+      shell: pwsh
+      run: |
+        $publishPath = "artifacts/publish/${{ inputs.runtime-id }}"
+        Write-Host "Checking publish directory: $publishPath"
+        if (Test-Path $publishPath) {
+          Write-Host "✅ $publishPath directory exists"
+          Get-ChildItem $publishPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Host "❌ $publishPath directory not found"
+          Write-Host "Available directories in artifacts/:"
+          if (Test-Path "artifacts") {
+            Get-ChildItem "artifacts" -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
+          } else {
+            Write-Host "  No artifacts directory found"
+          }
+        }

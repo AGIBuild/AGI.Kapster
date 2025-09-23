@@ -1,6 +1,6 @@
 name: Main CI/CD
 
-# 主开发分支CI - 持续集成和预发布构建
+# 主开发分支集成和预发布构建
 on:
   push:
     branches: [ main ]
@@ -27,10 +27,14 @@ jobs:
       build-number: ${{ steps.version.outputs.build-number }}
       
     steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
     - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
       with:
-        fetch-depth: 0
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
     - name: 📊 Get build information
@@ -69,27 +73,39 @@ jobs:
     name: 🚀 Build Preview
     uses: ./.github/workflows/_reusable-multiplatform.yml
     needs: [build-info, test-and-quality]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     with:
       configuration: 'Release'
-      skip-tests: true
       create-packages: false
 
   preview-summary:
     name: 📋 Preview Summary
     runs-on: ubuntu-latest
     needs: [build-info, test-and-quality, build-preview]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always()
     
     steps:
     - name: 📊 Build Status Summary
       shell: pwsh
       run: |
-        Write-Host "🚀 Main Branch Preview Build Complete"
+        $eventType = "${{ github.event_name }}"
+        $ref = "${{ github.ref }}"
+        
+        if ($eventType -eq "push" -and $ref -eq "refs/heads/main") {
+          Write-Host "🚀 Main Branch Preview Build Complete"
+        } elseif ($eventType -eq "pull_request") {
+          Write-Host "🚀 Pull Request Preview Build Complete"
+        } else {
+          Write-Host "🚀 Preview Build Complete"
+        }
         Write-Host "======================================="
         Write-Host "Version: ${{ needs.build-info.outputs.version }}"
         Write-Host "Build: ${{ needs.build-info.outputs.build-number }}"
         Write-Host "Tests: ${{ needs.test-and-quality.result }}"
         Write-Host "Preview Builds: ${{ needs.build-preview.result }}"
         Write-Host ""
-        Write-Host "✅ Ready for release branch creation!"
+        
+        if ($eventType -eq "push" -and $ref -eq "refs/heads/main") {
+          Write-Host "✅ Ready for release branch creation!"
+        } else {
+          Write-Host "✅ Preview build validation complete!"
+        }

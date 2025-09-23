@@ -1,622 +1,77 @@
-### 方案A任务拆分（.NET 9 + Avalonia 11 + CommunityToolkit.Mvvm）
-
-说明：每个任务应独立、可分配、可验证。任务包含：ID、标题、简述、平台、依赖、交付物、验收标准、优先级、状态、预计工期。
-
-**优先级说明**：
-- 🔴 P0-Critical: 阻塞发布的关键任务
-- 🟠 P1-High: 高优先级，影响核心功能
-- 🟡 P2-Medium: 中优先级，重要但非阻塞
-- 🟢 P3-Low: 低优先级，增强功能
-
-**状态说明**：
-- ✅ Done: 已完成
-- 🚧 In Progress: 进行中
-- ⏳ Pending: 待开始
-- ❌ Blocked: 被阻塞
-
-**平台**：Win / Mac / Cross
-
-## M0 基础工程与框架
-
-- ID: T-0001
-  - 标题: 初始化跨平台项目骨架
-  - 简述: 使用 Avalonia CLI 基于 .NET 9 创建解决方案与项目结构；建主应用、平台启动、基础窗口。
-  - 平台: Cross
-  - 依赖: 无
-  - 交付物: 可编译运行的基础应用（Win/Mac），多目标发布配置
-  - 验收标准: Win10+ 与 macOS 上均可启动空白窗口，无运行时错误
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0002
-  - 标题: 引入 MVVM 与依赖注入/日志
-  - 简述: 引入 CommunityToolkit.Mvvm、Microsoft.Extensions.Hosting/DependencyInjection、Serilog；基础启动管道
-  - 平台: Cross
-  - 依赖: T-0001
-  - 交付物: 启动日志、DI 可解析 ViewModel/Service
-  - 验收标准: 启动日志写入文件与控制台，ViewModel 成功注入
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0003
-  - 标题: 平台互操作基础封装
-  - 简述: 建立 P/Invoke/WinRT/Objective‑C Bridge 基础结构与抽象接口
-  - 平台: Cross
-  - 依赖: T-0002
-  - 交付物: IHotkeyProvider/ICaptureService/IClipboardService 接口与空实现
-  - 验收标准: 编译通过，接口通过 DI 可解析
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-## M1 呼出、遮罩、自由矩形选区与基础导出
-
-- ID: T-0101
-  - 标题: 全局快捷键注册（Win）
-  - 简述: P/Invoke RegisterHotKey；默认 Alt+A；冲突检测与重试
-  - 平台: Win
-  - 依赖: T-0003
-  - 交付物: Windows 热键服务实现
-  - 验收标准: 按下热键触发回调，日志可见
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0102
-  - 标题: 全局快捷键注册（Mac）
-  - 简述: Carbon RegisterEventHotKey 或现代 API；默认 Alt+A；线程安全实现
-  - 平台: Mac
-  - 依赖: T-0003
-  - 交付物: macOS 热键服务实现
-  - 验收标准: 按下热键触发回调，日志可见，与系统热键无冲突
-  - 优先级: 🔴 P0-Critical
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0103
-  - 标题: 多屏透明遮罩与输入拦截
-  - 简述: 创建跨所有显示器的全屏 OverlayWindow，处理鼠标/键盘事件
-  - 平台: Cross
-  - 依赖: T-0101, T-0102
-  - 交付物: OverlayWindowManager 及遮罩渲染
-  - 验收标准: 热键呼出遮罩，Esc 关闭，无闪烁；多屏覆盖正确
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0104
-  - 标题: 自由矩形选区与手柄
-  - 简述: 拖拽创建矩形；支持移动与 8 个缩放手柄；吸附像素对齐
-  - 平台: Cross
-  - 依赖: T-0103
-  - 交付物: SelectionEngine（自由矩形）
-  - 验收标准: 选区创建/移动/缩放流畅，坐标精确
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0105
-  - 标题: 高 DPI 与跨屏坐标统一
-  - 简述: 统一物理像素坐标，处理 Avalonia/Skia 缩放，跨屏拖拽
-  - 平台: Cross
-  - 依赖: T-0104
-  - 交付物: 坐标/缩放适配层
-  - 验收标准: 不同缩放比显示器间拖拽选区无跳变/变形
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0106
-  - 标题: 区域截图捕获（Win）
-  - 简述: Windows.Graphics.Capture 捕获选区位图
-  - 平台: Win
-  - 依赖: T-0104, T-0105
-  - 交付物: CaptureService（Win）
-  - 验收标准: 选区导出位图像素准确，>30 FPS 预览（如实现）
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0107
-  - 标题: 区域截图捕获（Mac）
-  - 简述: CoreGraphics CGDisplay/CGWindow 静态帧捕获选区，性能优化
-  - 平台: Mac
-  - 依赖: T-0104, T-0105
-  - 交付物: CaptureService（Mac）
-  - 验收标准: 选区导出位图像素准确，性能与Windows版本相当
-  - 优先级: 🟠 P1-High
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0108
-  - 标题: 剪贴板服务
-  - 简述: Windows SetClipboardData（PNG/ DIBV5），macOS NSPasteboard（PNG）
-  - 平台: Cross
-  - 依赖: T-0106, T-0107
-  - 交付物: ClipboardService 实现
-  - 验收标准: 截图复制后可在系统粘贴（Paint/Preview）成功
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0109
-  - 标题: 文件导出服务
-  - 简述: PNG/JPG 导出（质量可调），默认路径与命名
-  - 平台: Cross
-  - 依赖: T-0106, T-0107
-  - 交付物: ExportService（文件）
-  - 验收标准: 导出文件可被系统查看器正确打开
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0110
-  - 标题: 基础工具栏（复制/保存/取消）
-  - 简述: 工具栏靠选区边缘吸附，提供基础动作
-  - 平台: Cross
-  - 依赖: T-0103, T-0108, T-0109
-  - 交付物: ToolbarController（基础）
-  - 验收标准: 工具栏显示/隐藏正确，按钮动作可用
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-## M2 窗口/元素拾取与权限
-
-- ID: T-0201
-  - 标题: 元素拾取与高亮（Win）
-  - 简述: UIAutomation + WindowFromPoint；悬停高亮元素/窗口；空格切换模式
-  - 平台: Win
-  - 依赖: T-0103
-  - 交付物: ElementDetector（Win）
-  - 验收标准: 悬停高亮准确，点击生成选区与元素矩形吻合
-  - 优先级: 🟡 P2-Medium
-  - 状态: 🚧 In Progress
-  - 预计工期: 需要优化UIAutomation实现
-
-- ID: T-0202
-  - 标题: 元素拾取与高亮（Mac）
-  - 简述: AXUIElementCopyElementAtPosition；窗口/元素边界高亮
-  - 平台: Mac
-  - 依赖: T-0103
-  - 交付物: ElementDetector（Mac）
-  - 验收标准: 悬停高亮准确，点击生成选区与元素矩形吻合
-  - 优先级: 🔴 P0-Critical
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0203
-  - 标题: 捕获窗口/元素内容
-  - 简述: 通过句柄/AX 元素映射到具体捕获区域（含窗口阴影处理）
-  - 平台: Cross
-  - 依赖: T-0201, T-0202, T-0106, T-0107
-  - 交付物: 捕获模式切换（全屏/窗口/元素/自由）
-  - 验收标准: 四种模式下均可正确捕获
-  - 优先级: 🟡 P2-Medium
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0204
-  - 标题: macOS 屏幕录制权限检测与引导
-  - 简述: 首次调用引导到系统设置；权限状态显示与重试
-  - 平台: Mac
-  - 依赖: T-0107
-  - 交付物: 权限对话/引导
-  - 验收标准: 无权限时有明确指引；授予后无需重装即可生效
-  - 优先级: 🔴 P0-Critical
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-## M3 标注引擎与样式
-
-- ID: T-0301
-  - 标题: 标注数据模型与接口
-  - 简述: 定义 IAnnotationItem（Text/Arrow/Rect/Ellipse/Freehand/Emoji）与样式（颜色/粗细/字体）
-  - 平台: Cross
-  - 依赖: T-0104
-  - 交付物: 模型/接口/基本序列化
-  - 验收标准: 单元测试覆盖创建/变更/序列化
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0302
-  - 标题: 形状绘制与编辑（矩形/圆/线）
-  - 简述: Skia 矢量绘制；拖拽创建、选中、移动、缩放
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: Rect/Ellipse/Line 工具
-  - 验收标准: 形状渲染清晰，编辑手感稳定
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0303
-  - 标题: 箭头（粗头细尾带拖尾）
-  - 简述: 路径采样 + 变宽描边；箭头头部几何与躯干渐细
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: Arrow 工具
-  - 验收标准: 箭头样式与微信新版一致度高，可调粗细/颜色
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0304
-  - 标题: 自由画笔与橡皮擦
-  - 简述: 压感/速度可选简化；路径平滑；擦除支持
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: Freehand/Eraser 工具
-  - 验收标准: 曲线平滑，擦除自然，无明显锯齿
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0305
-  - 标题: 文本工具（内联编辑）
-  - 简述: 文字输入、IME 支持；字体/大小/颜色/对齐
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: Text 工具
-  - 验收标准: 输入法正常，编辑体验稳定，文本渲染清晰
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0306
-  - 标题: Emoji 工具
-  - 简述: 使用系统彩色 Emoji 字体；缩放/移动
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: Emoji 工具
-  - 验收标准: 常见 Emoji 显示正确，导出后颜色不失真
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0307
-  - 标题: 标注选择/对齐与变换
-  - 简述: 选中框、拖拽、缩放、层级、对齐参考线
-  - 平台: Cross
-  - 依赖: T-0302, T-0303, T-0304, T-0305, T-0306
-  - 交付物: 标注交互层
-  - 验收标准: 多对象选择编辑稳定，无误触
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0308
-  - 标题: 撤销/重做（命令栈）
-  - 简述: 增删改样式操作入栈；快捷键支持
-  - 平台: Cross
-  - 依赖: T-0307
-  - 交付物: Undo/Redo 服务
-  - 验收标准: 连续操作可正确回滚/重做，无状态错乱
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0309
-  - 标题: 标注合成与导出
-  - 简述: 位图底图 + 矢量标注合成；输出到剪贴板/文件（sRGB）
-  - 平台: Cross
-  - 依赖: T-0108, T-0109, T-0307
-  - 交付物: 合成管线
-  - 验收标准: 导出图像与画面一致，颜色/清晰度正确
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-## M4 设置、打磨与稳定性
-
-- ID: T-0401
-  - 标题: 设置页（快捷键/默认样式）
-  - 简述: 热键修改、样式预设、持久化（JSON）
-  - 平台: Cross
-  - 依赖: T-0101, T-0102, T-0302~T-0306
-  - 交付物: SettingsService + UI
-  - 验收标准: 重启后设置生效，非法值有校验
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0402
-  - 标题: 热键冲突检测与指引
-  - 简述: 注册失败时提示与建议组合
-  - 平台: Cross
-  - 依赖: T-0401
-  - 交付物: UI 提示与重试机制
-  - 验收标准: 冲突时给出明确可行替代
-  - 优先级: 🟡 P2-Medium
-  - 状态: 🚧 In Progress
-  - 预计工期: 需要改进用户体验
-
-- ID: T-0403
-  - 标题: 性能优化与最小重绘
-  - 简述: 注释层分层、脏矩形、GPU 路径优先
-  - 平台: Cross
-  - 依赖: T-0307, T-0309
-  - 交付物: 优化后的渲染管线
-  - 验收标准: 1080p 复杂标注交互流畅，无明显掉帧
-  - 优先级: 🟠 P1-High
-  - 状态: ⏳ Pending
-  - 预计工期: 3-4周
-
-- ID: T-0404
-  - 标题: 错误处理与日志/崩溃上报（本地）
-  - 简述: 统一异常处理，关键操作日志
-  - 平台: Cross
-  - 依赖: T-0002
-  - 交付物: 日志与错误对话
-  - 验收标准: 异常有可读提示，日志包含关键信息
-  - 优先级: 🟡 P2-Medium
-  - 状态: 🚧 In Progress
-  - 预计工期: 需要完善异常处理
-
-- ID: T-0405
-  - 标题: 基础打包与发布
-  - 简述: 发布 win-x64、osx‑x64/arm64；应用签名/公证为可选
-  - 平台: Cross
-  - 依赖: T-0309
-  - 交付物: 可分发产物（压缩包/安装包）
-  - 验收标准: 目标平台可直接运行
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 2周
-
-- ID: T-0406
-  - 标题: CI 构建与单元测试集成
-  - 简述: GitHub Actions（Win/Mac）构建与测试
-  - 平台: Cross
-  - 依赖: T-0001, T-0901
-  - 交付物: 工作流配置
-  - 验收标准: PR 自动构建与测试通过
-  - 优先级: 🟠 P1-High
-  - 状态: ⏳ Pending
-  - 预计工期: 1-2周
-
-## 测试与质量保证
-
-- ID: T-0901
-  - 标题: 几何与标注模型单元测试
-  - 简述: 选区几何计算、标注数据模型与命令栈测试
-  - 平台: Cross
-  - 依赖: T-0301, T-0308
-  - 交付物: 单测项目与覆盖率报告
-  - 验收标准: 关键路径覆盖率≥70%，全部通过
-  - 优先级: 🟠 P1-High
-  - 状态: ⏳ Pending
-  - 预计工期: 2-3周
-
-- ID: T-0902
-  - 标题: 捕获服务集成测试（可控环境）
-  - 简述: 基于虚拟图像源/静态窗口做像素校验
-  - 平台: Cross
-  - 依赖: T-0106, T-0107
-  - 交付物: 集成测试脚本/工具
-  - 验收标准: 在测试源上像素误差≤1px
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 1-2周
-
-- ID: T-0903
-  - 标题: 手工验收用例清单
-  - 简述: 多屏/DPI/权限/模式/导出等手工检查列表
-  - 平台: Cross
-  - 依赖: M1~M4
-  - 交付物: 用例清单（表格）
-  - 验收标准: 所列用例在两平台均通过
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 1周
-
-## 新增任务（基于当前分析）
-
-### 系统托盘和用户界面
-- ID: T-0601
-  - 标题: 系统托盘服务与菜单
-  - 简述: 跨平台系统托盘图标、右键菜单、通知功能
-  - 平台: Cross
-  - 依赖: T-0001, T-0002
-  - 交付物: SystemTrayService 实现
-  - 验收标准: 托盘图标显示正确，菜单功能完整，通知正常
-  - 优先级: 🟠 P1-High
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0602
-  - 标题: About 对话框
-  - 简述: 应用程序信息对话框，版本信息、功能介绍
-  - 平台: Cross
-  - 依赖: T-0601
-  - 交付物: AboutDialog 窗口
-  - 验收标准: 对话框正确显示，图标资源加载正常
-  - 优先级: 🟡 P2-Medium
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-### 导出和文件处理优化
-- ID: T-0603
-  - 标题: 图像导出质量优化
-  - 简述: JPEG质量控制、BMP格式支持、文件大小估算
-  - 平台: Cross
-  - 依赖: T-0109
-  - 交付物: 优化的 ExportService
-  - 验收标准: JPEG质量100时无过度压缩，BMP正常导出，文件大小估算准确
-  - 优先级: 🟠 P1-High
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-### 配置和环境管理
-- ID: T-0604
-  - 标题: 环境配置和日志级别管理
-  - 简述: 基于构建配置的环境检测，开发/生产环境日志级别自动切换
-  - 平台: Cross
-  - 依赖: T-0002
-  - 交付物: 智能环境检测和配置加载
-  - 验收标准: dotnet run 使用 dev 环境，Release 构建使用 prod 环境
-  - 优先级: 🟡 P2-Medium
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-### UI 和工具栏优化
-- ID: T-0605
-  - 标题: 工具栏图标和布局优化
-  - 简述: 工具图标选择、大小调整、Emoji工具重新设计
-  - 平台: Cross
-  - 依赖: T-0110
-  - 交付物: 优化的工具栏界面
-  - 验收标准: 图标清晰易识别，布局合理，用户体验良好
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-- ID: T-0606
-  - 标题: 箭头工具样式优化
-  - 简述: 燕尾箭头设计，透明渐变效果
-  - 平台: Cross
-  - 依赖: T-0303
-  - 交付物: 优化的箭头渲染
-  - 验收标准: 箭头样式美观，渐变效果自然
-  - 优先级: 🟢 P3-Low
-  - 状态: ✅ Done
-  - 预计工期: 已完成
-
-### 自动更新系统
-- ID: T-0501
-  - 标题: 自动更新机制
-  - 简述: 版本检查、增量更新、回滚机制；Squirrel.Windows + 自建更新服务
-  - 平台: Cross
-  - 依赖: T-0405
-  - 交付物: 自动更新服务和客户端
-  - 验收标准: 自动检测新版本，静默更新，支持回滚
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 3-4周
-
-### 功能增强任务
-- ID: T-0502
-  - 标题: 高亮标注工具
-  - 简述: 半透明矩形标注，多种高亮颜色预设
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: 高亮工具实现
-  - 验收标准: 半透明效果正确，颜色预设丰富
-  - 优先级: 🟢 P3-Low
-  - 状态: ⏳ Pending
-  - 预计工期: 1-2周
-
-- ID: T-0503
-  - 标题: 马赛克/模糊工具
-  - 简述: 隐私保护功能，可调节模糊程度
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: 马赛克/模糊工具
-  - 验收标准: 模糊效果自然，程度可调
-  - 优先级: 🟢 P3-Low
-  - 状态: ⏳ Pending
-  - 预计工期: 1-2周
-
-### 技术债务修复
-- ID: T-0504
-  - 标题: FreehandAnnotation序列化完善
-  - 简述: 完成手绘标注的序列化和反序列化实现
-  - 平台: Cross
-  - 依赖: T-0301
-  - 交付物: 完整的序列化实现
-  - 验收标准: 手绘标注可正确保存和加载
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 1周
-
-- ID: T-0505
-  - 标题: WindowsElementDetector优化
-  - 简述: 重新启用和优化UIAutomation，解决COM问题
-  - 平台: Win
-  - 依赖: T-0201
-  - 交付物: 优化的元素检测器
-  - 验收标准: UIAutomation稳定工作，检测准确率提升
-  - 优先级: 🟡 P2-Medium
-  - 状态: ⏳ Pending
-  - 预计工期: 1-2周
-
-## 优先级实施计划
-
-### Phase 1: macOS平台完整支持（🔴 P0-Critical）
-**状态：✅ 已完成**
-1. ✅ T-0102: macOS全局热键实现
-2. ✅ T-0202: macOS元素检测器
-3. ✅ T-0204: macOS权限管理
-4. ✅ 跨平台测试和调试
-
-### Phase 2: 基础设施建设（🟠 P1-High）
-**状态：🚧 进行中**
-1. ✅ T-0601: 系统托盘服务 - 已完成
-2. ✅ T-0603: 图像导出质量优化 - 已完成
-3. ⏳ T-0406: CI/CD管道搭建 (1-2周)
-4. ⏳ T-0901: 单元测试覆盖率提升 (2-3周)
-5. ⏳ T-0403: 性能优化 (3-4周，可并行)
-
-### Phase 3: 质量和体验优化（🟡 P2-Medium）
-**状态：🚧 进行中**
-1. ✅ T-0602: About 对话框 - 已完成
-2. ✅ T-0604: 环境配置管理 - 已完成
-3. ⏳ T-0504: 技术债务修复 (1周)
-4. ⏳ T-0505: Windows元素检测优化 (1-2周)
-5. ⏳ T-0402: 热键冲突处理改进 (1周)
-6. ⏳ T-0405: 打包和发布流程 (2周)
-7. ⏳ T-0501: 自动更新系统 (3-4周)
-
-### Phase 4: 功能增强（🟢 P3-Low）
-**状态：✅ 大部分已完成**
-1. ✅ T-0605: 工具栏图标和布局优化 - 已完成
-2. ✅ T-0606: 箭头工具样式优化 - 已完成
-3. ⏳ T-0502: 高亮工具 (1-2周)
-4. ⏳ T-0503: 马赛克工具 (1-2周)
-5. ⏳ 其他用户体验优化
-
-## 里程碑建议（更新）
-
-- **M1-Complete**: ✅ 已完成 - 基础截图和标注功能
-- **M2-macOS**: ✅ 已完成 - macOS平台功能完整性
-- **M3-UI/UX**: ✅ 已完成 - 用户界面和体验优化
-- **M4-Quality**: 🚧 进行中 - 测试覆盖率和CI/CD (4周)
-- **M5-Performance**: ⏳ 待开始 - 性能和稳定性优化 (6周)
-- **M6-Release**: ⏳ 待开始 - 1.0正式版就绪 (2周)
-
-## 当前项目状态总结
-
-### ✅ 已完成的关键功能
-1. **跨平台基础架构** - .NET 9 + Avalonia 11 + MVVM
-2. **macOS 平台完整支持** - 热键、截图、元素检测、权限管理
-3. **Windows 平台完整支持** - 所有核心功能
-4. **完整的标注系统** - 箭头、矩形、圆形、文本、Emoji、自由画笔
-5. **多格式导出** - PNG、JPEG、BMP、WebP，质量控制优化
-6. **系统集成** - 托盘服务、剪贴板、About对话框
-7. **开发环境** - 智能环境检测、日志级别管理
-8. **UI/UX 优化** - 工具栏图标、箭头样式、布局优化
-
-### 🚧 进行中的任务
-1. **CI/CD 管道** - GitHub Actions 构建和测试
-2. **单元测试覆盖率** - 关键路径测试
-3. **Windows UIAutomation 优化** - 元素检测稳定性
-
-### ⏳ 待完成的任务
-1. **性能优化** - 渲染管线、内存管理
-2. **打包发布** - 跨平台安装包
-3. **自动更新系统** - 版本检查和更新机制
-4. **功能增强** - 高亮工具、马赛克工具
-
-### 📊 完成度评估
-- **核心功能**: 95% 完成
-- **平台支持**: 100% 完成 (Windows + macOS)
-- **用户体验**: 90% 完成
-- **质量保证**: 60% 完成
-- **发布准备**: 40% 完成
-
-**总体完成度**: 约 80%，已具备 MVP (最小可行产品) 发布条件。
-
-
+# Project Planning Archive
+
+## Historical Task Breakdown (Plan A)
+
+This document contains historical project planning information from the initial development phase using .NET 9 + Avalonia 11 + CommunityToolkit.Mvvm architecture.
+
+**Note**: This is archived content for historical reference. Current project status and active tasks should be found in [Project Status](project-status.md).
+
+## Completed Milestones
+
+### M0 - Foundation & Framework ✅
+- ✅ Cross-platform project scaffolding
+- ✅ MVVM and dependency injection setup
+- ✅ Platform interop foundation
+- ✅ Basic logging and configuration
+
+### M1 - Core Services ✅
+- ✅ Screen capture service implementation
+- ✅ Clipboard service with platform abstractions
+- ✅ Hotkey registration system
+- ✅ Settings management service
+
+### M2 - Overlay System ✅
+- ✅ Overlay window management
+- ✅ Multi-screen support
+- ✅ Platform-specific implementations
+- ✅ Event-driven architecture
+
+### M3 - UI Components ✅
+- ✅ System tray integration
+- ✅ Settings dialog
+- ✅ Overlay rendering system
+- ✅ Background-only operation
+
+## Architecture Decisions Made
+
+### Technology Stack
+- **.NET 9.0**: Latest LTS version for performance and features
+- **Avalonia UI 11**: Cross-platform UI framework
+- **CommunityToolkit.Mvvm**: MVVM pattern implementation
+- **NUKE Build**: Modern build automation
+
+### Design Patterns
+- **Dependency Injection**: Microsoft.Extensions.DependencyInjection
+- **Platform Abstraction**: Service interfaces with platform-specific implementations
+- **Event-Driven**: Loose coupling through event system
+- **Background Service**: System tray only, no main window
+
+### Key Technical Decisions
+1. **Removed Factory Pattern**: Simplified DI approach over factory abstractions
+2. **Background-Only Mode**: Eliminated main window for cleaner UX
+3. **Time-Based Versioning**: Predictable versioning strategy
+4. **Composite Actions**: Reusable GitHub Actions components
+
+## Lessons Learned
+
+### What Worked Well
+- Cross-platform service abstraction
+- NUKE build system integration
+- GitHub Actions automation
+- Test-driven development approach
+
+### Challenges Overcome
+- macOS black screen issue with overlay windows
+- Clipboard access across platforms
+- Version management complexity
+- Build system optimization
+
+### Future Considerations
+- Enhanced element detection capabilities
+- Advanced annotation features
+- Performance optimizations
+- Additional platform support
+
+---
+
+*This document is maintained for historical reference and architectural context. Active development follows current specifications in the main documentation.*
