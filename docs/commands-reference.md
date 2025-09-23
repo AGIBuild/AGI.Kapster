@@ -1,372 +1,388 @@
-# AGI.Captor Commands Reference
+# Commands Reference
 
-## 🚀 Quick Start
+## Build Commands
 
+### PowerShell Build Script
 ```powershell
-# Clone project
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+# Basic build
+.\build.ps1
 
-# Get project information
-.\build.ps1 Info
+# Specific target
+.\build.ps1 [Target]
 
-# Complete build with tests
-.\build.ps1 Clean Build Test
+# With parameters
+.\build.ps1 [Target] --parameter value
 ```
 
-## 🔧 Build Commands
+### Available Targets
 
-### Basic Build Operations
+#### Core Targets
 ```powershell
-# Clean build output
+# Clean build artifacts
 .\build.ps1 Clean
 
 # Restore NuGet packages
 .\build.ps1 Restore
 
-# Compile all projects
+# Build all projects
 .\build.ps1 Build
 
 # Run unit tests
 .\build.ps1 Test
 
-# Build with tests (most common)
-.\build.ps1 Build Test
+# Build and test (default)
+.\build.ps1
 ```
 
-### Advanced Build Options
-```powershell
-# Build specific configuration
-.\build.ps1 Build --configuration Release
-.\build.ps1 Build --configuration Debug
-
-# Build with verbose output
-.\build.ps1 Build --verbosity normal
-
-# Skip dependencies
-.\build.ps1 Test --skip Build
-```
-
-### Multi-Platform Publishing
+#### Publishing Targets
 ```powershell
 # Publish for current platform
 .\build.ps1 Publish
 
 # Publish for specific runtime
-.\build.ps1 Publish --runtime-id win-x64
-.\build.ps1 Publish --runtime-id linux-x64
-.\build.ps1 Publish --runtime-id osx-x64
+.\build.ps1 Publish --runtime win-x64
+.\build.ps1 Publish --runtime osx-x64
+.\build.ps1 Publish --runtime linux-x64
 
-# Publish multiple platforms
-.\build.ps1 Publish --runtime-id win-x64,linux-x64,osx-x64
-```
-
-### Package Creation
-```powershell
-# Create packages for all platforms
+# Create packages
 .\build.ps1 Package
-
-# Create package for specific platform
-.\build.ps1 Package --runtime-id win-x64
-
-# Package with specific configuration
-.\build.ps1 Package --configuration Release
 ```
 
-## 🧪 Testing Commands
+#### Version Management
+```powershell
+# Display version information
+.\build.ps1 Info
+
+# Generate new time-based version
+.\build.ps1 UpgradeVersion
+
+# Verify version consistency
+.\build.ps1 CheckVersionLocked
+```
+
+## Development Workflow
+
+### Daily Development
+```powershell
+# Start development session
+.\build.ps1 Clean Build
+
+# Run tests during development
+.\build.ps1 Test
+
+# Full validation before commit
+.\build.ps1 Clean Test
+```
+
+### Release Preparation
+```powershell
+# Update version
+.\build.ps1 UpgradeVersion
+
+# Verify build for all targets
+.\build.ps1 Clean Build Test Package
+
+# Create release artifacts
+.\build.ps1 Publish --runtime win-x64
+.\build.ps1 Publish --runtime osx-x64
+.\build.ps1 Publish --runtime linux-x64
+```
+
+## .NET CLI Commands
+
+### Project Management
+```bash
+# Build solution
+dotnet build AGI.Captor.sln
+
+# Run tests
+dotnet test AGI.Captor.sln
+
+# Publish application
+dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj
+```
+
+### Package Management
+```bash
+# Restore packages
+dotnet restore
+
+# Add package
+dotnet add package [PackageName]
+
+# Update packages
+dotnet list package --outdated
+dotnet add package [PackageName] --version [Version]
+```
+
+## GitHub CLI Commands
+
+### Release Management
+```bash
+# List releases
+gh release list
+
+# Create release
+gh release create v2024.9.23.1 --title "Release 2024.9.23.1"
+
+# View release
+gh release view v2024.9.23.1
+```
+
+### Workflow Management
+```bash
+# List workflow runs
+gh run list
+
+# View workflow run
+gh run view [run-id]
+
+# Trigger workflow
+gh workflow run release.yml
+```
+
+### Repository Commands
+```bash
+# Clone repository
+gh repo clone AGIBuild/AGI.Captor
+
+# Create pull request
+gh pr create --title "Feature: New overlay mode"
+
+# View pull requests
+gh pr list
+```
+
+## Git Commands
+
+### Branch Management
+```bash
+# Create feature branch
+git checkout -b feature/new-feature
+
+# Switch to release branch
+git checkout release
+
+# Merge feature branch
+git merge feature/new-feature
+```
+
+### Version Tagging
+```bash
+# Create version tag
+git tag v2024.9.23.1
+
+# Push tag
+git push origin v2024.9.23.1
+
+# List tags
+git tag -l
+
+# Delete tag
+git tag -d v2024.9.23.1
+git push origin --delete v2024.9.23.1
+```
+
+### Repository Operations
+```bash
+# Check status
+git status
+
+# View commit history
+git log --oneline -10
+
+# View changes
+git diff
+git diff --cached
+```
+
+## Testing Commands
 
 ### Unit Testing
 ```powershell
 # Run all tests
 .\build.ps1 Test
 
-# Run tests with coverage collection
+# Run tests with coverage
 .\build.ps1 Test --collect-coverage
 
-# Run specific test project
-dotnet test tests/AGI.Captor.Tests/
-
-# Run specific test class
-dotnet test --filter "ClassName=OverlayServiceTests"
-
-# Run specific test method
-dotnet test --filter "MethodName=ShouldCreateOverlay"
-
-# Verbose test output
-dotnet test --verbosity normal
+# Run specific test
+dotnet test --filter "TestClassName"
 ```
 
-### Coverage Analysis
-```powershell
+### Test Reporting
+```bash
 # Generate coverage report
-.\build.ps1 Test --collect-coverage
+dotnet test --collect:"XPlat Code Coverage"
 
-# View coverage in browser
-start artifacts/test-results/coverage.html
-
-# Generate Cobertura format
-dotnet test --collect:"XPlat Code Coverage" --results-directory artifacts/test-results/
+# View coverage results
+# Coverage reports are in TestResults/ directory
 ```
 
-## 📦 Packaging Commands
-
-### Automated Packaging
-```powershell
-# Create all platform packages
-.\build.ps1 Package
-
-# Windows MSI package
-.\build.ps1 Package --runtime-id win-x64
-
-# Linux packages
-.\build.ps1 Package --runtime-id linux-x64
-
-# macOS packages
-.\build.ps1 Package --runtime-id osx-x64
-```
-
-### Manual Packaging
-```powershell
-# Windows MSI (using WiX)
-cd packaging/windows
-dotnet build AGI.Captor.wixproj
-
-# Linux DEB package
-cd packaging/linux
-./create-deb.sh
-
-# Linux RPM package
-cd packaging/linux
-./create-rpm.sh
-
-# macOS PKG package
-cd packaging/macos
-./create-pkg.sh
-```
-
-## 🌿 Git Workflow Commands
-
-### Branch Operations
-```bash
-# Create feature branch
-git checkout -b feature/new-overlay-mode
-
-# Create release branch
-git checkout -b release/2025.9.23
-
-# Switch to main branch
-git checkout main
-
-# Delete feature branch
-git branch -d feature/old-feature
-git push origin --delete feature/old-feature
-```
-
-### Tagging for Releases
-```bash
-# Create release tag
-git tag v2025.9.23.1200
-
-# Create annotated tag
-git tag -a v2025.9.23.1200 -m "Release version 2025.9.23.1200"
-
-# Push tag to trigger release workflow
-git push origin v2025.9.23.1200
-
-# Delete tag
-git tag -d v2025.9.23.1200
-git push origin --delete v2025.9.23.1200
-```
-
-### Commit Conventions
-```bash
-# Feature commit
-git commit -m "feat: add new overlay selection mode"
-
-# Bug fix commit
-git commit -m "fix: resolve memory leak in overlay rendering"
-
-# Breaking change
-git commit -m "feat!: redesign overlay API"
-
-# Documentation update
-git commit -m "docs: update build system documentation"
-
-# Refactoring
-git commit -m "refactor: simplify overlay manager architecture"
-```
-
-## 🔍 Debugging and Diagnostics
-
-### Application Logs
-```powershell
-# View recent application logs
-Get-Content logs/app-*.log | Select-Object -Last 50
-
-# Monitor logs in real-time
-Get-Content logs/app-*.log -Wait
-
-# Filter error logs
-Get-Content logs/app-*.log | Select-String "ERROR"
-```
-
-### System Information
-```powershell
-# .NET information
-dotnet --info
-
-# Check .NET versions
-dotnet --list-sdks
-dotnet --list-runtimes
-
-# Environment variables
-Get-ChildItem Env: | Where-Object Name -like "*DOTNET*"
-
-# NUKE build information
-.\build.ps1 Info
-```
+## Debugging Commands
 
 ### Build Diagnostics
 ```powershell
 # Verbose build output
+.\build.ps1 Build --verbosity detailed
+
+# Diagnostic output
 .\build.ps1 Build --verbosity diagnostic
 
-# Clean and rebuild everything
-.\build.ps1 Clean Restore Build --force
-
-# Check build dependencies
-.\build.ps1 --help
+# Build with specific configuration
+.\build.ps1 Build --configuration Debug
 ```
 
-## 🚀 GitHub Actions Integration
-
-### Local Testing
+### Environment Information
 ```powershell
-# Simulate CI build
-.\build.ps1 Clean Restore Build Test
+# Display build info
+.\build.ps1 Info
 
-# Simulate quality build
-.\build.ps1 Clean Build Test Publish
+# Check .NET installation
+dotnet --info
 
-# Test multi-platform publishing
-.\build.ps1 Publish --runtime-id win-x64,linux-x64,osx-x64
+# List installed SDKs
+dotnet --list-sdks
 ```
 
-### Workflow Triggers
+## Package Management
+
+### NuGet Commands
 ```bash
-# Trigger CI workflow
-git push origin main
-git push origin feature/branch-name
+# Clear NuGet cache
+dotnet nuget locals all --clear
 
-# Trigger quality workflow
-git push origin main
+# List package sources
+dotnet nuget list source
 
-# Trigger release workflow
-git tag v2025.9.23.1200
-git push origin v2025.9.23.1200
+# Search packages
+dotnet search [PackageName]
 ```
 
-## 📚 Common Workflows
+### Project Dependencies
+```bash
+# List project references
+dotnet list reference
 
-### Development Cycle
-```powershell
-# 1. Clean development build
-.\build.ps1 Clean Build Test
+# Add project reference
+dotnet add reference ../OtherProject/OtherProject.csproj
 
-# 2. Run with coverage
-.\build.ps1 Test --collect-coverage
-
-# 3. Fix issues and repeat
-.\build.ps1 Build Test
+# List package dependencies
+dotnet list package
 ```
 
-### Release Preparation
+## Platform-Specific Commands
+
+### Windows
 ```powershell
-# 1. Complete build with all platforms
-.\build.ps1 Clean Build Test Publish Package
+# Build MSI installer (requires WiX)
+.\build.ps1 Package --runtime win-x64
 
-# 2. Verify artifacts
-Get-ChildItem artifacts/publish/
-Get-ChildItem artifacts/packages/
-
-# 3. Create release tag
-git tag v2025.9.23.1200
-git push origin v2025.9.23.1200
+# Install/uninstall service
+sc create AGI.Captor binPath="path\to\exe"
+sc delete AGI.Captor
 ```
 
-### Troubleshooting Build Issues
+### macOS
+```bash
+# Build PKG installer
+./build.ps1 Package --runtime osx-x64
+
+# Install/uninstall PKG
+sudo installer -pkg AGI.Captor.pkg -target /
+pkgutil --pkgs | grep agicaptor
+```
+
+### Linux
+```bash
+# Build DEB package
+./build.ps1 Package --runtime linux-x64
+
+# Install/uninstall DEB
+sudo dpkg -i agi-captor.deb
+sudo dpkg -r agi-captor
+```
+
+## Troubleshooting Commands
+
+### Common Issues
 ```powershell
-# 1. Clean everything
+# Clear all build artifacts
 .\build.ps1 Clean
-Remove-Item artifacts/ -Recurse -Force -ErrorAction SilentlyContinue
 
-# 2. Restore dependencies
+# Reset NuGet packages
+Remove-Item -Recurse -Force packages/
 .\build.ps1 Restore
 
-# 3. Build with verbose output
+# Check for build errors
 .\build.ps1 Build --verbosity diagnostic
-
-# 4. Check for compilation errors
-.\build.ps1 Build 2>&1 | Select-String "error"
 ```
 
-## 💡 Performance Tips
-
-### Build Optimization
+### Performance Diagnostics
 ```powershell
-# Skip clean for faster incremental builds
-.\build.ps1 Build Test
+# Build with timing
+.\build.ps1 Build --verbosity diagnostic | Select-String "Time Elapsed"
 
-# Use specific configuration
-.\build.ps1 Build --configuration Debug  # Faster compilation
-
-# Skip tests during development
-.\build.ps1 Build --skip Test
+# Memory usage during build
+Get-Process dotnet | Select-Object Name, CPU, WorkingSet
 ```
 
-### Parallel Processing
+### Version Issues
 ```powershell
-# Enable parallel builds (default in NUKE)
-.\build.ps1 Build --parallel
+# Check version consistency
+.\build.ps1 CheckVersionLocked
 
-# Limit parallel degree
-.\build.ps1 Build --parallel --max-cpu-count 4
+# Force version regeneration
+.\build.ps1 UpgradeVersion --force
+
+# View version history
+git log --oneline version.json
 ```
 
-## 🔧 Tool Configuration
+## CI/CD Commands
 
-### PowerShell Aliases
+### Local CI Simulation
 ```powershell
-# Add to PowerShell profile ($PROFILE)
-New-Alias -Name build -Value ".\build.ps1"
-New-Alias -Name test -Value ".\build.ps1 Test"
-New-Alias -Name clean -Value ".\build.ps1 Clean"
+# Simulate CI build
+.\build.ps1 Clean Restore Build Test Package
 
-# Usage after aliases
-build Build Test
-test --collect-coverage
-clean
+# Test publish workflow
+.\build.ps1 Publish --runtime win-x64 --output ./artifacts/win-x64
 ```
 
-### Environment Setup
+### GitHub Actions Integration
+```yaml
+# In workflow file
+- name: Build and Test
+  run: .\build.ps1 Test
+  
+- name: Create Packages
+  run: .\build.ps1 Package --runtime ${{ matrix.runtime }}
+```
+
+## Quick Reference
+
+### Most Common Commands
 ```powershell
-# Set default configuration
-$env:Configuration = "Release"
+# Daily development
+.\build.ps1                    # Build and test
+.\build.ps1 Clean              # Clean artifacts
+.\build.ps1 Test               # Run tests only
 
-# Set default runtime
-$env:RuntimeIdentifier = "win-x64"
-
-# Enable .NET CLI telemetry opt-out
-$env:DOTNET_CLI_TELEMETRY_OPTOUT = "true"
+# Release workflow
+.\build.ps1 UpgradeVersion     # New version
+.\build.ps1 Package            # Create packages
+git tag v$(cat version.json | jq -r .version)  # Create tag
 ```
 
-## 📖 Related Documentation
+### Emergency Commands
+```powershell
+# Complete reset
+git clean -fdx
+.\build.ps1 Restore Build Test
 
-- [Build System](build-system.md) - Detailed build system architecture
-- [GitHub Actions Workflows](../.github/README.md) - CI/CD pipeline documentation
-- [Testing Architecture](testing-architecture.md) - Testing strategy and patterns
-- [Packaging Guide](packaging-guide.md) - Platform-specific packaging details
-- [Release Workflow](release-workflow.md) - Release process and automation
-
----
-*Last updated: September 2025 · NUKE build system with GitHub Actions integration*
+# Rollback release
+git tag -d v2024.9.23.1
+git push origin --delete v2024.9.23.1
+gh release delete v2024.9.23.1
+```
