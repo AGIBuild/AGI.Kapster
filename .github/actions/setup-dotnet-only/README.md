@@ -26,7 +26,6 @@ A lightweight composite GitHub Action for setting up .NET environment with NuGet
 |-------|-------------|----------|---------|
 | `dotnet-version` | .NET version to install | No | `9.0.x` |
 | `dotnet-quality` | .NET quality channel (ga, preview) | No | `preview` |
-| `include-dotnet8` | Whether to include .NET 8.x | No | `true` |
 | `enable-nuget-cache` | Enable NuGet package caching | No | `true` |
 | `cache-key-suffix` | Additional suffix for cache key | No | _(empty)_ |
 
@@ -81,10 +80,10 @@ Perfect for scenarios where you need .NET setup without full environment configu
 | Feature | setup-dotnet-only | setup-environment |
 |---------|-------------------|-------------------|
 | Repository checkout | ❌ | ✅ |
-| .NET installation | ✅ | ✅ |
+| .NET 9.0 installation | ✅ | ✅ |
 | NuGet caching | ✅ | ✅ |
-| Git configuration | ❌ | ✅ |
-| Environment variables | ❌ | ✅ |
+| Git configuration | ✅ | ✅ |
+| Environment variables | ✅ | ✅ |
 | Use case | Lightweight builds | Full CI/CD |
 
 ## Prerequisites

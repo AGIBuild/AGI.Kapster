@@ -15,10 +15,6 @@ inputs:
     description: '.NET version to install'
     required: false
     default: '9.0.x'
-  include-dotnet8:
-    description: 'Whether to include .NET 8.x'
-    required: false
-    default: 'true'
 
 runs:
   using: "composite"
@@ -31,7 +27,7 @@ runs:
     - name: 🔧 Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ inputs.include-dotnet8 == 'true' && format('8.0.x{0}{1}', '\n', inputs.dotnet-version) || inputs.dotnet-version }}
+        dotnet-version: ${{ inputs.dotnet-version }}
         dotnet-quality: ${{ inputs.dotnet-quality }}
         
     - name: ⚙️ Configure Git safe.directory
