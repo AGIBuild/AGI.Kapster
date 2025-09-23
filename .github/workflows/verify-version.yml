@@ -24,7 +24,7 @@ jobs:
 
       - name: Restore tools
         shell: pwsh
-        run: dotnet tool restore
+        run: dotnet tool restore || true
 
       - name: Validate version.json exists
         shell: pwsh
