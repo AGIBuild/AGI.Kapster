@@ -189,7 +189,8 @@ class BuildTasks : NukeBuild
                     .SetProject(MainProject)
                     .SetConfiguration(Configuration)
                     .SetRuntime(rid)
-                    .SetSelfContained(SelfContained)
+                    // Force self-contained publish for installers so runtime is bundled
+                    .SetSelfContained(true)
                     .SetPublishSingleFile(SingleFile)
                     .SetPublishTrimmed(Trim)
                     .EnableNoRestore()
@@ -339,39 +340,12 @@ class BuildTasks : NukeBuild
 
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
 
-            // Check if WiX v4+ is available
-            string wixPath = null;
+            // Check if WiX v4+ is available by running `wix --version`.
             try
             {
-                // Try to find wix.exe (WiX v4+)
                 var process = ProcessTasks.StartProcess("wix", "--version", logOutput: false);
                 process.AssertZeroExitCode();
-                wixPath = "wix";
-            }
-            catch
-            {
-                try
-                {
-                    // Fallback to older WiX toolset
-                    wixPath = ToolPathResolver.GetPathExecutable("heat") ??
-                             ToolPathResolver.GetPathExecutable("candle");
-                }
-                catch
-                {
-                    // WiX not available
-                }
-            }
-
-            if (wixPath == null)
-            {
-                Console.WriteLine("⚠️ WiX Toolset not found. Creating portable ZIP instead...");
-                CreatePortableZip(publishPath, rid, version.File);
-                return;
-            }
-
-            // Use WiX v4+ syntax
-            if (wixPath == "wix")
-            {
+                // If the command succeeded, use WiX v4 (executable 'wix')
                 try
                 {
                     CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
@@ -382,9 +356,9 @@ class BuildTasks : NukeBuild
                     CreatePortableZip(publishPath, rid, version.File);
                 }
             }
-            else
+            catch
             {
-                Console.WriteLine("⚠️ WiX v3 detected but v4+ required for MSI creation. Creating portable ZIP...");
+                Console.WriteLine("⚠️ WiX Toolset not found or not usable. Creating portable ZIP instead...");
                 CreatePortableZip(publishPath, rid, version.File);
             }
         }
@@ -399,8 +373,7 @@ class BuildTasks : NukeBuild
 
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
-        var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
-        var wixobjFile = WindowsPackagingDirectory / "AGI.Kapster.wixobj";
+    var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
 
         // Ensure WXS file exists
         if (!File.Exists(wxsFile))

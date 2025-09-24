@@ -7,7 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AGI.Kapster.wxs" />
+    <!-- Use WiX v4 source file to match build tasks and WiX v4 tool usage -->
+    <Compile Include="AGI.Kapster.v4.wxs" />
   </ItemGroup>
 
   <ItemGroup>
