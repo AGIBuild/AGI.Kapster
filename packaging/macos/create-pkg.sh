@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# AGI Captor macOS PKG和DMG创建脚本
-# 用法: ./create-pkg.sh <publish_directory> <version> [sign_identity]
+# AGI Captor macOS PKG creation script
+# Usage: ./create-pkg.sh <publish_directory> <version> [sign_identity]
 
 set -e
 
@@ -11,18 +11,18 @@ VERSION="$2"
 SIGN_IDENTITY="$3"
 
 if [ -z "$PUBLISH_DIR" ] || [ -z "$VERSION" ]; then
-    echo "用法: $0 <publish_directory> <version> [sign_identity]"
-    echo "示例: $0 ../artifacts/publish/osx-x64 1.2.0 'Developer ID Application: Your Name'"
+    echo "Usage: $0 <publish_directory> <version> [sign_identity]"
+    echo "Example: $0 ../artifacts/publish/osx-x64 1.2.0 'Developer ID Application: Your Name'"
     exit 1
 fi
 
-# 验证输入目录
+# Validate input directory
 if [ ! -d "$PUBLISH_DIR" ]; then
-    echo "错误: 发布目录不存在: $PUBLISH_DIR"
+    echo "Error: Publish directory does not exist: $PUBLISH_DIR"
     exit 1
 fi
 
-# 配置
+# Configuration
 APP_NAME="AGI Captor"
 BUNDLE_ID="com.agi.captor"
 # Get architecture from environment or detect from path
@@ -44,9 +44,9 @@ PKG_NAME="AGI.Captor-${VERSION}-${ARCH}.pkg"
 TEMP_DIR="$(mktemp -d)"
 APP_DIR="$TEMP_DIR/$APP_NAME.app"
 
-echo "🔨 创建 macOS 应用程序包..."
+echo "🔨 Creating macOS application package..."
 
-# 创建.app结构
+# Create .app structure
 echo "Creating .app structure..."
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -70,7 +70,7 @@ cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/" || {
     exit 1
 }
 
-# 创建Info.plist
+# Create Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -108,22 +108,22 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-# 复制图标（如果存在）
+# Copy icon (if exists)
 if [ -f "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" ]; then
     cp "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
 elif [ -f "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" ]; then
-    echo "⚠️  找到.ico文件但需要.icns文件，请转换图标格式"
+    echo "⚠️  Found .ico file but .icns file is needed, please convert icon format"
 fi
 
-# 应用签名（如果提供了签名身份）
+# Application signing (if signing identity provided)
 if [ -n "$SIGN_IDENTITY" ]; then
-    echo "🔐 应用程序签名..."
+    echo "🔐 Signing application..."
     codesign --force --verify --verbose --sign "$SIGN_IDENTITY" "$APP_DIR"
 fi
 
-echo "📦 创建 PKG 安装包..."
+echo "📦 Creating PKG installer..."
 
-# 创建PKG
+# Create PKG
 echo "Creating PKG with pkgbuild..."
 echo "Root directory: $TEMP_DIR"
 echo "Contents:"
@@ -142,18 +142,18 @@ pkgbuild --root "$TEMP_DIR" \
     exit 1
 }
 
-# 如果提供了签名身份，签名PKG
+# Sign PKG if signing identity provided
 if [ -n "$SIGN_IDENTITY" ]; then
-    echo "🔐 PKG 签名..."
+    echo "🔐 Signing PKG..."
     productsign --sign "$SIGN_IDENTITY" "$SCRIPT_DIR/$PKG_NAME" "$SCRIPT_DIR/${PKG_NAME%.pkg}-signed.pkg"
     mv "$SCRIPT_DIR/${PKG_NAME%.pkg}-signed.pkg" "$SCRIPT_DIR/$PKG_NAME"
 fi
 
-echo "✅ macOS PKG 安装包创建完成:"
+echo "✅ macOS PKG installer created:"
 echo "  📦 PKG: $SCRIPT_DIR/$PKG_NAME"
 
-# 显示签名状态
+# Show signing status
 if [ -n "$SIGN_IDENTITY" ]; then
-    echo "🔐 验证签名:"
+    echo "🔐 Verifying signature:"
     codesign --verify --verbose=2 "$SCRIPT_DIR/$PKG_NAME" 2>&1 || true
 fi
