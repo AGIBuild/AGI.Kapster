@@ -6,8 +6,9 @@ using Avalonia.Platform;
 using Avalonia.VisualTree;
 using SkiaSharp;
 using Serilog;
+using AGI.Kapster.Desktop.Services.Capture;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Services.Capture.Platforms;
 
 /// <summary>
 /// macOS-specific screen capture implementation
@@ -26,7 +27,7 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
         return await Task.FromResult<SKBitmap?>(null);
     }
 
-    public async Task<SKBitmap?> CaptureWindowAsync(IntPtr windowHandle)
+    public async Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
     {
         // TODO: Implement using CGWindowListCreateImage with specific window ID
         Log.Warning("macOS window capture not yet implemented");
@@ -89,7 +90,7 @@ public class MacScreenCaptureStrategy : IScreenCaptureStrategy
         return await Task.FromResult<SKBitmap?>(null);
     }
 
-    public async Task<SKBitmap?> CaptureWindowRegionAsync(Avalonia.Rect windowRect, Avalonia.Visual window)
+    public async Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
     {
         try
         {

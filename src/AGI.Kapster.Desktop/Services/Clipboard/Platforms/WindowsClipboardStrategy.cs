@@ -4,8 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using SkiaSharp;
 using Serilog;
+using AGI.Kapster.Desktop.Services.Clipboard;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Services.Clipboard.Platforms;
 
 /// <summary>
 /// Windows-specific clipboard implementation using Win32 API
@@ -23,7 +24,7 @@ public class WindowsClipboardStrategy : IClipboardStrategy
             {
                 // Convert SKBitmap to Windows HBITMAP
                 var hBitmap = CreateHBitmapFromSKBitmap(bitmap);
-                if (hBitmap == IntPtr.Zero)
+                if (hBitmap == nint.Zero)
                 {
                     Log.Warning("Failed to create HBITMAP from SKBitmap");
                     return false;
@@ -56,23 +57,23 @@ public class WindowsClipboardStrategy : IClipboardStrategy
             {
                 // Allocate global memory for text
                 var hGlobal = Marshal.StringToHGlobalUni(text);
-                if (hGlobal == IntPtr.Zero) return false;
+                if (hGlobal == nint.Zero) return false;
 
                 bool result = false;
 
                 // Try to open clipboard with retries
                 for (int i = 0; i < 10 && !result; i++)
                 {
-                    if (OpenClipboard(IntPtr.Zero))
+                    if (OpenClipboard(nint.Zero))
                     {
                         try
                         {
                             EmptyClipboard();
                             var set = SetClipboardData(CF_UNICODETEXT, hGlobal);
-                            result = set != IntPtr.Zero;
+                            result = set != nint.Zero;
                             if (result)
                             {
-                                hGlobal = IntPtr.Zero; // Clipboard takes ownership
+                                hGlobal = nint.Zero; // Clipboard takes ownership
                             }
                         }
                         finally
@@ -88,7 +89,7 @@ public class WindowsClipboardStrategy : IClipboardStrategy
                 }
 
                 // Clean up if clipboard didn't take ownership
-                if (hGlobal != IntPtr.Zero)
+                if (hGlobal != nint.Zero)
                 {
                     Marshal.FreeHGlobal(hGlobal);
                 }
@@ -109,13 +110,13 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         {
             try
             {
-                if (!OpenClipboard(IntPtr.Zero))
+                if (!OpenClipboard(nint.Zero))
                     return null;
 
                 try
                 {
                     var hBitmap = GetClipboardData(CF_BITMAP);
-                    if (hBitmap == IntPtr.Zero)
+                    if (hBitmap == nint.Zero)
                         return null;
 
                     return ConvertHBitmapToSKBitmap(hBitmap);
@@ -139,13 +140,13 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         {
             try
             {
-                if (!OpenClipboard(IntPtr.Zero))
+                if (!OpenClipboard(nint.Zero))
                     return null;
 
                 try
                 {
                     var hGlobal = GetClipboardData(CF_UNICODETEXT);
-                    if (hGlobal == IntPtr.Zero)
+                    if (hGlobal == nint.Zero)
                         return null;
 
                     return Marshal.PtrToStringUni(hGlobal);
@@ -169,7 +170,7 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         {
             try
             {
-                if (!OpenClipboard(IntPtr.Zero))
+                if (!OpenClipboard(nint.Zero))
                     return false;
 
                 try
@@ -189,15 +190,15 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         });
     }
 
-    private IntPtr CreateHBitmapFromSKBitmap(SKBitmap skBitmap)
+    private nint CreateHBitmapFromSKBitmap(SKBitmap skBitmap)
     {
         var info = skBitmap.Info;
-        var hdc = GetDC(IntPtr.Zero);
+        var hdc = GetDC(nint.Zero);
         var hBitmap = CreateCompatibleBitmap(hdc, info.Width, info.Height);
-        ReleaseDC(IntPtr.Zero, hdc);
+        ReleaseDC(nint.Zero, hdc);
 
-        if (hBitmap == IntPtr.Zero)
-            return IntPtr.Zero;
+        if (hBitmap == nint.Zero)
+            return nint.Zero;
 
         // Copy pixel data
         var bmi = new BITMAPINFO
@@ -215,15 +216,15 @@ public class WindowsClipboardStrategy : IClipboardStrategy
 
         using (var pixmap = skBitmap.PeekPixels())
         {
-            hdc = GetDC(IntPtr.Zero);
+            hdc = GetDC(nint.Zero);
             SetDIBits(hdc, hBitmap, 0, (uint)info.Height, pixmap.GetPixels(), ref bmi, DIB_RGB_COLORS);
-            ReleaseDC(IntPtr.Zero, hdc);
+            ReleaseDC(nint.Zero, hdc);
         }
 
         return hBitmap;
     }
 
-    private SKBitmap? ConvertHBitmapToSKBitmap(IntPtr hBitmap)
+    private SKBitmap? ConvertHBitmapToSKBitmap(nint hBitmap)
     {
         if (GetObject(hBitmap, Marshal.SizeOf(typeof(BITMAP)), out BITMAP bm) == 0)
             return null;
@@ -246,28 +247,28 @@ public class WindowsClipboardStrategy : IClipboardStrategy
                 }
             };
 
-            var hdc = GetDC(IntPtr.Zero);
+            var hdc = GetDC(nint.Zero);
             GetDIBits(hdc, hBitmap, 0, (uint)bm.bmHeight, pixmap.GetPixels(), ref bmi, DIB_RGB_COLORS);
-            ReleaseDC(IntPtr.Zero, hdc);
+            ReleaseDC(nint.Zero, hdc);
         }
 
         return bitmap;
     }
 
-    private bool SetHBitmapToClipboard(IntPtr hBitmap)
+    private bool SetHBitmapToClipboard(nint hBitmap)
     {
         bool result = false;
 
         // Robust clipboard open with retries
         for (int i = 0; i < 10 && !result; i++)
         {
-            if (OpenClipboard(IntPtr.Zero))
+            if (OpenClipboard(nint.Zero))
             {
                 try
                 {
                     EmptyClipboard();
                     var set = SetClipboardData(CF_BITMAP, hBitmap);
-                    result = set != IntPtr.Zero;
+                    result = set != nint.Zero;
                     if (result)
                     {
                         // Clipboard takes ownership
@@ -296,7 +297,7 @@ public class WindowsClipboardStrategy : IClipboardStrategy
     private const int DIB_RGB_COLORS = 0;
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+    private static extern bool OpenClipboard(nint hWndNewOwner);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool CloseClipboard();
@@ -305,33 +306,33 @@ public class WindowsClipboardStrategy : IClipboardStrategy
     private static extern bool EmptyClipboard();
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+    private static extern nint SetClipboardData(uint uFormat, nint hMem);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr GetClipboardData(uint uFormat);
+    private static extern nint GetClipboardData(uint uFormat);
 
     [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int cx, int cy);
+    private static extern nint CreateCompatibleBitmap(nint hdc, int cx, int cy);
 
     [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(IntPtr hObject);
+    private static extern bool DeleteObject(nint hObject);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetDC(IntPtr hWnd);
+    private static extern nint GetDC(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    private static extern int ReleaseDC(nint hWnd, nint hDC);
 
     [DllImport("gdi32.dll")]
-    private static extern int GetObject(IntPtr hgdiobj, int cbBuffer, out BITMAP lpvObject);
+    private static extern int GetObject(nint hgdiobj, int cbBuffer, out BITMAP lpvObject);
 
     [DllImport("gdi32.dll")]
-    private static extern int SetDIBits(IntPtr hdc, IntPtr hbmp, uint uStartScan, uint cScanLines,
-        IntPtr lpvBits, ref BITMAPINFO lpbi, uint uUsage);
+    private static extern int SetDIBits(nint hdc, nint hbmp, uint uStartScan, uint cScanLines,
+        nint lpvBits, ref BITMAPINFO lpbi, uint uUsage);
 
     [DllImport("gdi32.dll")]
-    private static extern int GetDIBits(IntPtr hdc, IntPtr hbmp, uint uStartScan, uint cScanLines,
-        IntPtr lpvBits, ref BITMAPINFO lpbi, uint uUsage);
+    private static extern int GetDIBits(nint hdc, nint hbmp, uint uStartScan, uint cScanLines,
+        nint lpvBits, ref BITMAPINFO lpbi, uint uUsage);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BITMAP
@@ -342,7 +343,7 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         public int bmWidthBytes;
         public ushort bmPlanes;
         public ushort bmBitsPixel;
-        public IntPtr bmBits;
+        public nint bmBits;
     }
 
     [StructLayout(LayoutKind.Sequential)]

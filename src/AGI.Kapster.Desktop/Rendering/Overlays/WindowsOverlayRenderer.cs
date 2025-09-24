@@ -1,8 +1,10 @@
 using System;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.Overlay;
 using Avalonia;
 using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Rendering.Overlays;
 
 /// <summary>
 /// Windows-specific overlay renderer implementation

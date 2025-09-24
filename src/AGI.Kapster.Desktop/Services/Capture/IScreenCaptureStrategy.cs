@@ -5,7 +5,7 @@ using Avalonia.Platform;
 using Avalonia.VisualTree;
 using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay;
+namespace AGI.Kapster.Desktop.Services.Capture;
 
 /// <summary>
 /// Platform-specific screen capture strategy
@@ -20,7 +20,7 @@ public interface IScreenCaptureStrategy
     /// <summary>
     /// Captures a specific window
     /// </summary>
-    Task<SKBitmap?> CaptureWindowAsync(IntPtr windowHandle);
+    Task<SKBitmap?> CaptureWindowAsync(nint windowHandle);
 
     /// <summary>
     /// Captures a specific region
@@ -32,7 +32,7 @@ public interface IScreenCaptureStrategy
     /// </summary>
     /// <param name="windowRect">Rectangle in window coordinates</param>
     /// <param name="window">The window for coordinate conversion</param>
-    Task<SKBitmap?> CaptureWindowRegionAsync(Avalonia.Rect windowRect, Avalonia.Visual window);
+    Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window);
 
     /// <summary>
     /// Captures a UI element (if platform supports it)
@@ -78,7 +78,7 @@ public interface IElementInfo
     /// <summary>
     /// Gets the window handle containing this element
     /// </summary>
-    IntPtr WindowHandle { get; }
+    nint WindowHandle { get; }
 
     /// <summary>
     /// Gets platform-specific element data

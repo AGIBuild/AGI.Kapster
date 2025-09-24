@@ -7,8 +7,9 @@ using Avalonia.Platform;
 using Avalonia.VisualTree;
 using SkiaSharp;
 using Serilog;
+using AGI.Kapster.Desktop.Services.Capture;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Services.Capture.Platforms;
 
 /// <summary>
 /// Windows-specific screen capture implementation
@@ -40,7 +41,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         });
     }
 
-    public async Task<SKBitmap?> CaptureWindowAsync(IntPtr windowHandle)
+    public async Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
     {
         return await Task.Run(() =>
         {
@@ -76,7 +77,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         return await CaptureRegionAsync(element.Bounds);
     }
 
-    public async Task<SKBitmap?> CaptureWindowRegionAsync(Avalonia.Rect windowRect, Avalonia.Visual window)
+    public async Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
     {
         return await Task.Run(() =>
         {
@@ -114,7 +115,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
     {
         try
         {
-            var hdcSrc = GetDC(IntPtr.Zero);
+            var hdcSrc = GetDC(nint.Zero);
             var hdcDest = CreateCompatibleDC(hdcSrc);
             var hBitmap = CreateCompatibleBitmap(hdcSrc, region.Width, region.Height);
             var hOld = SelectObject(hdcDest, hBitmap);
@@ -123,7 +124,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
 
             SelectObject(hdcDest, hOld);
             DeleteDC(hdcDest);
-            ReleaseDC(IntPtr.Zero, hdcSrc);
+            ReleaseDC(nint.Zero, hdcSrc);
 
             var bitmap = ConvertHBitmapToSKBitmap(hBitmap);
             DeleteObject(hBitmap);
@@ -137,7 +138,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         }
     }
 
-    private SKBitmap? ConvertHBitmapToSKBitmap(IntPtr hBitmap)
+    private SKBitmap? ConvertHBitmapToSKBitmap(nint hBitmap)
     {
         var bmp = GetObject(hBitmap, Marshal.SizeOf(typeof(BITMAP)), out BITMAP bm);
         if (bmp == 0) return null;
@@ -160,9 +161,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                 }
             };
 
-            var hdcScreen = GetDC(IntPtr.Zero);
+            var hdcScreen = GetDC(nint.Zero);
             GetDIBits(hdcScreen, hBitmap, 0, (uint)bm.bmHeight, pixmap.GetPixels(), ref bmi, DIB_RGB_COLORS);
-            ReleaseDC(IntPtr.Zero, hdcScreen);
+            ReleaseDC(nint.Zero, hdcScreen);
         }
 
         return bitmap;
@@ -175,39 +176,39 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
     private const int DIB_RGB_COLORS = 0;
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetDC(IntPtr hWnd);
+    private static extern nint GetDC(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    private static extern int ReleaseDC(nint hWnd, nint hDC);
 
     [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+    private static extern nint CreateCompatibleDC(nint hdc);
 
     [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int width, int height);
+    private static extern nint CreateCompatibleBitmap(nint hdc, int width, int height);
 
     [DllImport("gdi32.dll")]
-    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+    private static extern nint SelectObject(nint hdc, nint hgdiobj);
 
     [DllImport("gdi32.dll")]
-    private static extern bool DeleteDC(IntPtr hdc);
+    private static extern bool DeleteDC(nint hdc);
 
     [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(IntPtr hObject);
+    private static extern bool DeleteObject(nint hObject);
 
     [DllImport("gdi32.dll")]
-    private static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int width, int height,
-        IntPtr hdcSrc, int xSrc, int ySrc, int rop);
+    private static extern bool BitBlt(nint hdcDest, int xDest, int yDest, int width, int height,
+        nint hdcSrc, int xSrc, int ySrc, int rop);
 
     [DllImport("user32.dll")]
-    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
     [DllImport("gdi32.dll")]
-    private static extern int GetObject(IntPtr hgdiobj, int cbBuffer, out BITMAP lpvObject);
+    private static extern int GetObject(nint hgdiobj, int cbBuffer, out BITMAP lpvObject);
 
     [DllImport("gdi32.dll")]
-    private static extern int GetDIBits(IntPtr hdc, IntPtr hbmp, uint uStartScan, uint cScanLines,
-        IntPtr lpvBits, ref BITMAPINFO lpbi, uint uUsage);
+    private static extern int GetDIBits(nint hdc, nint hbmp, uint uStartScan, uint cScanLines,
+        nint lpvBits, ref BITMAPINFO lpbi, uint uUsage);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -227,7 +228,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         public int bmWidthBytes;
         public ushort bmPlanes;
         public ushort bmBitsPixel;
-        public IntPtr bmBits;
+        public nint bmBits;
     }
 
     [StructLayout(LayoutKind.Sequential)]

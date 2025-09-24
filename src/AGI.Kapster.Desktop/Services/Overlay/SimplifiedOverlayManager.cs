@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.Clipboard;
+using AGI.Kapster.Desktop.Services.Export.Imaging;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;

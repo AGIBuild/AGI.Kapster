@@ -1,7 +1,9 @@
 using System;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.ElementDetection;
 using Avalonia;
 
-namespace AGI.Kapster.Desktop.Services.Overlay;
+namespace AGI.Kapster.Desktop.Services.Adapters;
 
 /// <summary>
 /// Adapter to convert DetectedElement to IElementInfo
@@ -25,7 +27,7 @@ public class ElementInfoAdapter : IElementInfo
 
     public string? Name => _detectedElement.Name;
 
-    public IntPtr WindowHandle => _detectedElement.WindowHandle;
+    public nint WindowHandle => _detectedElement.WindowHandle;
 
     public object? PlatformData => _detectedElement;
 

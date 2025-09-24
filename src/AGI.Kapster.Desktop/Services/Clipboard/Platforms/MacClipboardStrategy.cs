@@ -7,8 +7,10 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using SkiaSharp;
 using Serilog;
+using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Clipboard;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Services.Clipboard.Platforms;
 
 /// <summary>
 /// macOS-specific clipboard implementation

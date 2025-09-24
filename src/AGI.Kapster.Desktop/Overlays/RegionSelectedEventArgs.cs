@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Media.Imaging;
-using AGI.Kapster.Desktop.Services;
+using AGI.Kapster.Desktop.Services.ElementDetection;
 
 namespace AGI.Kapster.Desktop.Overlays;
 

@@ -2,7 +2,7 @@ using System.IO;
 using Avalonia.Media.Imaging;
 using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay;
+namespace AGI.Kapster.Desktop.Services.Export.Imaging;
 
 /// <summary>
 /// Helper class to convert between different bitmap formats

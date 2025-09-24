@@ -31,7 +31,7 @@ class BuildTasks : NukeBuild
     readonly bool SelfContained = true; // Required for Avalonia + SkiaSharp apps
 
     [Parameter("Single file publish")]
-    readonly bool SingleFile = false; // Disabled for Avalonia + SkiaSharp compatibility
+    readonly bool SingleFile = true; // Default to single-file publish for installers
 
     [Parameter("Enable IL trimming (use with caution for Avalonia apps)")]
     readonly bool Trim;
@@ -185,16 +185,29 @@ class BuildTasks : NukeBuild
                 var publishPath = PublishDirectory / rid;
                 Console.WriteLine($"📦 Publishing for {rid} to {publishPath}");
                 
-                DotNetPublish(s => s
-                    .SetProject(MainProject)
-                    .SetConfiguration(Configuration)
-                    .SetRuntime(rid)
-                    // Force self-contained publish for installers so runtime is bundled
-                    .SetSelfContained(true)
-                    .SetPublishSingleFile(SingleFile)
-                    .SetPublishTrimmed(Trim)
-                    .EnableNoRestore()
-                    .SetOutput(publishPath));
+                DotNetPublish(s =>
+                {
+                    // When publishing single-file, avoid trimming native code and enable self-extract so native
+                    // libraries (SkiaSharp, HarfBuzz, etc.) are available at runtime.
+                    var publishSettings = s
+                        .SetProject(MainProject)
+                        .SetConfiguration(Configuration)
+                        .SetRuntime(rid)
+                        .SetSelfContained(true)
+                        .SetPublishSingleFile(SingleFile)
+                        .SetPublishTrimmed(SingleFile ? false : Trim)
+                        .EnableNoRestore()
+                        .SetOutput(publishPath);
+
+                    if (SingleFile)
+                    {
+                        publishSettings = publishSettings
+                            .SetProperty("IncludeNativeLibrariesForSelfExtract", "true")
+                            .SetProperty("IncludeAllContentForSelfExtract", "true");
+                    }
+
+                    return publishSettings;
+                });
                     
                 Console.WriteLine($"✅ Published {rid} successfully to {publishPath}");
             }
@@ -341,26 +354,9 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
 
             // Check if WiX v4+ is available by running `wix --version`.
-            try
-            {
-                var process = ProcessTasks.StartProcess("wix", "--version", logOutput: false);
-                process.AssertZeroExitCode();
-                // If the command succeeded, use WiX v4 (executable 'wix')
-                try
-                {
-                    CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ MSI creation failed: {ex.Message}. Creating portable ZIP instead...");
-                    CreatePortableZip(publishPath, rid, version.File);
-                }
-            }
-            catch
-            {
-                Console.WriteLine("⚠️ WiX Toolset not found or not usable. Creating portable ZIP instead...");
-                CreatePortableZip(publishPath, rid, version.File);
-            }
+            var process = ProcessTasks.StartProcess("wix", "--version", logOutput: false);
+            process.AssertZeroExitCode();
+            CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
         }
         catch (Exception ex)
         {

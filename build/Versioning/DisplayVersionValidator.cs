@@ -1,7 +1,7 @@
 using System;
 using System.Text.RegularExpressions;
 
-namespace AGI.Kapster.Build.Versioning
+namespace Versioning
 {
     public static class DisplayVersionValidator
     {

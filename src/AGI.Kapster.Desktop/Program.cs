@@ -17,6 +17,11 @@ using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Views;
+using AGI.Kapster.Desktop.Services.Clipboard;
+using AGI.Kapster.Desktop.Rendering.Overlays;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.Capture.Platforms;
+using AGI.Kapster.Desktop.Services.Clipboard.Platforms;
 
 namespace AGI.Kapster.Desktop;
 

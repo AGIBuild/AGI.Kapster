@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay;
+namespace AGI.Kapster.Desktop.Services.Clipboard;
 
 /// <summary>
 /// Platform-specific clipboard strategy

@@ -5,6 +5,9 @@ using Avalonia.Platform;
 using AGI.Kapster.Desktop.Overlays;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using AGI.Kapster.Desktop.Services.ElementDetection;
+using AGI.Kapster.Desktop.Services.Adapters;
+using AGI.Kapster.Desktop.Services.Capture;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
 

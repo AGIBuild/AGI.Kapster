@@ -6,7 +6,7 @@ using System.Text;
 using Avalonia;
 using Serilog;
 
-namespace AGI.Kapster.Desktop.Services;
+namespace AGI.Kapster.Desktop.Services.ElementDetection;
 
 /// <summary>
 /// Windows implementation of element detector using UIAutomation and Win32 APIs
@@ -40,7 +40,7 @@ public class WindowsElementDetector : IElementDetector
         Log.Information("Detection mode changed to: {Mode}", _isWindowMode ? "Window" : "Element");
     }
 
-    public DetectedElement? DetectElementAt(int x, int y, IntPtr ignoreWindow = default)
+    public DetectedElement? DetectElementAt(int x, int y, nint ignoreWindow = default)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -66,34 +66,34 @@ public class WindowsElementDetector : IElementDetector
         }
     }
 
-    private DetectedElement? DetectWindowAt(int x, int y, IntPtr ignoreWindow = default)
+    private DetectedElement? DetectWindowAt(int x, int y, nint ignoreWindow = default)
     {
         var point = new POINT { X = x, Y = y };
 
         // First attempt: Get window directly
-        IntPtr hwnd = WindowFromPoint(point);
+        nint hwnd = WindowFromPoint(point);
 
-        if (hwnd == IntPtr.Zero)
+        if (hwnd == nint.Zero)
             return null;
 
         // If we hit the ignore window (overlay), try to find windows beneath it
-        if (ignoreWindow != IntPtr.Zero && (hwnd == ignoreWindow || IsChildWindow(hwnd, ignoreWindow)))
+        if (ignoreWindow != nint.Zero && (hwnd == ignoreWindow || IsChildWindow(hwnd, ignoreWindow)))
         {
             hwnd = FindWindowBeneathIgnored(x, y, ignoreWindow);
-            if (hwnd == IntPtr.Zero)
+            if (hwnd == nint.Zero)
                 return null;
         }
 
         // Check if this is a valid window that we want to select
-        IntPtr targetWindow = FindSelectableWindow(hwnd);
+        nint targetWindow = FindSelectableWindow(hwnd);
 
         return GetWindowInfo(targetWindow, true);
     }
 
-    private bool IsChildWindow(IntPtr hwnd, IntPtr parentHwnd)
+    private bool IsChildWindow(nint hwnd, nint parentHwnd)
     {
-        IntPtr parent = hwnd;
-        while (parent != IntPtr.Zero)
+        nint parent = hwnd;
+        while (parent != nint.Zero)
         {
             parent = GetParent(parent);
             if (parent == parentHwnd)
@@ -102,7 +102,7 @@ public class WindowsElementDetector : IElementDetector
         return false;
     }
 
-    private IntPtr FindWindowBeneathIgnored(int x, int y, IntPtr ignoreWindow)
+    private nint FindWindowBeneathIgnored(int x, int y, nint ignoreWindow)
     {
         // Temporarily hide the ignore window to detect what's beneath
         bool wasVisible = IsWindowVisible(ignoreWindow);
@@ -126,27 +126,27 @@ public class WindowsElementDetector : IElementDetector
         }
     }
 
-    private IntPtr FindSelectableWindow(IntPtr hwnd)
+    private nint FindSelectableWindow(nint hwnd)
     {
         // First, try the immediate window
         if (IsSelectableWindow(hwnd))
             return hwnd;
 
         // Then try parent windows until we find a selectable one
-        IntPtr parent = hwnd;
-        while (parent != IntPtr.Zero)
+        nint parent = hwnd;
+        while (parent != nint.Zero)
         {
             parent = GetParent(parent);
-            if (parent != IntPtr.Zero && IsSelectableWindow(parent))
+            if (parent != nint.Zero && IsSelectableWindow(parent))
                 return parent;
         }
 
         // Fallback to root window
-        IntPtr rootWindow = GetAncestor(hwnd, GA_ROOT);
-        return rootWindow != IntPtr.Zero ? rootWindow : hwnd;
+        nint rootWindow = GetAncestor(hwnd, GA_ROOT);
+        return rootWindow != nint.Zero ? rootWindow : hwnd;
     }
 
-    private bool IsSelectableWindow(IntPtr hwnd)
+    private bool IsSelectableWindow(nint hwnd)
     {
         // Check if window is visible
         if (!IsWindowVisible(hwnd))
@@ -175,7 +175,7 @@ public class WindowsElementDetector : IElementDetector
         return true;
     }
 
-    private DetectedElement? DetectUIElementAt(int x, int y, IntPtr ignoreWindow = default)
+    private DetectedElement? DetectUIElementAt(int x, int y, nint ignoreWindow = default)
     {
         try
         {
@@ -209,7 +209,7 @@ public class WindowsElementDetector : IElementDetector
         }
     }
 
-    private DetectedElement? FindUIElementAt(int x, int y, IntPtr windowHandle)
+    private DetectedElement? FindUIElementAt(int x, int y, nint windowHandle)
     {
         try
         {
@@ -225,7 +225,7 @@ public class WindowsElementDetector : IElementDetector
 
             // Strategy 2: Enhanced recursive child detection with multiple attempts
             var deepestChild = FindDeepestChildAtMultipass(x, y, windowHandle);
-            if (deepestChild != IntPtr.Zero && deepestChild != windowHandle)
+            if (deepestChild != nint.Zero && deepestChild != windowHandle)
             {
                 var childInfo = GetWindowInfo(deepestChild, false);
                 if (childInfo != null)
@@ -257,7 +257,7 @@ public class WindowsElementDetector : IElementDetector
                 Log.Debug("RealChildWindowFromPoint result: {Handle:X} (parent: {Parent:X})",
                     realChild.ToInt64(), windowHandle.ToInt64());
 
-                if (realChild != IntPtr.Zero && realChild != windowHandle)
+                if (realChild != nint.Zero && realChild != windowHandle)
                 {
                     var realChildInfo = GetWindowInfo(realChild, false);
                     if (realChildInfo != null)
@@ -300,13 +300,13 @@ public class WindowsElementDetector : IElementDetector
         return null;
     }
 
-    private IntPtr FindDeepestChildAtMultipass(int x, int y, IntPtr parentWindow)
+    private nint FindDeepestChildAtMultipass(int x, int y, nint parentWindow)
     {
         // Multi-pass approach for better element detection
 
         // Pass 1: Standard ChildWindowFromPoint
         var child1 = FindDeepestChildAt(x, y, parentWindow);
-        if (child1 != IntPtr.Zero && child1 != parentWindow && IsInteractiveElement(child1))
+        if (child1 != nint.Zero && child1 != parentWindow && IsInteractiveElement(child1))
             return child1;
 
         // Pass 2: Try with slight coordinate offsets (helps with border cases)
@@ -314,24 +314,24 @@ public class WindowsElementDetector : IElementDetector
         foreach (var (dx, dy) in offsets)
         {
             var child2 = FindDeepestChildAt(x + dx, y + dy, parentWindow);
-            if (child2 != IntPtr.Zero && child2 != parentWindow && child2 != child1 && IsInteractiveElement(child2))
+            if (child2 != nint.Zero && child2 != parentWindow && child2 != child1 && IsInteractiveElement(child2))
                 return child2;
         }
 
         return child1;
     }
 
-    private IntPtr FindDeepestChildAt(int x, int y, IntPtr parentWindow)
+    private nint FindDeepestChildAt(int x, int y, nint parentWindow)
     {
         var point = new POINT { X = x, Y = y };
 
         // Convert to client coordinates of the parent window
         if (!ScreenToClient(parentWindow, ref point))
-            return IntPtr.Zero;
+            return nint.Zero;
 
         // Get immediate child
         var child = ChildWindowFromPoint(parentWindow, point);
-        if (child == IntPtr.Zero || child == parentWindow)
+        if (child == nint.Zero || child == parentWindow)
             return parentWindow;
 
         // Recursively find deeper children
@@ -339,13 +339,13 @@ public class WindowsElementDetector : IElementDetector
         if (ScreenToClient(child, ref screenPoint))
         {
             var deeperChild = FindDeepestChildAt(x, y, child);
-            return deeperChild != IntPtr.Zero ? deeperChild : child;
+            return deeperChild != nint.Zero ? deeperChild : child;
         }
 
         return child;
     }
 
-    private bool IsInteractiveElement(IntPtr hwnd)
+    private bool IsInteractiveElement(nint hwnd)
     {
         if (!IsWindowVisible(hwnd))
             return false;
@@ -390,11 +390,11 @@ public class WindowsElementDetector : IElementDetector
         return !string.IsNullOrEmpty(title) && width < 500 && height < 200;
     }
 
-    private DetectedElement? FindChildByEnumeration(int x, int y, IntPtr parentWindow)
+    private DetectedElement? FindChildByEnumeration(int x, int y, nint parentWindow)
     {
         try
         {
-            var foundChild = IntPtr.Zero;
+            var foundChild = nint.Zero;
             var targetPoint = new POINT { X = x, Y = y };
 
             // Convert to parent window coordinates
@@ -429,9 +429,9 @@ public class WindowsElementDetector : IElementDetector
                     }
                 }
                 return true; // Continue enumeration
-            }, IntPtr.Zero);
+            }, nint.Zero);
 
-            if (foundChild != IntPtr.Zero)
+            if (foundChild != nint.Zero)
             {
                 return GetWindowInfo(foundChild, false);
             }
@@ -480,7 +480,7 @@ public class WindowsElementDetector : IElementDetector
         return reasonableSize && hasText;
     }
 
-    private DetectedElement? GetWindowInfo(IntPtr hwnd, bool isWindow)
+    private DetectedElement? GetWindowInfo(nint hwnd, bool isWindow)
     {
         try
         {
@@ -608,17 +608,17 @@ public class WindowsElementDetector : IElementDetector
         }
     }
 
-    private IntPtr GetElementWindowHandle(object element)
+    private nint GetElementWindowHandle(object element)
     {
         try
         {
             var method = element.GetType().GetMethod("GetCurrentPropertyValue");
             var result = method?.Invoke(element, new object[] { UIA_NativeWindowHandlePropertyId });
-            return result is int intValue ? new IntPtr(intValue) : IntPtr.Zero;
+            return result is int intValue ? new nint(intValue) : nint.Zero;
         }
         catch
         {
-            return IntPtr.Zero;
+            return nint.Zero;
         }
     }
 
@@ -654,45 +654,45 @@ public class WindowsElementDetector : IElementDetector
     private const uint GA_ROOT = 2;
 
     [DllImport("user32.dll")]
-    private static extern IntPtr WindowFromPoint(POINT point);
+    private static extern nint WindowFromPoint(POINT point);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+    private static extern nint GetAncestor(nint hwnd, uint gaFlags);
 
     [DllImport("user32.dll")]
-    private static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
+    private static extern bool GetWindowRect(nint hwnd, out RECT lpRect);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+    private static extern int GetWindowText(nint hWnd, StringBuilder lpString, int nMaxCount);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+    private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
     [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetParent(IntPtr hWnd);
+    private static extern nint GetParent(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool IsWindowVisible(IntPtr hWnd);
+    private static extern bool IsWindowVisible(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
 
     [DllImport("user32.dll")]
-    private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+    private static extern bool ScreenToClient(nint hWnd, ref POINT lpPoint);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr ChildWindowFromPoint(IntPtr hWndParent, POINT point);
+    private static extern nint ChildWindowFromPoint(nint hWndParent, POINT point);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr RealChildWindowFromPoint(IntPtr hWndParent, POINT point);
+    private static extern nint RealChildWindowFromPoint(nint hWndParent, POINT point);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+    private static extern bool EnumChildWindows(nint hWndParent, EnumChildProc lpEnumFunc, nint lParam);
 
-    private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+    private delegate bool EnumChildProc(nint hWnd, nint lParam);
 
     private const int SW_HIDE = 0;
     private const int SW_SHOW = 5;

@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
 
-namespace AGI.Kapster.Desktop.Services;
+namespace AGI.Kapster.Desktop.Services.ElementDetection;
 
 /// <summary>
 /// Detected UI element information
@@ -11,7 +11,7 @@ public record DetectedElement(
     string Name,
     string ClassName,
     string ProcessName,
-    IntPtr WindowHandle,
+    nint WindowHandle,
     bool IsWindow
 );
 
@@ -27,7 +27,7 @@ public interface IElementDetector : IDisposable
     /// <param name="y">Screen Y coordinate</param>
     /// <param name="ignoreWindow">Window handle to ignore during detection (e.g., overlay window)</param>
     /// <returns>Information about the detected element, or null if none found</returns>
-    DetectedElement? DetectElementAt(int x, int y, IntPtr ignoreWindow = default);
+    DetectedElement? DetectElementAt(int x, int y, nint ignoreWindow = default);
 
     /// <summary>
     /// Detects the UI element at the specified screen coordinates (convenience method)

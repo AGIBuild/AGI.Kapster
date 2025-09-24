@@ -1,5 +1,6 @@
 using System;
 using AGI.Kapster.Desktop.Models;
+using AGI.Kapster.Desktop.Services.ElementDetection;
 using Serilog;
 
 namespace AGI.Kapster.Desktop.Services.Overlay;

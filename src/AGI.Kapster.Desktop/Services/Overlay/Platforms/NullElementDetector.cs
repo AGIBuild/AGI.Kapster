@@ -1,8 +1,9 @@
 using System;
+using AGI.Kapster.Desktop.Services.ElementDetection;
 using Avalonia;
 using Serilog;
 
-namespace AGI.Kapster.Desktop.Services.ElementDetection;
+namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
 
 /// <summary>
 /// Null implementation of IElementDetector for platforms that don't support element detection
@@ -18,7 +19,7 @@ public class NullElementDetector : IElementDetector
         remove { /* No-op */ }
     }
 
-    public DetectedElement? DetectElementAt(int x, int y, IntPtr ignoreWindow = default)
+    public DetectedElement? DetectElementAt(int x, int y, nint ignoreWindow = default)
     {
         Log.Debug("Element detection not supported on this platform");
         return null;

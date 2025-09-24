@@ -55,45 +55,50 @@
     <!-- Desktop -->
     <StandardDirectory Id="DesktopFolder" />
 
-    <!-- Components: Main application files -->
+    <!-- Components: Main application files (only include files required for single-file installer) -->
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="AGI.Kapster.Desktop.exe" Guid="*">
         <File Id="AGI.Kapster.Desktop.exe" Source="$(var.SourceDir)\AGI.Kapster.Desktop.exe" KeyPath="yes" />
       </Component>
-      
-      <Component Id="AGI.Kapster.Desktop.dll" Guid="12345678-1234-1234-1234-123456789029">
-        <File Id="AGI.Kapster.Desktop.dll" Source="$(var.SourceDir)\AGI.Kapster.Desktop.dll" KeyPath="yes" />
+
+      <!-- PDB for debugging (optional) -->
+      <Component Id="PdbFile" Guid="12345678-1234-1234-1234-123456789035">
+        <File Id="AGI.Kapster.Desktop.pdb" Source="$(var.SourceDir)\AGI.Kapster.Desktop.pdb" KeyPath="no" />
       </Component>
-      
+
       <!-- Configuration files -->
       <Component Id="ConfigFiles" Guid="12345678-1234-1234-1234-123456789022">
         <File Id="appsettings.json" Source="$(var.SourceDir)\appsettings.json" KeyPath="yes" />
       </Component>
-      
+
       <Component Id="ConfigDevFiles" Guid="12345678-1234-1234-1234-123456789023">
         <File Id="appsettings.Development.json" Source="$(var.SourceDir)\appsettings.Development.json" KeyPath="yes" />
       </Component>
-      
+
       <Component Id="ConfigProdFiles" Guid="12345678-1234-1234-1234-123456789024">
         <File Id="appsettings.Production.json" Source="$(var.SourceDir)\appsettings.Production.json" KeyPath="yes" />
       </Component>
-      
+
       <!-- Application icon -->
       <Component Id="AppIcon" Guid="12345678-1234-1234-1234-123456789025">
         <File Id="logo.ico" Source="$(var.SourceDir)\..\..\..\src\AGI.Kapster.Desktop\logo.ico" KeyPath="yes" />
       </Component>
-      
-      <!-- Native libraries -->
+
+      <!-- Native libraries required at runtime -->
       <Component Id="HarfBuzzLibrary" Guid="12345678-1234-1234-1234-123456789026">
         <File Id="libHarfBuzzSharp.dll" Source="$(var.SourceDir)\libHarfBuzzSharp.dll" KeyPath="yes" />
       </Component>
-      
+
       <Component Id="SkiaSharpLibrary" Guid="12345678-1234-1234-1234-123456789027">
         <File Id="libSkiaSharp.dll" Source="$(var.SourceDir)\libSkiaSharp.dll" KeyPath="yes" />
       </Component>
-      
+
       <Component Id="UiohookLibrary" Guid="12345678-1234-1234-1234-123456789028">
         <File Id="uiohook.dll" Source="$(var.SourceDir)\uiohook.dll" KeyPath="yes" />
+      </Component>
+
+      <Component Id="AvLibGlesv2" Guid="12345678-1234-1234-1234-123456789036">
+        <File Id="av_libglesv2.dll" Source="$(var.SourceDir)\av_libglesv2.dll" KeyPath="no" />
       </Component>
     </ComponentGroup>
 
