@@ -250,20 +250,34 @@ public class SystemTrayService : ISystemTrayService
                 // In the future, this could be enhanced with platform-specific implementations
                 Log.Debug("System notification: {Title} - {Message}", title, message);
                 
-                // Update tooltip to show the notification
-                var originalTooltip = _trayIcon.ToolTipText;
-                _trayIcon.ToolTipText = $"🔔 {title}: {message}";
-                
-                // Reset after delay
-                System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
+                // Ensure UI operations run on the UI thread
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    try
                     {
                         if (_trayIcon != null)
                         {
-                            _trayIcon.ToolTipText = originalTooltip;
+                            // Update tooltip to show the notification
+                            var originalTooltip = _trayIcon.ToolTipText;
+                            _trayIcon.ToolTipText = $"🔔 {title}: {message}";
+                            
+                            // Reset after delay
+                            System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
+                            {
+                                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                                {
+                                    if (_trayIcon != null)
+                                    {
+                                        _trayIcon.ToolTipText = originalTooltip;
+                                    }
+                                });
+                            });
                         }
-                    });
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Failed to update tray icon tooltip on UI thread");
+                    }
                 });
             }
         }
