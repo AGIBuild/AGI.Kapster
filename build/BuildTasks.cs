@@ -564,8 +564,8 @@ class BuildTasks : NukeBuild
         catch (Exception ex)
         {
             Console.WriteLine($"❌ macOS package creation failed: {ex.Message}");
-                var version = GetFixedVersionOrFallback();
-                CreatePortableZip(publishPath, rid, version.File);
+            // Don't fallback to portable ZIP for macOS - PKG is required
+            throw;
         }
     }
 
