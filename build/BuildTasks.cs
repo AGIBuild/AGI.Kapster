@@ -694,21 +694,21 @@ class BuildTasks : NukeBuild
     {
         if (string.IsNullOrWhiteSpace(v)) return false;
 
-        // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
-        // Pattern groups: 1=year, 2=month, 3=day, 4=seconds
-        var pattern = @"^(\d{4})\.(?:0|[1-9]|1[0-2])\.(?:0|[1-9]|[12]\d|3[01])\.(\d{1,5})$";
+    // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
+    // Pattern groups: 1=year, 2=month, 3=day, 4=seconds
+    var pattern = @"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d{1,5})$";
         var m = System.Text.RegularExpressions.Regex.Match(v, pattern);
         if (!m.Success) return false;
 
-        // Validate numeric ranges for month, day and seconds
-        if (!int.TryParse(m.Groups[2].Value, out var month)) return false;
-        if (month < 1 || month > 12) return false;
+    // Validate numeric ranges for month, day and seconds
+    if (!int.TryParse(m.Groups[2].Value, out var month)) return false;
+    if (month < 1 || month > 12) return false;
 
-        if (!int.TryParse(m.Groups[3].Value, out var day)) return false;
-        if (day < 1 || day > 31) return false;
+    if (!int.TryParse(m.Groups[3].Value, out var day)) return false;
+    if (day < 1 || day > 31) return false;
 
-        if (!int.TryParse(m.Groups[4].Value, out var seconds)) return false;
-        if (seconds < 0 || seconds > 86399) return false;
+    if (!int.TryParse(m.Groups[4].Value, out var seconds)) return false;
+    if (seconds < 0 || seconds > 86399) return false;
 
         return true;
     }
