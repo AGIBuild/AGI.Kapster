@@ -76,7 +76,20 @@
       
       <!-- Application icon -->
       <Component Id="AppIcon" Guid="12345678-1234-1234-1234-123456789025">
-        <File Id="logo.ico" Source="$(var.SourceDir)\logo.ico" KeyPath="yes" />
+        <File Id="logo.ico" Source="$(var.SourceDir)\..\..\..\src\AGI.Captor.Desktop\logo.ico" KeyPath="yes" />
+      </Component>
+      
+      <!-- Native libraries -->
+      <Component Id="HarfBuzzLibrary" Guid="12345678-1234-1234-1234-123456789026">
+        <File Id="libHarfBuzzSharp.dll" Source="$(var.SourceDir)\libHarfBuzzSharp.dll" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="SkiaSharpLibrary" Guid="12345678-1234-1234-1234-123456789027">
+        <File Id="libSkiaSharp.dll" Source="$(var.SourceDir)\libSkiaSharp.dll" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="UiohookLibrary" Guid="12345678-1234-1234-1234-123456789028">
+        <File Id="uiohook.dll" Source="$(var.SourceDir)\uiohook.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
@@ -182,14 +195,8 @@
 
     <!-- Application icon -->
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
-    <Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\logo.ico" />
+    <Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\..\..\..\src\AGI.Captor.Desktop\logo.ico" />
 
-    <!-- System requirements check - optimized for more reasonable conditions -->
-    <!-- Windows 8.1+ (VersionNT >= 603) supports most modern applications -->
-    <Condition Message="This application requires Windows 8.1 or later. Please upgrade your operating system.">
-      Installed OR (VersionNT >= 603)
-    </Condition>
-    
     <!-- Self-contained .NET 9.0 applications do not require additional runtime checks -->
 
   </Package>
