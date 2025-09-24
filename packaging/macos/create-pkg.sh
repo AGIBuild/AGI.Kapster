@@ -4,7 +4,6 @@
 # 用法: ./create-pkg.sh <publish_directory> <version> [sign_identity]
 
 set -e
-set -x  # Enable debug output
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLISH_DIR="$1"
