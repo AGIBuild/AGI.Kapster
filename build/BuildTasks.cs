@@ -524,13 +524,15 @@ class BuildTasks : NukeBuild
                 {
                     Console.WriteLine("📦 Creating PKG package...");
 
-                    var args = $"{publishPath} {version.File}";
+                    var args = new[] { standardScript.ToString(), publishPath.ToString(), version.File };
                     if (!string.IsNullOrWhiteSpace(MacSigningIdentity))
-                        args += $" \"{MacSigningIdentity}\"";
+                    {
+                        args = args.Concat(new[] { MacSigningIdentity }).ToArray();
+                    }
 
                     using var process = ProcessTasks.StartProcess(
                         "bash",
-                        $"{standardScript} {args}",
+                        string.Join(" ", args),
                         MacPackagingDirectory);
 
                     process.AssertZeroExitCode();
