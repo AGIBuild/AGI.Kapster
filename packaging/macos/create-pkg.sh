@@ -112,29 +112,8 @@ if [ -n "$SIGN_IDENTITY" ]; then
     mv "$SCRIPT_DIR/${PKG_NAME%.pkg}-signed.pkg" "$SCRIPT_DIR/$PKG_NAME"
 fi
 
-echo "💿 创建 DMG 镜像..."
-
-# 创建DMG的临时目录
-DMG_TEMP_DIR="$(mktemp -d)"
-{
-  cp -R "$APP_DIR" "$DMG_TEMP_DIR/"
-  
-  # Create Applications link
-  ln -s /Applications "$DMG_TEMP_DIR/Applications"
-  
-  # Create DMG
-  hdiutil create -volname "$APP_NAME" \
-                 -srcfolder "$DMG_TEMP_DIR" \
-                 -ov -format UDZO \
-                 "$SCRIPT_DIR/$DMG_NAME"
-  
-  # Cleanup temporary files
-  rm -rf "$TEMP_DIR" "$DMG_TEMP_DIR"
-} >/dev/null 2>&1 || true
-
-echo "✅ macOS 安装包创建完成:"
+echo "✅ macOS PKG 安装包创建完成:"
 echo "  📦 PKG: $SCRIPT_DIR/$PKG_NAME"
-echo "  💿 DMG: $SCRIPT_DIR/$DMG_NAME"
 
 # 显示签名状态
 if [ -n "$SIGN_IDENTITY" ]; then

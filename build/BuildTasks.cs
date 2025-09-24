@@ -267,8 +267,8 @@ class BuildTasks : NukeBuild
     [Parameter("Apple Team ID for notarization")]
     readonly string TeamId;
 
-    [Parameter("macOS package formats to create (PKG,DMG,AppStore)")]
-    readonly string MacOSFormats = "PKG,DMG";
+    [Parameter("macOS package formats to create (PKG,DMG,AppStore,APP)")]
+    readonly string MacOSFormats = "PKG";
 
     [Parameter("Windows code signing certificate thumbprint")]
     readonly string WindowsSigningThumbprint;
@@ -516,15 +516,15 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"🍎 Creating macOS packages for {rid}...");
             Console.WriteLine($"   Requested formats: {string.Join(", ", requestedFormats)}");
 
-            // Create traditional PKG and DMG
-            if (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG"))
+            // Create PKG package only
+            if (requestedFormats.Contains("PKG"))
             {
                 var standardScript = MacPackagingDirectory / "create-pkg.sh";
                 if (File.Exists(standardScript))
                 {
-                    Console.WriteLine("📦 Creating standard PKG and DMG packages...");
+                    Console.WriteLine("📦 Creating PKG package...");
 
-                        var args = $"{publishPath} {version.File}";
+                    var args = $"{publishPath} {version.File}";
                     if (!string.IsNullOrWhiteSpace(MacSigningIdentity))
                         args += $" \"{MacSigningIdentity}\"";
 
@@ -535,79 +535,27 @@ class BuildTasks : NukeBuild
 
                     process.AssertZeroExitCode();
 
-                    // Move packages to output directory
-                    if (requestedFormats.Contains("PKG"))
+                    // Move PKG to output directory
+                    var pkgPattern = $"AGI.Captor-{version.File}.pkg";
+                    foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
                     {
-                            var pkgPattern = $"AGI.Captor-{version.File}.pkg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
-                    }
-
-                    if (requestedFormats.Contains("DMG"))
-                    {
-                            var dmgPattern = $"AGI.Captor-{version.File}.dmg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, dmgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
+                        var targetPath = PackageOutputDirectory / Path.GetFileName(file);
+                        File.Move(file, targetPath);
+                        Console.WriteLine($"✅ Created: {targetPath}");
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"⚠️ Standard macOS packaging script not found: {standardScript}");
+                    Console.WriteLine($"⚠️ macOS packaging script not found: {standardScript}");
                 }
             }
 
-            // Create App Store version
-            if (requestedFormats.Contains("APPSTORE"))
-            {
-                var appStoreScript = MacPackagingDirectory / "create-appstore.sh";
-                if (File.Exists(appStoreScript))
-                {
-                    if (string.IsNullOrWhiteSpace(MacSigningIdentity))
-                    {
-                        Console.WriteLine("⚠️ App Store packaging requires signing identity, skipping...");
-                    }
-                    else
-                    {
-                        Console.WriteLine("🏪 Creating App Store package...");
 
-                            var args = $"{publishPath} {version.File} \"{MacSigningIdentity}\"";
-
-                        using var process = ProcessTasks.StartProcess(
-                            "bash",
-                            $"{appStoreScript} {args}",
-                            MacPackagingDirectory);
-
-                        process.AssertZeroExitCode();
-
-                        // Move App Store package to output directory
-                            var appStorePkgPattern = $"AGI.Captor-{version.File}-AppStore.pkg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, appStorePkgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"⚠️ App Store packaging script not found: {appStoreScript}");
-                }
-            }
-
-            // Run notarization if credentials provided and not App Store only
+            // Run notarization if credentials provided
             if (!string.IsNullOrWhiteSpace(AppleId) &&
                 !string.IsNullOrWhiteSpace(AppPassword) &&
                 !string.IsNullOrWhiteSpace(TeamId) &&
-                (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG")))
+                requestedFormats.Contains("PKG"))
             {
                 Console.WriteLine("🔐 Starting notarization process...");
                     RunMacNotarization(version.File);
@@ -871,3 +819,4 @@ class BuildTasks : NukeBuild
             }
         });
 }
+
