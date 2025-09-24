@@ -28,10 +28,10 @@ class BuildTasks : NukeBuild
     readonly string Framework;
 
     [Parameter("Self-contained deployment")]
-    readonly bool SelfContained = true;
+    readonly bool SelfContained = true; // Required for Avalonia + SkiaSharp apps
 
     [Parameter("Single file publish")]
-    readonly bool SingleFile = false;
+    readonly bool SingleFile = false; // Disabled for Avalonia + SkiaSharp compatibility
 
     [Parameter("Enable IL trimming (use with caution for Avalonia apps)")]
     readonly bool Trim;

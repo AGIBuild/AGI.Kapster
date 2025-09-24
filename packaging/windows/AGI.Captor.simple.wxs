@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="AGI Captor"
+           Language="1033"
+           Version="!(bind.FileVersion.AGI.Captor.Desktop.exe)"
+           Manufacturer="AGI Build"
+           ProductCode="*"
+           UpgradeCode="12345678-1234-1234-1234-123456789012"
+           InstallerVersion="500"
+           Compressed="yes">
+    
+    <MajorUpgrade 
+      AllowSameVersionUpgrades="yes"
+      AllowDowngrades="no"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall the newer version first."
+      Schedule="afterInstallInitialize" />
+
+    <Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
+
+    <!-- 安装目录结构 -->
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="AGI Captor" />
+    </StandardDirectory>
+    
+    <!-- 开始菜单 -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="AGI Captor" />
+    </StandardDirectory>
+
+    <!-- 组件：主应用程序文件 -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="AGI.Captor.Desktop.exe" Guid="*">
+        <File Id="AGI.Captor.Desktop.exe" Source="$(var.SourceDir)\AGI.Captor.Desktop.exe" KeyPath="yes" />
+      </Component>
+      
+      <!-- 配置文件 -->
+      <Component Id="ConfigFiles" Guid="12345678-1234-1234-1234-123456789022">
+        <File Id="appsettings.json" Source="$(var.SourceDir)\appsettings.json" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="ConfigDevFiles" Guid="12345678-1234-1234-1234-123456789023">
+        <File Id="appsettings.Development.json" Source="$(var.SourceDir)\appsettings.Development.json" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="ConfigProdFiles" Guid="12345678-1234-1234-1234-123456789024">
+        <File Id="appsettings.Production.json" Source="$(var.SourceDir)\appsettings.Production.json" KeyPath="yes" />
+      </Component>
+      
+      <!-- 应用程序图标 -->
+      <Component Id="AppIcon" Guid="12345678-1234-1234-1234-123456789025">
+        <File Id="logo.ico" Source="$(var.SourceDir)\logo.ico" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- 开始菜单快捷方式 -->
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="AGI Captor"
+                Description="Advanced Screenshot and Annotation Tool"
+                Target="[INSTALLFOLDER]AGI.Captor.Desktop.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Captor" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- 功能定义 -->
+    <Feature Id="ProductFeature" Title="AGI Captor" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+    <!-- 应用程序图标 -->
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\logo.ico" />
+
+  </Package>
+</Wix>

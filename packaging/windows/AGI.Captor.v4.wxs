@@ -9,21 +9,21 @@
            InstallerVersion="500"
            Compressed="yes">
     
-    <!-- 升级配置：支持智能版本升级和同版本修复 -->
+    <!-- Upgrade configuration: Support intelligent version upgrades and same-version fixes -->
     <MajorUpgrade 
       AllowSameVersionUpgrades="yes"
       AllowDowngrades="no"
       DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall the newer version first."
       Schedule="afterInstallInitialize" />
 
-    <!-- 自定义操作：终止运行中的进程 -->
+    <!-- Custom action: Terminate running processes -->
     <CustomAction Id="CA_KillProcess"
                   Directory="INSTALLFOLDER"
                   Execute="immediate"
                   ExeCommand='taskkill /f /im "AGI.Captor.Desktop.exe" /t'
                   Return="ignore" />
 
-    <!-- 自定义操作：清理用户数据目录 -->
+    <!-- Custom action: Clean up user data directory -->
     <CustomAction Id="CA_RemoveUserData"
                   Directory="INSTALLFOLDER"
                   Execute="deferred"
@@ -31,7 +31,7 @@
                   ExeCommand='cmd.exe /c "if exist "%LOCALAPPDATA%\AGI.Captor" rmdir /s /q "%LOCALAPPDATA%\AGI.Captor""'
                   Return="ignore" />
 
-    <!-- 自定义操作：安装完成后启动应用程序 -->
+    <!-- Custom action: Launch application after installation -->
     <CustomAction Id="CA_LaunchApplication"
                   Directory="INSTALLFOLDER"
                   Execute="immediate"
@@ -39,29 +39,29 @@
                   ExeCommand='"[INSTALLFOLDER]AGI.Captor.Desktop.exe"'
                   Return="asyncNoWait" />
 
-    <!-- 媒体配置 -->
+    <!-- Media configuration -->
     <Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
 
-    <!-- 安装目录结构 -->
+    <!-- Installation directory structure -->
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="AGI Captor" />
     </StandardDirectory>
     
-    <!-- 开始菜单 -->
+    <!-- Start menu -->
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="AGI Captor" />
     </StandardDirectory>
     
-    <!-- 桌面 -->
+    <!-- Desktop -->
     <StandardDirectory Id="DesktopFolder" />
 
-    <!-- 组件：主应用程序文件 -->
+    <!-- Components: Main application files -->
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="AGI.Captor.Desktop.exe" Guid="*">
         <File Id="AGI.Captor.Desktop.exe" Source="$(var.SourceDir)\AGI.Captor.Desktop.exe" KeyPath="yes" />
       </Component>
       
-      <!-- 配置文件 -->
+      <!-- Configuration files -->
       <Component Id="ConfigFiles" Guid="12345678-1234-1234-1234-123456789022">
         <File Id="appsettings.json" Source="$(var.SourceDir)\appsettings.json" KeyPath="yes" />
       </Component>
@@ -74,13 +74,13 @@
         <File Id="appsettings.Production.json" Source="$(var.SourceDir)\appsettings.Production.json" KeyPath="yes" />
       </Component>
       
-      <!-- 应用程序图标 -->
+      <!-- Application icon -->
       <Component Id="AppIcon" Guid="12345678-1234-1234-1234-123456789025">
         <File Id="logo.ico" Source="$(var.SourceDir)\logo.ico" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
-    <!-- 开始菜单快捷方式 -->
+    <!-- Start menu shortcut -->
     <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
       <Shortcut Id="ApplicationStartMenuShortcut"
                 Name="AGI Captor"
@@ -91,7 +91,7 @@
       <RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Captor" Name="installed" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <!-- 桌面快捷方式 -->
+    <!-- Desktop shortcut -->
     <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
       <Shortcut Id="ApplicationDesktopShortcut"
                 Name="AGI Captor"
@@ -101,9 +101,9 @@
       <RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Captor" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <!-- 注册表项：文件关联和应用程序信息 -->
+    <!-- Registry entries: File associations and application information -->
     <Component Id="RegistryEntries" Directory="INSTALLFOLDER" Guid="*">
-      <!-- 应用程序注册 -->
+      <!-- Application registration -->
       <RegistryKey Root="HKLM" Key="SOFTWARE\AGI Build\AGI Captor">
         <RegistryValue Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" />
         <RegistryValue Name="Version" Type="string" Value="[ProductVersion]" />
@@ -113,7 +113,7 @@
         <RegistryValue Name="InstallDate" Type="string" Value="[Date]" />
       </RegistryKey>
       
-      <!-- 卸载程序注册：使用ProductCode作为唯一键名避免重复安装 -->
+      <!-- Uninstaller registration: Use ProductCode as unique key to avoid duplicate installation -->
       <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]">
         <RegistryValue Name="DisplayName" Type="string" Value="AGI Captor" />
         <RegistryValue Name="DisplayVersion" Type="string" Value="[ProductVersion]" />
@@ -135,7 +135,7 @@
         <RegistryValue Name="VersionMinor" Type="integer" Value="2" />
       </RegistryKey>
       
-      <!-- 用户数据保护标记 -->
+      <!-- User data protection flags -->
       <RegistryKey Root="HKLM" Key="SOFTWARE\AGI Build\AGI Captor\UserData">
         <RegistryValue Name="PreserveOnUninstall" Type="integer" Value="1" />
         <RegistryValue Name="BackupOnUpgrade" Type="integer" Value="1" />
@@ -143,7 +143,7 @@
       </RegistryKey>
     </Component>
 
-    <!-- 用户数据保护组件 -->
+    <!-- User data protection component -->
     <Component Id="UserDataProtection" Directory="INSTALLFOLDER" Guid="*">
       <RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Captor\UserData" 
                      Name="PreserveSettings" Type="integer" Value="1" KeyPath="yes" />
@@ -153,7 +153,7 @@
                      Name="Version" Type="string" Value="[ProductVersion]" />
     </Component>
 
-    <!-- 功能定义 -->
+    <!-- Feature definition -->
     <Feature Id="ProductFeature" Title="AGI Captor" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
@@ -162,34 +162,35 @@
       <ComponentRef Id="UserDataProtection" />
     </Feature>
 
-    <!-- 安装序列：定义自定义操作的执行顺序 -->
+    <!-- Installation sequence: Define execution order of custom actions -->
     <InstallExecuteSequence>
-      <!-- 安装前：终止运行中的进程 -->
+      <!-- Before installation: Terminate running processes -->
       <Custom Action="CA_KillProcess" Before="InstallValidate" Condition="NOT Installed" />
       
-      <!-- 安装完成后：默认启动应用程序 -->
+      <!-- After installation: Launch application by default -->
       <Custom Action="CA_LaunchApplication" After="InstallFinalize" Condition="NOT Installed" />
     </InstallExecuteSequence>
 
-    <!-- 属性定义 -->
+    <!-- Property definitions -->
     <Property Id="CLEANUP_USER_DATA" Value="0" />
 
-    <!-- 禁用某些安装选项以简化用户体验 -->
+    <!-- Disable certain installation options to simplify user experience -->
     <Property Id="ARPHELPLINK" Value="https://github.com/AGIBuild/AGI.Captor" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/AGIBuild/AGI.Captor" />
     <Property Id="ARPNOMODIFY" Value="1" />
     <Property Id="ARPNOREPAIR" Value="0" />
 
-    <!-- 应用程序图标 -->
+    <!-- Application icon -->
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
-    <Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\..\..\..\src\AGI.Captor.Desktop\logo.ico" />
+    <Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\logo.ico" />
 
-    <!-- 系统要求检查 - 优化为更合理的条件 -->
-    <!-- Windows 8.1+ (VersionNT >= 603) 支持大多数现代应用 -->
-    <Launch Condition="Installed OR (VersionNT >= 603)" 
-            Message="This application requires Windows 8.1 or later. Please upgrade your operating system." />
+    <!-- System requirements check - optimized for more reasonable conditions -->
+    <!-- Windows 8.1+ (VersionNT >= 603) supports most modern applications -->
+    <Condition Message="This application requires Windows 8.1 or later. Please upgrade your operating system.">
+      Installed OR (VersionNT >= 603)
+    </Condition>
     
-    <!-- 自包含部署的.NET 9.0应用不需要额外的运行时检查 -->
+    <!-- Self-contained .NET 9.0 applications do not require additional runtime checks -->
 
   </Package>
 </Wix>
