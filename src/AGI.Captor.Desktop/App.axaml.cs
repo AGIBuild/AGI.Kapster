@@ -167,6 +167,12 @@ public partial class App : Application
 
     private void ShowStartupNotification(ISystemTrayService trayService)
     {
+        // Start the notification process asynchronously without blocking
+        _ = ShowStartupNotificationAsync(trayService);
+    }
+
+    private async System.Threading.Tasks.Task ShowStartupNotificationAsync(ISystemTrayService trayService)
+    {
         try
         {
             // Get application version for notification
@@ -175,28 +181,20 @@ public partial class App : Application
 
             Log.Debug("Scheduling startup notification for version {Version}", versionString);
 
-            // Show startup notification with a slight delay to ensure everything is initialized
-            System.Threading.Tasks.Task.Delay(2000).ContinueWith(_ =>
-            {
-                try
-                {
-                    Log.Debug("Executing startup notification");
-                    
-                    trayService.ShowNotification(
-                        "AGI Captor Started", 
-                        $"Version {versionString} is running in the background.\nUse Alt+A to take screenshots or right-click the tray icon for options.");
-                    
-                    Log.Information("Startup notification displayed successfully");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Failed to show startup notification");
-                }
-            });
+            // Wait for initialization to complete
+            await System.Threading.Tasks.Task.Delay(2000);
+
+            Log.Debug("Executing startup notification");
+            
+            trayService.ShowNotification(
+                "AGI Captor Started", 
+                $"Version {versionString} is running in the background.\nUse Alt+A to take screenshots or right-click the tray icon for options.");
+            
+            Log.Information("Startup notification displayed successfully");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to schedule startup notification");
+            Log.Error(ex, "Failed to show startup notification");
         }
     }
 }

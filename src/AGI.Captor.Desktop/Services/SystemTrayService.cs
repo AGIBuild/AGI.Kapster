@@ -206,6 +206,12 @@ public class SystemTrayService : ISystemTrayService
 
     public void ShowNotification(string title, string message)
     {
+        // Start the notification process asynchronously
+        _ = ShowNotificationAsync(title, message);
+    }
+
+    private async System.Threading.Tasks.Task ShowNotificationAsync(string title, string message)
+    {
         try
         {
             // Log the notification with higher priority
@@ -214,51 +220,7 @@ public class SystemTrayService : ISystemTrayService
             // Ensure UI operations run on the UI thread
             if (_trayIcon != null)
             {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    try
-                    {
-                        if (_trayIcon != null)
-                        {
-                            // Store original tooltip
-                            var originalTooltip = _trayIcon.ToolTipText;
-                            
-                            // Show notification with more prominent display
-                            var notificationText = $"🔔 {title}\n{message}";
-                            _trayIcon.ToolTipText = notificationText;
-                            
-                            Log.Debug("Tray icon tooltip updated to: {NotificationText}", notificationText);
-                            
-                            // Reset after longer delay to ensure user sees it
-                            System.Threading.Tasks.Task.Delay(8000).ContinueWith(_ =>
-                            {
-                                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                                {
-                                    try
-                                    {
-                                        if (_trayIcon != null)
-                                        {
-                                            _trayIcon.ToolTipText = originalTooltip;
-                                            Log.Debug("Tray icon tooltip reset to original");
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Log.Error(ex, "Failed to reset tray icon tooltip");
-                                    }
-                                });
-                            });
-                        }
-                        else
-                        {
-                            Log.Warning("Tray icon is null when trying to show notification");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "Failed to update tray icon tooltip on UI thread");
-                    }
-                });
+                await ShowNotificationOnUIThread(title, message);
             }
             else
             {
@@ -268,6 +230,81 @@ public class SystemTrayService : ISystemTrayService
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
+        }
+    }
+
+    private async System.Threading.Tasks.Task ShowNotificationOnUIThread(string title, string message)
+    {
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                if (_trayIcon != null)
+                {
+                    // Store original tooltip
+                    var originalTooltip = _trayIcon.ToolTipText;
+                    
+                    // Show notification with more prominent display
+                    var notificationText = $"🔔 {title}\n{message}";
+                    _trayIcon.ToolTipText = notificationText;
+                    
+                    Log.Debug("Tray icon tooltip updated to: {NotificationText}", notificationText);
+                    
+                    // Start the reset process asynchronously
+                    _ = ResetTooltipAfterDelay(originalTooltip ?? "AGI Captor - Screenshot Tool");
+                }
+                else
+                {
+                    Log.Warning("Tray icon is null when trying to show notification");
+                }
+                
+                tcs.SetResult(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to update tray icon tooltip on UI thread");
+                tcs.SetException(ex);
+            }
+        });
+
+        await tcs.Task;
+    }
+
+    private async System.Threading.Tasks.Task ResetTooltipAfterDelay(string originalTooltip)
+    {
+        try
+        {
+            // Wait for the notification to be visible
+            await System.Threading.Tasks.Task.Delay(8000);
+
+            // Reset tooltip on UI thread
+            var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    if (_trayIcon != null)
+                    {
+                        _trayIcon.ToolTipText = originalTooltip;
+                        Log.Debug("Tray icon tooltip reset to original");
+                    }
+                    tcs.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Failed to reset tray icon tooltip");
+                    tcs.SetException(ex);
+                }
+            });
+
+            await tcs.Task;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to reset tooltip after delay");
         }
     }
 }
