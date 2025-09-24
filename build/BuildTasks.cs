@@ -31,7 +31,7 @@ class BuildTasks : NukeBuild
     readonly bool SelfContained = true;
 
     [Parameter("Single file publish")]
-    readonly bool SingleFile = true;
+    readonly bool SingleFile = false;
 
     [Parameter("Enable IL trimming (use with caution for Avalonia apps)")]
     readonly bool Trim;
