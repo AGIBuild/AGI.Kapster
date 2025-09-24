@@ -173,11 +173,15 @@ public partial class App : Application
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             var versionString = version?.ToString() ?? "Unknown";
 
+            Log.Debug("Scheduling startup notification for version {Version}", versionString);
+
             // Show startup notification with a slight delay to ensure everything is initialized
-            System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+            System.Threading.Tasks.Task.Delay(2000).ContinueWith(_ =>
             {
                 try
                 {
+                    Log.Debug("Executing startup notification");
+                    
                     trayService.ShowNotification(
                         "AGI Captor Started", 
                         $"Version {versionString} is running in the background.\nUse Alt+A to take screenshots or right-click the tray icon for options.");

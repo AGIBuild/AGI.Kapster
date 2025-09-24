@@ -208,8 +208,8 @@ public class SystemTrayService : ISystemTrayService
     {
         try
         {
-            // Log the notification
-            Log.Debug("Showing notification: {Title} - {Message}", title, message);
+            // Log the notification with higher priority
+            Log.Information("🔔 NOTIFICATION: {Title} - {Message}", title, message);
 
             // Ensure UI operations run on the UI thread
             if (_trayIcon != null)
@@ -220,21 +220,38 @@ public class SystemTrayService : ISystemTrayService
                     {
                         if (_trayIcon != null)
                         {
-                            // Update tooltip to show the notification
+                            // Store original tooltip
                             var originalTooltip = _trayIcon.ToolTipText;
-                            _trayIcon.ToolTipText = $"🔔 {title}: {message}";
                             
-                            // Reset after delay
-                            System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
+                            // Show notification with more prominent display
+                            var notificationText = $"🔔 {title}\n{message}";
+                            _trayIcon.ToolTipText = notificationText;
+                            
+                            Log.Debug("Tray icon tooltip updated to: {NotificationText}", notificationText);
+                            
+                            // Reset after longer delay to ensure user sees it
+                            System.Threading.Tasks.Task.Delay(8000).ContinueWith(_ =>
                             {
                                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                                 {
-                                    if (_trayIcon != null)
+                                    try
                                     {
-                                        _trayIcon.ToolTipText = originalTooltip;
+                                        if (_trayIcon != null)
+                                        {
+                                            _trayIcon.ToolTipText = originalTooltip;
+                                            Log.Debug("Tray icon tooltip reset to original");
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Log.Error(ex, "Failed to reset tray icon tooltip");
                                     }
                                 });
                             });
+                        }
+                        else
+                        {
+                            Log.Warning("Tray icon is null when trying to show notification");
                         }
                     }
                     catch (Exception ex)
@@ -242,6 +259,10 @@ public class SystemTrayService : ISystemTrayService
                         Log.Error(ex, "Failed to update tray icon tooltip on UI thread");
                     }
                 });
+            }
+            else
+            {
+                Log.Warning("Cannot show notification: tray icon is null");
             }
         }
         catch (Exception ex)
