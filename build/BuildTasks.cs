@@ -538,7 +538,7 @@ class BuildTasks : NukeBuild
                     process.AssertZeroExitCode();
 
                     // Move PKG to output directory
-                    var pkgPattern = $"AGI.Captor-{version.File}.pkg";
+                    var pkgPattern = $"AGI.Captor-{version.File}-{rid}.pkg";
                     foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
                     {
                         var targetPath = PackageOutputDirectory / Path.GetFileName(file);

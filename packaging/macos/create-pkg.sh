@@ -131,16 +131,33 @@ ls -la "$TEMP_DIR" || true
 echo "App contents:"
 ls -la "$APP_DIR" || true
 
+echo "PKG will be created at: $SCRIPT_DIR/$PKG_NAME"
+
+# Ensure the script directory exists
+mkdir -p "$SCRIPT_DIR"
+
 pkgbuild --root "$TEMP_DIR" \
          --identifier "$BUNDLE_ID" \
          --version "$VERSION" \
          --install-location "/Applications" \
-         "$SCRIPT_DIR/$PKG_NAME" || {
+         "$SCRIPT_DIR/$PKG_NAME" 2>&1 || {
     echo "❌ pkgbuild failed with exit code $?"
     echo "TEMP_DIR contents:"
     find "$TEMP_DIR" -type f -exec ls -la {} \; || true
+    echo "Script directory contents:"
+    ls -la "$SCRIPT_DIR" || true
     exit 1
 }
+
+# Verify PKG was created
+if [ ! -f "$SCRIPT_DIR/$PKG_NAME" ]; then
+    echo "❌ PKG file was not created: $SCRIPT_DIR/$PKG_NAME"
+    echo "Script directory contents:"
+    ls -la "$SCRIPT_DIR" || true
+    exit 1
+fi
+
+echo "✅ PKG file created successfully: $SCRIPT_DIR/$PKG_NAME"
 
 # Sign PKG if signing identity provided
 if [ -n "$SIGN_IDENTITY" ]; then
