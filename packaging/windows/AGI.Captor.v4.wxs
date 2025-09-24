@@ -61,11 +61,6 @@
         <File Id="AGI.Captor.Desktop.exe" Source="$(var.SourceDir)\AGI.Captor.Desktop.exe" KeyPath="yes" />
       </Component>
       
-      <!-- PDB 调试文件 (可选) -->
-      <Component Id="DebugFiles" Guid="12345678-1234-1234-1234-123456789021">
-        <File Id="AGI.Captor.Desktop.pdb" Source="$(var.SourceDir)\AGI.Captor.Desktop.pdb" KeyPath="yes" />
-      </Component>
-      
       <!-- 配置文件 -->
       <Component Id="ConfigFiles" Guid="12345678-1234-1234-1234-123456789022">
         <File Id="appsettings.json" Source="$(var.SourceDir)\appsettings.json" KeyPath="yes" />
@@ -79,24 +74,9 @@
         <File Id="appsettings.Production.json" Source="$(var.SourceDir)\appsettings.Production.json" KeyPath="yes" />
       </Component>
       
-      <!-- SkiaSharp 原生库 -->
-      <Component Id="SkiaSharpNative" Guid="12345678-1234-1234-1234-123456789025">
-        <File Id="libSkiaSharp.dll" Source="$(var.SourceDir)\libSkiaSharp.dll" KeyPath="yes" />
-      </Component>
-      
-      <!-- Avalonia 原生库 -->
-      <Component Id="AvaloniaNative" Guid="12345678-1234-1234-1234-123456789026">
-        <File Id="av_libglesv2.dll" Source="$(var.SourceDir)\av_libglesv2.dll" KeyPath="yes" />
-      </Component>
-      
-      <!-- HarfBuzz 库 -->
-      <Component Id="HarfBuzzNative" Guid="12345678-1234-1234-1234-123456789027">
-        <File Id="libHarfBuzzSharp.dll" Source="$(var.SourceDir)\libHarfBuzzSharp.dll" KeyPath="yes" />
-      </Component>
-      
-      <!-- Uiohook 库 -->
-      <Component Id="UiohookNative" Guid="12345678-1234-1234-1234-123456789028">
-        <File Id="uiohook.dll" Source="$(var.SourceDir)\uiohook.dll" KeyPath="yes" />
+      <!-- 应用程序图标 -->
+      <Component Id="AppIcon" Guid="12345678-1234-1234-1234-123456789025">
+        <File Id="logo.ico" Source="$(var.SourceDir)\logo.ico" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
