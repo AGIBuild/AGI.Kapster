@@ -175,7 +175,6 @@ public partial class App : Application
     {
         try
         {
-            // Get application version for notification
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             var versionString = version?.ToString() ?? "Unknown";
 
