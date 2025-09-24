@@ -135,6 +135,9 @@ class BuildTasks : NukeBuild
         {
             try
             {
+                // Ensure test solution is restored first so project.assets.json is generated
+                DotNetRestore(s => s.SetProjectFile(TestSolutionPath));
+
                 var testSettings = new DotNetTestSettings()
                     .SetProjectFile(TestSolutionPath)
                     .SetConfiguration(Configuration)
