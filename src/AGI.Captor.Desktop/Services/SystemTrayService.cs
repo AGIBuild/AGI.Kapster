@@ -243,19 +243,12 @@ public class SystemTrayService : ISystemTrayService
     {
         try
         {
-            var platform = AvaloniaLocator.Current.GetService<IRuntimePlatform>();
-            if (platform == null)
-            {
-                Log.Warning("Runtime platform not available, using fallback notification");
-                return;
-            }
-
-            // Use Avalonia's notification system if available
+            // Use a simple cross-platform notification approach
             if (_trayIcon != null)
             {
                 // For now, we'll use a simple approach that works across platforms
                 // In the future, this could be enhanced with platform-specific implementations
-                Log.Information("System notification: {Title} - {Message}", title, message);
+                Log.Debug("System notification: {Title} - {Message}", title, message);
                 
                 // Update tooltip to show the notification
                 var originalTooltip = _trayIcon.ToolTipText;
