@@ -61,6 +61,9 @@ class BuildTasks : NukeBuild
     Project MainProject => Solution?.AllProjects?.FirstOrDefault(p => p.Name == "AGI.Kapster.Desktop");
     Project[] TestProjects => Solution?.AllProjects?.Where(p => p.Name.Contains("Tests")).ToArray() ?? Array.Empty<Project>();
 
+    // Tests are located in a separate solution file
+    AbsolutePath TestSolutionPath => RootDirectory / "AGI.Kapster.Tests.sln";
+
     // Runtime detection
     string CurrentRuntimeIdentifier => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win-x64" :
         RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ?
@@ -133,11 +136,11 @@ class BuildTasks : NukeBuild
             try
             {
                 var testSettings = new DotNetTestSettings()
-                    .SetProjectFile(Solution)
+                    .SetProjectFile(TestSolutionPath)
                     .SetConfiguration(Configuration)
                     .SetResultsDirectory(TestResultsDirectory)
-                    .EnableNoBuild()
                     .EnableNoRestore();
+                // Tests always run from AGI.Kapster.Tests.sln (separate tests solution)
 
                 if (!string.IsNullOrWhiteSpace(TestFilter))
                     testSettings = testSettings.SetFilter(TestFilter);
@@ -256,6 +259,10 @@ class BuildTasks : NukeBuild
                         Console.WriteLine($"  - {test.Name}");
                 }
             }
+
+            // Show test solution path (tests are in AGI.Kapster.Tests.sln)
+            Console.WriteLine();
+            Console.WriteLine($"ℹ️ Test solution: {TestSolutionPath}");
 
             var version = GetFixedVersionOrFallback();
             Console.WriteLine();
