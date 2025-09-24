@@ -25,8 +25,22 @@ fi
 # 配置
 APP_NAME="AGI Captor"
 BUNDLE_ID="com.agi.captor"
-PKG_NAME="AGI.Captor-${VERSION}.pkg"
-DMG_NAME="AGI.Captor-${VERSION}.dmg"
+# Get architecture from environment or detect from path
+ARCH=""
+if [[ "$PUBLISH_DIR" == *"osx-arm64"* ]]; then
+    ARCH="osx-arm64"
+elif [[ "$PUBLISH_DIR" == *"osx-x64"* ]]; then
+    ARCH="osx-x64"
+else
+    # Fallback: detect from system
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "arm64" ]]; then
+        ARCH="osx-arm64"
+    else
+        ARCH="osx-x64"
+    fi
+fi
+PKG_NAME="AGI.Captor-${VERSION}-${ARCH}.pkg"
 TEMP_DIR="$(mktemp -d)"
 APP_DIR="$TEMP_DIR/$APP_NAME.app"
 
