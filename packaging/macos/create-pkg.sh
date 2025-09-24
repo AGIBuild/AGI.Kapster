@@ -4,6 +4,7 @@
 # 用法: ./create-pkg.sh <publish_directory> <version> [sign_identity]
 
 set -e
+set -x  # Enable debug output
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLISH_DIR="$1"
@@ -33,17 +34,28 @@ APP_DIR="$TEMP_DIR/$APP_NAME.app"
 echo "🔨 创建 macOS 应用程序包..."
 
 # 创建.app结构
-{
-  mkdir -p "$APP_DIR/Contents/MacOS"
-  mkdir -p "$APP_DIR/Contents/Resources"
-  
-  # Copy executable file
-  cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
-  chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
-  
-  # Copy other files
-  cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/"
-} >/dev/null 2>&1 || true
+echo "Creating .app structure..."
+mkdir -p "$APP_DIR/Contents/MacOS"
+mkdir -p "$APP_DIR/Contents/Resources"
+
+echo "Publish directory contents:"
+ls -la "$PUBLISH_DIR" || true
+
+# Copy executable file
+echo "Copying executable..."
+if [ ! -f "$PUBLISH_DIR/AGI.Captor.Desktop" ]; then
+    echo "❌ Executable not found: $PUBLISH_DIR/AGI.Captor.Desktop"
+    exit 1
+fi
+cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
+chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
+
+# Copy other files
+echo "Copying other files..."
+cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/" || {
+    echo "❌ Failed to copy files from $PUBLISH_DIR"
+    exit 1
+}
 
 # 创建Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
@@ -99,11 +111,23 @@ fi
 echo "📦 创建 PKG 安装包..."
 
 # 创建PKG
+echo "Creating PKG with pkgbuild..."
+echo "Root directory: $TEMP_DIR"
+echo "Contents:"
+ls -la "$TEMP_DIR" || true
+echo "App contents:"
+ls -la "$APP_DIR" || true
+
 pkgbuild --root "$TEMP_DIR" \
          --identifier "$BUNDLE_ID" \
          --version "$VERSION" \
          --install-location "/Applications" \
-         "$SCRIPT_DIR/$PKG_NAME"
+         "$SCRIPT_DIR/$PKG_NAME" || {
+    echo "❌ pkgbuild failed with exit code $?"
+    echo "TEMP_DIR contents:"
+    find "$TEMP_DIR" -type f -exec ls -la {} \; || true
+    exit 1
+}
 
 # 如果提供了签名身份，签名PKG
 if [ -n "$SIGN_IDENTITY" ]; then
