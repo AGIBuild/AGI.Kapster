@@ -414,18 +414,7 @@ class BuildTasks : NukeBuild
         {
             Console.WriteLine($"🔨 Compiling WiX source...");
 
-            // Step 1: Compile .wxs to .wixobj
-            var compileArgs = new List<string>
-            {
-                "build",
-                "-arch", rid == "win-arm64" ? "arm64" : "x64",
-                "-define", $"SourceDir={publishPath}",
-                "-define", $"ProductVersion={version.FileVersion}",
-                "-out", packagePath,
-                wxsFile
-            };
-
-            // Create ProcessStartInfo for safer argument handling
+            // Step 1: Compile .wxs to MSI using WiX v4
             var processInfo = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "wix",
@@ -435,18 +424,14 @@ class BuildTasks : NukeBuild
                 CreateNoWindow = true
             };
 
-            // Add arguments safely without manual escaping using foreach for better readability
+            // WiX v4 build command with correct parameters
             var wixArgs = new string[]
             {
                 "build",
-                "-arch",
-                rid == "win-arm64" ? "arm64" : "x64",
-                "-define",
-                $"SourceDir={publishPath}",
-                "-define",
-                $"ProductVersion={version.FileVersion}",
-                "-out",
-                packagePath,
+                "-arch", rid == "win-arm64" ? "arm64" : "x64",
+                "-define", $"SourceDir={publishPath}",
+                "-define", $"ProductVersion={version.FileVersion}",
+                "-out", packagePath,
                 wxsFile
             };
 

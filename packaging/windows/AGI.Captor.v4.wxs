@@ -61,39 +61,9 @@
         <File Id="AGI.Captor.Desktop.exe" Source="$(var.SourceDir)\AGI.Captor.Desktop.exe" KeyPath="yes" />
       </Component>
       
-      <!-- PDB 调试文件 -->
+      <!-- PDB 调试文件 (可选) -->
       <Component Id="DebugFiles" Guid="12345678-1234-1234-1234-123456789021">
         <File Id="AGI.Captor.Desktop.pdb" Source="$(var.SourceDir)\AGI.Captor.Desktop.pdb" KeyPath="yes" />
-      </Component>
-      
-      <!-- 配置文件 -->
-      <Component Id="ConfigFiles" Guid="12345678-1234-1234-1234-123456789022">
-        <File Id="appsettings.json" Source="$(var.SourceDir)\appsettings.json" KeyPath="yes" />
-      </Component>
-      
-      <Component Id="ConfigDevFiles" Guid="12345678-1234-1234-1234-123456789023">
-        <File Id="appsettings.Development.json" Source="$(var.SourceDir)\appsettings.Development.json" KeyPath="yes" />
-      </Component>
-      
-      <Component Id="ConfigProdFiles" Guid="12345678-1234-1234-1234-123456789024">
-        <File Id="appsettings.Production.json" Source="$(var.SourceDir)\appsettings.Production.json" KeyPath="yes" />
-      </Component>
-      
-      <!-- 动态库文件 -->
-      <Component Id="AvaloniaLibrary" Guid="12345678-1234-1234-1234-123456789025">
-        <File Id="av_libglesv2.dll" Source="$(var.SourceDir)\av_libglesv2.dll" KeyPath="yes" />
-      </Component>
-      
-      <Component Id="HarfBuzzLibrary" Guid="12345678-1234-1234-1234-123456789026">
-        <File Id="libHarfBuzzSharp.dll" Source="$(var.SourceDir)\libHarfBuzzSharp.dll" KeyPath="yes" />
-      </Component>
-      
-      <Component Id="SkiaSharpLibrary" Guid="12345678-1234-1234-1234-123456789027">
-        <File Id="libSkiaSharp.dll" Source="$(var.SourceDir)\libSkiaSharp.dll" KeyPath="yes" />
-      </Component>
-      
-      <Component Id="UiohookLibrary" Guid="12345678-1234-1234-1234-123456789028">
-        <File Id="uiohook.dll" Source="$(var.SourceDir)\uiohook.dll" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
