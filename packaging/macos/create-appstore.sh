@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AGI Captor macOS App Store版本创建脚本
+# AGI Kapster macOS App Store版本创建脚本
 # 用法: ./create-appstore.sh <publish_directory> <version> <signing_identity>
 
 set -e
@@ -30,9 +30,9 @@ if [ ! -f "$ENTITLEMENTS_FILE" ]; then
 fi
 
 # 配置
-APP_NAME="AGI Captor"
-BUNDLE_ID="com.agi.captor"
-PKG_NAME="AGI.Captor-${VERSION}-AppStore.pkg"
+APP_NAME="AGI Kapster"
+BUNDLE_ID="com.AGI.Kapster"
+PKG_NAME="AGI.Kapster-${VERSION}-AppStore.pkg"
 TEMP_DIR="$(mktemp -d)"
 APP_DIR="$TEMP_DIR/$APP_NAME.app"
 
@@ -44,8 +44,8 @@ echo "🏪 创建 App Store 版本..."
   mkdir -p "$APP_DIR/Contents/Resources"
   
   # Copy executable file
-  cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
-  chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
+  cp "$PUBLISH_DIR/AGI.Kapster.Desktop" "$APP_DIR/Contents/MacOS/"
+  chmod +x "$APP_DIR/Contents/MacOS/AGI.Kapster.Desktop"
   
   # Copy other files
   cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/"
@@ -60,7 +60,7 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <key>CFBundleDisplayName</key>
     <string>$APP_NAME</string>
     <key>CFBundleExecutable</key>
-    <string>AGI.Captor.Desktop</string>
+    <string>AGI.Kapster.Desktop</string>
     <key>CFBundleIconFile</key>
     <string>logo.icns</string>
     <key>CFBundleIdentifier</key>
@@ -92,11 +92,11 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     
     <!-- 隐私使用说明 -->
     <key>NSCameraUsageDescription</key>
-    <string>AGI Captor needs camera access for screen recording functionality.</string>
+    <string>AGI Kapster needs camera access for screen recording functionality.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>AGI Captor needs microphone access to record audio during screen capture.</string>
+    <string>AGI Kapster needs microphone access to record audio during screen capture.</string>
     <key>NSScreenCaptureDescription</key>
-    <string>AGI Captor is a screen capture application that requires screen recording permissions.</string>
+    <string>AGI Kapster is a screen capture application that requires screen recording permissions.</string>
     
     <!-- 沙盒标识 -->
     <key>LSApplicationSecondsOfLaunchTime</key>
@@ -106,9 +106,9 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 EOF
 
 # 复制图标（如果存在）
-if [ -f "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" ]; then
-    cp "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
-elif [ -f "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" ]; then
+if [ -f "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" ]; then
+    cp "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
+elif [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
     echo "⚠️  找到.ico文件但需要.icns文件，App Store版本需要正确的图标格式"
 fi
 

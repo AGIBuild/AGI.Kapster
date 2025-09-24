@@ -1,13 +1,13 @@
 <Project>
   <PropertyGroup>
-    <OutputName>AGI.Captor</OutputName>
+    <OutputName>AGI.Kapster</OutputName>
     <OutputType>Package</OutputType>
     <WixToolPath Condition="'$(WixToolPath)' == ''">$(MSBuildThisFileDirectory)tools\</WixToolPath>
     <WixExtDir Condition="'$(WixExtDir)' == ''">$(MSBuildThisFileDirectory)tools\</WixExtDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AGI.Captor.wxs" />
+    <Compile Include="AGI.Kapster.wxs" />
   </ItemGroup>
 
   <ItemGroup>

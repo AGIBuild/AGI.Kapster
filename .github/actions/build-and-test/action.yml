@@ -1,6 +1,6 @@
 name: 'Build and Test'
 description: 'Common build and test operations for .NET projects'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   configuration:

@@ -1,6 +1,6 @@
 name: 'Setup Complete Environment'
 description: 'Complete environment setup including .NET, caching, and global configurations'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   fetch-depth:

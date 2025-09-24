@@ -1,6 +1,6 @@
 name: 'Publish Package'
 description: 'Build and package applications for specific runtime'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   runtime-id:

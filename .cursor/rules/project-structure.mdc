@@ -1,15 +1,15 @@
 ---
 alwaysApply: true
-description: AGI.Captor project structure and navigation guide
+description: AGI.Kapster project structure and navigation guide
 ---
 
-# AGI.Captor Project Structure
+# AGI.Kapster Project Structure
 
 This is a .NET 9 cross-platform screenshot and annotation tool built with Avalonia UI.
 
 ## Entry Points
-- Main application: [src/AGI.Captor.App/Program.cs](mdc:src/AGI.Captor.App/Program.cs)
-- Application startup: [src/AGI.Captor.App/App.axaml.cs](mdc:src/AGI.Captor.App/App.axaml.cs)
+- Main application: [src/AGI.Kapster.App/Program.cs](mdc:src/AGI.Kapster.App/Program.cs)
+- Application startup: [src/AGI.Kapster.App/App.axaml.cs](mdc:src/AGI.Kapster.App/App.axaml.cs)
 
 ## Core Architecture
 - **MVVM Pattern**: Using CommunityToolkit.Mvvm
@@ -28,14 +28,14 @@ This is a .NET 9 cross-platform screenshot and annotation tool built with Avalon
 - **Rendering/**: Graphics rendering and annotation drawing
 
 ## Critical Services
-- [ISettingsService](mdc:src/AGI.Captor.App/Services/ISettingsService.cs): Settings management (transient lifecycle)
-- [IHotkeyProvider](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyProvider.cs): Global hotkey registration
-- [IOverlayController](mdc:src/AGI.Captor.App/Services/IOverlayController.cs): Screenshot overlay management
-- [IAnnotationService](mdc:src/AGI.Captor.App/Services/AnnotationService.cs): Drawing tools and annotation logic
-- [IExportService](mdc:src/AGI.Captor.App/Services/ExportService.cs): Image encoding and file export
+- [ISettingsService](mdc:src/AGI.Kapster.App/Services/ISettingsService.cs): Settings management (transient lifecycle)
+- [IHotkeyProvider](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyProvider.cs): Global hotkey registration
+- [IOverlayController](mdc:src/AGI.Kapster.App/Services/IOverlayController.cs): Screenshot overlay management
+- [IAnnotationService](mdc:src/AGI.Kapster.App/Services/AnnotationService.cs): Drawing tools and annotation logic
+- [IExportService](mdc:src/AGI.Kapster.App/Services/ExportService.cs): Image encoding and file export
 
 ## Main Windows
-- [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Screenshot capture overlay
-- [NewAnnotationOverlay](mdc:src/AGI.Captor.App/Overlays/NewAnnotationOverlay.cs): Drawing canvas
-- [NewAnnotationToolbar](mdc:src/AGI.Captor.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
-- [SettingsWindow](mdc:src/AGI.Captor.App/Views/SettingsWindow.axaml.cs): Application settings UI
+- [OverlayWindow](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs): Screenshot capture overlay
+- [NewAnnotationOverlay](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationOverlay.cs): Drawing canvas
+- [NewAnnotationToolbar](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
+- [SettingsWindow](mdc:src/AGI.Kapster.App/Views/SettingsWindow.axaml.cs): Application settings UI

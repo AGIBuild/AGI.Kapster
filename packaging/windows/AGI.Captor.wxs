@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="AGI Captor"
+  <Package Name="AGI Kapster"
            Language="1033"
            Version="1.2.0.0"
            Manufacturer="AGI Build"
@@ -13,7 +13,7 @@
     <MediaTemplate EmbedCab="yes" />
 
     <!-- 功能配置 -->
-    <Feature Id="ProductFeature" Title="AGI Captor" Level="1">
+    <Feature Id="ProductFeature" Title="AGI Kapster" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="DesktopShortcut" />
@@ -22,12 +22,12 @@
     <!-- 安装目录结构 -->
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="AGI Captor" />
+        <Directory Id="INSTALLFOLDER" Name="AGI Kapster" />
       </Directory>
       
       <!-- 开始菜单 -->
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="AGI Captor" />
+        <Directory Id="ApplicationProgramsFolder" Name="AGI Kapster" />
       </Directory>
       
       <!-- 桌面 -->
@@ -38,14 +38,14 @@
     <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="ApplicationShortcut" Guid="12345678-1234-1234-1234-123456789013">
         <Shortcut Id="ApplicationStartMenuShortcut"
-                  Name="AGI Captor"
+                  Name="AGI Kapster"
                   Description="Advanced Screenshot and Annotation Tool"
-                  Target="[#AGI.Captor.Desktop.exe]"
+                  Target="[#AGI.Kapster.Desktop.exe]"
                   WorkingDirectory="INSTALLFOLDER"
-                  Icon="AGI.Captor.ico" />
+                  Icon="AGI.Kapster.ico" />
         <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue Root="HKCU" 
-                       Key="Software\AGI\Captor" 
+                       Key="Software\AGI\Kapster" 
                        Name="installed" 
                        Type="integer" 
                        Value="1" 
@@ -57,13 +57,13 @@
     <DirectoryRef Id="DesktopFolder">
       <Component Id="DesktopShortcut" Guid="12345678-1234-1234-1234-123456789014">
         <Shortcut Id="ApplicationDesktopShortcut"
-                  Name="AGI Captor"
+                  Name="AGI Kapster"
                   Description="Advanced Screenshot and Annotation Tool"
-                  Target="[#AGI.Captor.Desktop.exe]"
+                  Target="[#AGI.Kapster.Desktop.exe]"
                   WorkingDirectory="INSTALLFOLDER"
-                  Icon="AGI.Captor.ico" />
+                  Icon="AGI.Kapster.ico" />
         <RegistryValue Root="HKCU" 
-                       Key="Software\AGI\Captor" 
+                       Key="Software\AGI\Kapster" 
                        Name="desktop_shortcut" 
                        Type="integer" 
                        Value="1" 
@@ -72,28 +72,28 @@
     </DirectoryRef>
 
     <!-- 图标 -->
-    <Icon Id="AGI.Captor.ico" SourceFile="$(var.SourceDir)\logo.ico" />
+    <Icon Id="AGI.Kapster.ico" SourceFile="$(var.SourceDir)\logo.ico" />
 
     <!-- 注册表项 -->
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="RegistryEntries" Guid="12345678-1234-1234-1234-123456789015">
-        <RegistryKey Root="HKLM" Key="SOFTWARE\AGI\Captor">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\AGI\Kapster">
           <RegistryValue Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" />
           <RegistryValue Name="Version" Type="string" Value="1.2.0" />
         </RegistryKey>
         
         <!-- 文件关联（可选） -->
         <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\.agicap">
-          <RegistryValue Type="string" Value="AGI.Captor.Document" />
+          <RegistryValue Type="string" Value="AGI.Kapster.Document" />
         </RegistryKey>
         
-        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\AGI.Captor.Document">
-          <RegistryValue Type="string" Value="AGI Captor Document" />
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\AGI.Kapster.Document">
+          <RegistryValue Type="string" Value="AGI Kapster Document" />
           <RegistryKey Key="DefaultIcon">
-            <RegistryValue Type="string" Value="[INSTALLFOLDER]AGI.Captor.Desktop.exe,0" />
+            <RegistryValue Type="string" Value="[INSTALLFOLDER]AGI.Kapster.Desktop.exe,0" />
           </RegistryKey>
           <RegistryKey Key="shell\open\command">
-            <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]AGI.Captor.Desktop.exe&quot; &quot;%1&quot;" />
+            <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]AGI.Kapster.Desktop.exe&quot; &quot;%1&quot;" />
           </RegistryKey>
         </RegistryKey>
       </Component>
@@ -111,8 +111,8 @@
     
     <!-- 自定义属性 -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <Property Id="ARPPRODUCTICON" Value="AGI.Captor.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/AGIBuild/AGI.Captor" />
+    <Property Id="ARPPRODUCTICON" Value="AGI.Kapster.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/AGIBuild/AGI.Kapster" />
     <Property Id="ARPNOMODIFY" Value="1" />
   </Product>
 

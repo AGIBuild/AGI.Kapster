@@ -1,4 +1,4 @@
-# AGI.Captor MSI Package Verification Script
+# AGI.Kapster MSI Package Verification Script
 # 验证生成的MSI安装包的基本属性和完整性
 
 param(
@@ -6,7 +6,7 @@ param(
     [string]$MsiPath
 )
 
-Write-Host "🔍 AGI.Captor MSI Package Verification" -ForegroundColor Cyan
+Write-Host "🔍 AGI.Kapster MSI Package Verification" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 
 # 检查文件是否存在

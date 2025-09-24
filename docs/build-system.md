@@ -2,7 +2,7 @@
 
 ## Overview
 
-AGI.Captor uses a modern **NUKE Build System** integrated with **GitHub Actions** for automated CI/CD workflows, providing cross-platform build automation with PowerShell integration.
+AGI.Kapster uses a modern **NUKE Build System** integrated with **GitHub Actions** for automated CI/CD workflows, providing cross-platform build automation with PowerShell integration.
 
 ## Architecture
 

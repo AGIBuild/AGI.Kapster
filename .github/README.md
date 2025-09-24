@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-This directory contains the complete CI/CD automation for AGI.Captor using GitHub Actions with composite actions and reusable workflows.
+This directory contains the complete CI/CD automation for AGI.Kapster using GitHub Actions with composite actions and reusable workflows.
 
 ## Architecture Overview
 
@@ -99,9 +99,9 @@ artifacts/
 │   ├── linux-x64/
 │   └── osx-x64/
 └── packages/              # Installable packages
-    ├── AGI.Captor-win-x64.msi
-    ├── AGI.Captor-linux-x64.deb
-    └── AGI.Captor-osx-x64.pkg
+    ├── AGI.Kapster-win-x64.msi
+    ├── AGI.Kapster-linux-x64.deb
+    └── AGI.Kapster-osx-x64.pkg
 ```
 
 ## Configuration

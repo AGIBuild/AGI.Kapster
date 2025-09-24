@@ -1,6 +1,6 @@
 name: 'Setup .NET Environment'
 description: 'Common setup for .NET projects including checkout, .NET setup, and Git configuration'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   fetch-depth:

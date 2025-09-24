@@ -23,13 +23,13 @@ This project uses .NET's built-in testing framework with xUnit and includes code
 
 ```powershell
 # Run tests without coverage
-dotnet test tests/AGI.Captor.Tests
+dotnet test tests/AGI.Kapster.Tests
 
 # Run tests with coverage
-dotnet test tests/AGI.Captor.Tests --collect:"XPlat Code Coverage"
+dotnet test tests/AGI.Kapster.Tests --collect:"XPlat Code Coverage"
 
 # Run specific test class
-dotnet test tests/AGI.Captor.Tests --filter "FullyQualifiedName~HotkeyManagerTests"
+dotnet test tests/AGI.Kapster.Tests --filter "FullyQualifiedName~HotkeyManagerTests"
 ```
 
 ## Test Structure
@@ -44,7 +44,7 @@ dotnet test tests/AGI.Captor.Tests --filter "FullyQualifiedName~HotkeyManagerTes
 ### Test Files
 
 ```
-tests/AGI.Captor.Tests/
+tests/AGI.Kapster.Tests/
 ├── Commands/
 │   └── CommandTests.cs          # Undo/redo command tests
 ├── Models/
@@ -141,10 +141,10 @@ Test results are available in:
 
 ```powershell
 # Run tests in debug mode
-dotnet test tests/AGI.Captor.Tests --configuration Debug
+dotnet test tests/AGI.Kapster.Tests --configuration Debug
 
 # Run with verbose output
-dotnet test tests/AGI.Captor.Tests --logger "console;verbosity=detailed"
+dotnet test tests/AGI.Kapster.Tests --logger "console;verbosity=detailed"
 ```
 
 ## Best Practices

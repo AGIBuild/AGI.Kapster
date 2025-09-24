@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AGI Captor Linux DEB package creation script
+# AGI Kapster Linux DEB package creation script
 # Usage: ./create-deb.sh <publish_directory> <version> <architecture>
 
 set -e
@@ -23,7 +23,7 @@ if [ ! -d "$PUBLISH_DIR" ]; then
 fi
 
 # Configuration
-PACKAGE_NAME="agi-captor"
+PACKAGE_NAME="agi-kapster"
 DEB_NAME="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 TEMP_DIR="$(mktemp -d)"
 DEB_DIR="$TEMP_DIR/deb"
@@ -42,23 +42,23 @@ echo "🔨 Creating DEB package structure..."
   # Copy application files
   cp -r "$PUBLISH_DIR"/* "$DEB_DIR/usr/share/$PACKAGE_NAME/"
 } >/dev/null 2>&1 || true
-chmod +x "$DEB_DIR/usr/share/$PACKAGE_NAME/AGI.Captor.Desktop"
+chmod +x "$DEB_DIR/usr/share/$PACKAGE_NAME/AGI.Kapster.Desktop"
 
 # Create launcher script
-cat > "$DEB_DIR/usr/bin/agi-captor" << 'EOF'
+cat > "$DEB_DIR/usr/bin/agi-kapster" << 'EOF'
 #!/bin/bash
-exec /usr/share/agi-captor/AGI.Captor.Desktop "$@"
+exec /usr/share/agi-kapster/AGI.Kapster.Desktop "$@"
 EOF
-chmod +x "$DEB_DIR/usr/bin/agi-captor"
+chmod +x "$DEB_DIR/usr/bin/agi-kapster"
 
 # Create desktop file
-cat > "$DEB_DIR/usr/share/applications/agi-captor.desktop" << EOF
+cat > "$DEB_DIR/usr/share/applications/agi-kapster.desktop" << EOF
 [Desktop Entry]
-Name=AGI Captor
+Name=AGI Kapster
 Comment=Advanced Screenshot and Annotation Tool
 GenericName=Screenshot Tool
-Exec=agi-captor %F
-Icon=agi-captor
+Exec=agi-kapster %F
+Icon=agi-kapster
 Terminal=false
 Type=Application
 Categories=Graphics;Photography;
@@ -68,8 +68,8 @@ Keywords=screenshot;annotation;capture;
 EOF
 
 # Copy icon (if exists)
-if [ -f "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" ]; then
-    cp "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" "$DEB_DIR/usr/share/pixmaps/agi-captor.png"
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" "$DEB_DIR/usr/share/pixmaps/agi-kapster.png"
 fi
 
 # Create control file
@@ -82,7 +82,7 @@ Architecture: $ARCH
 Depends: libc6, libgcc-s1, libssl3, zlib1g
 Maintainer: AGI Build <support@agibuild.com>
 Description: Advanced Screenshot and Annotation Tool
- AGI Captor is a powerful cross-platform screenshot and annotation tool
+ AGI Kapster is a powerful cross-platform screenshot and annotation tool
  built with modern .NET technology. It provides intuitive tools for
  capturing, annotating, and sharing screenshots with professional quality.
  .
@@ -92,7 +92,7 @@ Description: Advanced Screenshot and Annotation Tool
   * Multiple export formats
   * Customizable hotkeys
   * Cross-platform compatibility
-Homepage: https://github.com/AGIBuild/AGI.Captor
+Homepage: https://github.com/AGIBuild/AGI.Kapster
 EOF
 
 # Calculate installed size
@@ -151,9 +151,9 @@ chmod +x "$DEB_DIR/DEBIAN/postrm"
 # Create copyright file
 cat > "$DEB_DIR/usr/share/doc/$PACKAGE_NAME/copyright" << EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: AGI Captor
+Upstream-Name: AGI Kapster
 Upstream-Contact: AGI Build <support@agibuild.com>
-Source: https://github.com/AGIBuild/AGI.Captor
+Source: https://github.com/AGIBuild/AGI.Kapster
 
 Files: *
 Copyright: 2025 AGI Build
@@ -181,7 +181,7 @@ EOF
 cat > "$DEB_DIR/usr/share/doc/$PACKAGE_NAME/changelog.Debian" << EOF
 $PACKAGE_NAME ($VERSION) unstable; urgency=medium
 
-  * Initial release of AGI Captor
+  * Initial release of AGI Kapster
   * Cross-platform screenshot and annotation tool
   * Built with .NET and Avalonia UI
 

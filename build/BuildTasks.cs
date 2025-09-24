@@ -46,7 +46,7 @@ class BuildTasks : NukeBuild
     readonly bool Coverage;
 
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
-    [Parameter("Manual new version (display format: yyyy.M.d.HHmmss — month/day no leading zero, time HHmmss). If omitted auto-generate.")] readonly string NewVersion; // updated
+    [Parameter("Manual new version (display format: yyyy.M.d.S — 4 segments where S is seconds since midnight, range 0..86399, max 5 digits. Example: 2025.9.4.3605). If omitted auto-generate.")] readonly string NewVersion; // updated
 
     AbsolutePath VersionFile => RootDirectory / "version.json"; // added
     static (string Display, string Assembly, string File, string Info)? _versionCache; // added
@@ -58,7 +58,7 @@ class BuildTasks : NukeBuild
     AbsolutePath CoverageDirectory => ArtifactsDirectory / "coverage";
 
     // Project references
-    Project MainProject => Solution?.AllProjects?.FirstOrDefault(p => p.Name == "AGI.Captor.Desktop");
+    Project MainProject => Solution?.AllProjects?.FirstOrDefault(p => p.Name == "AGI.Kapster.Desktop");
     Project[] TestProjects => Solution?.AllProjects?.Where(p => p.Name.Contains("Tests")).ToArray() ?? Array.Empty<Project>();
 
     // Runtime detection
@@ -167,7 +167,7 @@ class BuildTasks : NukeBuild
         {
             if (MainProject == null)
             {
-                throw new InvalidOperationException("Main project (AGI.Captor.Desktop) not found");
+                throw new InvalidOperationException("Main project (AGI.Kapster.Desktop) not found");
             }
 
             DotNetRun(s => s
@@ -334,7 +334,7 @@ class BuildTasks : NukeBuild
         try
         {
             var version = GetFixedVersionOrFallback();
-            var packageName = $"AGI.Captor-{version.File}-{rid}.msi";
+            var packageName = $"AGI.Kapster-{version.File}-{rid}.msi";
             var packagePath = PackageOutputDirectory / packageName;
 
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
@@ -399,8 +399,8 @@ class BuildTasks : NukeBuild
 
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
-        var wxsFile = WindowsPackagingDirectory / "AGI.Captor.v4.wxs";
-        var wixobjFile = WindowsPackagingDirectory / "AGI.Captor.wixobj";
+        var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
+        var wixobjFile = WindowsPackagingDirectory / "AGI.Kapster.wixobj";
 
         // Ensure WXS file exists
         if (!File.Exists(wxsFile))
@@ -472,7 +472,7 @@ class BuildTasks : NukeBuild
 
     void CreatePortableZip(AbsolutePath publishPath, string rid, string version)
     {
-        var zipName = $"AGI.Captor-{version}-{rid}-portable.zip";
+        var zipName = $"AGI.Kapster-{version}-{rid}-portable.zip";
         var zipPath = PackageOutputDirectory / zipName;
 
         Console.WriteLine($"📁 Creating portable ZIP: {zipName}");
@@ -523,7 +523,7 @@ class BuildTasks : NukeBuild
                     process.AssertZeroExitCode();
 
                     // Move PKG to output directory
-                    var pkgPattern = $"AGI.Captor-{version.File}-{rid}.pkg";
+                    var pkgPattern = $"AGI.Kapster-{version.File}-{rid}.pkg";
                     foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
                     {
                         var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -566,8 +566,8 @@ class BuildTasks : NukeBuild
         }
 
         // Find all PKG and DMG files to notarize
-        var pkgPattern = $"AGI.Captor-{version}.pkg";
-        var dmgPattern = $"AGI.Captor-{version}.dmg";
+        var pkgPattern = $"AGI.Kapster-{version}.pkg";
+        var dmgPattern = $"AGI.Kapster-{version}.dmg";
         var filesToNotarize = new List<string>();
 
         foreach (var file in Directory.GetFiles(PackageOutputDirectory, pkgPattern))
@@ -622,7 +622,7 @@ class BuildTasks : NukeBuild
                 debProcess.AssertZeroExitCode();
 
                 // Move DEB to output directory
-                var debPattern = $"agi-captor_{version.File}_{arch}.deb";
+                var debPattern = $"agi-kapster_{version.File}_{arch}.deb";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, debPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -645,7 +645,7 @@ class BuildTasks : NukeBuild
                 rpmProcess.AssertZeroExitCode();
 
                 // Move RPM to output directory
-                var rpmPattern = $"agi-captor-{version.File}-1.{rpmArch}.rpm";
+                var rpmPattern = $"agi-kapster-{version.File}-1.{rpmArch}.rpm";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, rpmPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -714,12 +714,28 @@ class BuildTasks : NukeBuild
 
     string GenerateTimestampVersion()
     {
+        // Produce 4-segment version: Year.Month.Day.SecondsSinceMidnight
+        // Example: 2025.9.4.3605 (where 3605 = 1*3600 + 0*60 + 5)
         var utc = DateTime.UtcNow;
-        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{utc:HHmm}";
+        var secondsSinceMidnight = utc.Hour * 3600 + utc.Minute * 60 + utc.Second; // 0..86399
+        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{secondsSinceMidnight}";
     }
 
     bool IsValidDisplayVersion(string v)
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d?\\.[1-9]\\d?\\.[0-2]\\d[0-5]\\d$");
+    {
+        if (string.IsNullOrWhiteSpace(v)) return false;
+
+        // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
+        var pattern = @"^(\d{4})\.(?:[1-9]|1[0-2])\.(?:[1-9]|[12]\d|3[01])\.(\d{1,5})$";
+        var m = System.Text.RegularExpressions.Regex.Match(v, pattern);
+        if (!m.Success) return false;
+
+        // Validate last segment numeric range 0..86399
+        if (!int.TryParse(m.Groups[2].Value, out var seconds)) return false;
+        if (seconds < 0 || seconds > 86399) return false;
+
+        return true;
+    }
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
         => (display, display, display, display);

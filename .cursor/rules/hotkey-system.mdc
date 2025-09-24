@@ -6,9 +6,9 @@ globs: **/Hotkeys/*.cs,**/Services/*Hotkey*.cs
 # Hotkey System Architecture
 
 ## Core Interfaces
-- [IHotkeyProvider](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyProvider.cs): Platform-specific hotkey registration
-- [IHotkeyManager](mdc:src/AGI.Captor.App/Services/Hotkeys/IHotkeyManager.cs): High-level hotkey management
-- [IApplicationController](mdc:src/AGI.Captor.App/Services/IApplicationController.cs): Application lifecycle control
+- [IHotkeyProvider](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyProvider.cs): Platform-specific hotkey registration
+- [IHotkeyManager](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyManager.cs): High-level hotkey management
+- [IApplicationController](mdc:src/AGI.Kapster.App/Services/IApplicationController.cs): Application lifecycle control
 
 ## Platform Implementation
 - **Windows**: Uses Windows API (RegisterHotKey/UnregisterHotKey)

@@ -4,7 +4,7 @@
 
 ## Overview
 
-AGI.Captor ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our screenshot and annotation application.
+AGI.Kapster ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our screenshot and annotation application.
 
 ## Information We Collect
 
@@ -47,7 +47,7 @@ AGI.Captor ("we", "our", or "us") is committed to protecting your privacy. This 
 
 ## Children's Privacy
 
-AGI.Captor is not intended for children under 13. We do not knowingly collect personal information from children under 13.
+AGI.Kapster is not intended for children under 13. We do not knowingly collect personal information from children under 13.
 
 ## Changes to This Policy
 
@@ -60,7 +60,7 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 
 If you have any questions about this Privacy Policy, please contact us:
 - **Email**: support@agibuild.com
-- **GitHub**: https://github.com/AGIBuild/AGI.Captor/issues
+- **GitHub**: https://github.com/AGIBuild/AGI.Kapster/issues
 
 ## Compliance
 

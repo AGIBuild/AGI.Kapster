@@ -171,7 +171,7 @@ overlayController.Cancelled += (sender, args) =>
 
 ### Core Implementation
 ```
-src/AGI.Captor.Desktop/
+src/AGI.Kapster.Desktop/
 ├── Services/
 │   ├── Overlay/
 │   │   ├── SimplifiedOverlayManager.cs      # Main controller
@@ -186,7 +186,7 @@ src/AGI.Captor.Desktop/
 
 ### UI Components
 ```
-src/AGI.Captor.Desktop/
+src/AGI.Kapster.Desktop/
 ├── Rendering/
 │   └── Overlays/
 │       ├── OverlayWindow.axaml              # Avalonia overlay window
@@ -196,7 +196,7 @@ src/AGI.Captor.Desktop/
 
 ### Tests
 ```
-tests/AGI.Captor.Tests/
+tests/AGI.Kapster.Tests/
 ├── Services/
 │   └── Overlay/
 │       ├── OverlayManagerTests.cs          # Manager unit tests

@@ -2,13 +2,13 @@
 
 ## Overview
 
-AGI.Captor implements a comprehensive testing strategy using dependency injection, abstraction patterns, and mocking to ensure reliable, isolated unit tests. The architecture supports both unit and integration testing with proper isolation from external dependencies.
+AGI.Kapster implements a comprehensive testing strategy using dependency injection, abstraction patterns, and mocking to ensure reliable, isolated unit tests. The architecture supports both unit and integration testing with proper isolation from external dependencies.
 
 ## Test Organization
 
 ### Directory Structure
 ```
-tests/AGI.Captor.Tests/
+tests/AGI.Kapster.Tests/
 ├── TestHelpers/
 │   ├── TestBase.cs                    # Base class for all tests
 │   ├── MemoryFileSystemService.cs     # In-memory file system for testing
@@ -337,10 +337,10 @@ public async Task CaptureScreen_ShouldCompleteWithinTimeLimit()
 ### Test Execution Pipeline
 ```yaml
 - name: Run Unit Tests
-  run: dotnet test tests/AGI.Captor.Tests --logger trx
+  run: dotnet test tests/AGI.Kapster.Tests --logger trx
 
 - name: Run Integration Tests
-  run: dotnet test tests/AGI.Captor.IntegrationTests --logger trx
+  run: dotnet test tests/AGI.Kapster.IntegrationTests --logger trx
 
 - name: Publish Test Results
   uses: dorny/test-reporter@v1

@@ -93,13 +93,13 @@
 ### Project Management
 ```bash
 # Build solution
-dotnet build AGI.Captor.sln
+dotnet build AGI.Kapster.sln
 
 # Run tests
-dotnet test AGI.Captor.sln
+dotnet test AGI.Kapster.sln
 
 # Publish application
-dotnet publish src/AGI.Captor.Desktop/AGI.Captor.Desktop.csproj
+dotnet publish src/AGI.Kapster.Desktop/AGI.Kapster.Desktop.csproj
 ```
 
 ### Package Management
@@ -144,7 +144,7 @@ gh workflow run release.yml
 ### Repository Commands
 ```bash
 # Clone repository
-gh repo clone AGIBuild/AGI.Captor
+gh repo clone AGIBuild/AGI.Kapster
 
 # Create pull request
 gh pr create --title "Feature: New overlay mode"
@@ -279,8 +279,8 @@ dotnet list package
 .\build.ps1 Package --runtime win-x64
 
 # Install/uninstall service
-sc create AGI.Captor binPath="path\to\exe"
-sc delete AGI.Captor
+sc create AGI.Kapster binPath="path\to\exe"
+sc delete AGI.Kapster
 ```
 
 ### macOS
@@ -289,8 +289,8 @@ sc delete AGI.Captor
 ./build.ps1 Package --runtime osx-x64
 
 # Install/uninstall PKG
-sudo installer -pkg AGI.Captor.pkg -target /
-pkgutil --pkgs | grep agicaptor
+sudo installer -pkg AGI.Kapster.pkg -target /
+pkgutil --pkgs | grep agikapster
 ```
 
 ### Linux
@@ -299,8 +299,8 @@ pkgutil --pkgs | grep agicaptor
 ./build.ps1 Package --runtime linux-x64
 
 # Install/uninstall DEB
-sudo dpkg -i agi-captor.deb
-sudo dpkg -r agi-captor
+sudo dpkg -i agi-kapster.deb
+sudo dpkg -r agi-kapster
 ```
 
 ## Troubleshooting Commands

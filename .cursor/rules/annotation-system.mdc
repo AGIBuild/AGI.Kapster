@@ -6,10 +6,10 @@ globs: **/Overlays/*.cs,**/Services/AnnotationService.cs,**/Commands/*.cs
 # Annotation System Architecture
 
 ## Core Components
-- [AnnotationService](mdc:src/AGI.Captor.App/Services/AnnotationService.cs): Central annotation management
-- [NewAnnotationOverlay](mdc:src/AGI.Captor.App/Overlays/NewAnnotationOverlay.cs): Main drawing canvas
-- [NewAnnotationToolbar](mdc:src/AGI.Captor.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
-- [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Container window
+- [AnnotationService](mdc:src/AGI.Kapster.App/Services/AnnotationService.cs): Central annotation management
+- [NewAnnotationOverlay](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationOverlay.cs): Main drawing canvas
+- [NewAnnotationToolbar](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
+- [OverlayWindow](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs): Container window
 
 ## Tool System
 - `AnnotationToolType` enum defines available tools
@@ -38,7 +38,7 @@ if (CurrentTool != AnnotationToolType.None)
 - Always use direct references over FindControl<>()
 - Store control instances in private fields
 - Update references when creating new instances
-- Example pattern from [OverlayWindow](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs):
+- Example pattern from [OverlayWindow](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs):
   ```csharp
   private NewAnnotationOverlay? _annotator;
   // Use _annotator instead of FindControl<NewAnnotationOverlay>()

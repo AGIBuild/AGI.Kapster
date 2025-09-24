@@ -1,8 +1,8 @@
-# AGI.Captor 安装包创建指南
+# AGI.Kapster 安装包创建指南
 
 ## 概述
 
-AGI.Captor 现已支持跨平台安装包创建，包括 Windows MSI、macOS PKG/DMG 和 Linux DEB/RPM 包。
+AGI.Kapster 现已支持跨平台安装包创建，包括 Windows MSI、macOS PKG/DMG 和 Linux DEB/RPM 包。
 
 ## 快速开始
 
@@ -133,14 +133,14 @@ base64 -w0 code-signing.pfx > pfx.b64   # Linux/macOS
 
 #### 验证 MSI 签名
 ```powershell
-signtool verify /pa /all AGI.Captor-*.msi
+signtool verify /pa /all AGI.Kapster-*.msi
 ```
 
 #### 验证 macOS 签名 & 公证
 ```bash
-codesign --verify --deep --strict --verbose=2 AGI.Captor.app
-spctl --assess --type exec -vv AGI.Captor.app
-xcrun stapler validate AGI.Captor-*.pkg
+codesign --verify --deep --strict --verbose=2 AGI.Kapster.app
+spctl --assess --type exec -vv AGI.Kapster.app
+xcrun stapler validate AGI.Kapster-*.pkg
 ```
 
 ### 自定义版本
@@ -154,12 +154,12 @@ xcrun stapler validate AGI.Captor-*.pkg
 所有安装包将输出到：
 ```
 artifacts/packages/
-├── AGI.Captor-1.0.0.0-win-x64-portable.zip
-├── AGI.Captor-1.0.0.0-win-x64.msi
-├── AGI.Captor-1.0.0.0-osx-x64.pkg
-├── AGI.Captor-1.0.0.0-osx-x64.dmg
-├── agi-captor_1.0.0.0_amd64.deb
-└── agi-captor-1.0.0.0-1.x86_64.rpm
+├── AGI.Kapster-1.0.0.0-win-x64-portable.zip
+├── AGI.Kapster-1.0.0.0-win-x64.msi
+├── AGI.Kapster-1.0.0.0-osx-x64.pkg
+├── AGI.Kapster-1.0.0.0-osx-x64.dmg
+├── agi-kapster_1.0.0.0_amd64.deb
+└── agi-kapster-1.0.0.0-1.x86_64.rpm
 ```
 
 ## 依赖要求
