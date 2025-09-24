@@ -174,7 +174,7 @@ jobs:
             Write-Host "✅ WiX already installed: $wixVersion"
           } catch {
             Write-Host "📦 Installing WiX toolset..."
-            dotnet tool install --global wix --version 4.0.0
+            dotnet tool install --global wix --version 4.2.0
             # Add to PATH
             $wixPath = "$env:USERPROFILE\.dotnet\tools"
             if (Test-Path $wixPath) {
