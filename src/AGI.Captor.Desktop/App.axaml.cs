@@ -106,6 +106,9 @@ public partial class App : Application
                 trayService.ExitRequested += OnExitRequested;
 
                 Log.Debug("System tray initialized");
+
+                // Show startup notification
+                ShowStartupNotification(trayService);
             }
             catch (Exception ex)
             {
@@ -159,6 +162,37 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to exit application");
+        }
+    }
+
+    private void ShowStartupNotification(ISystemTrayService trayService)
+    {
+        try
+        {
+            // Get application version for notification
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            var versionString = version?.ToString() ?? "Unknown";
+
+            // Show startup notification with a slight delay to ensure everything is initialized
+            System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+            {
+                try
+                {
+                    trayService.ShowNotification(
+                        "AGI Captor Started", 
+                        $"Version {versionString} is running in the background.\nUse Alt+A to take screenshots or right-click the tray icon for options.");
+                    
+                    Log.Information("Startup notification displayed successfully");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Failed to show startup notification");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to schedule startup notification");
         }
     }
 }

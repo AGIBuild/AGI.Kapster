@@ -208,18 +208,20 @@ public class SystemTrayService : ISystemTrayService
     {
         try
         {
+            // Log the notification
+            Log.Information("Showing notification: {Title} - {Message}", title, message);
+
+            // Use platform-specific notification implementation
+            ShowPlatformNotification(title, message);
+
+            // Also update tray icon tooltip as fallback
             if (_trayIcon != null)
             {
-                // For now, log the notification
-                // In a full implementation, you might use Windows Toast notifications
-                Log.Debug("Notification: {Title} - {Message}", title, message);
-
-                // Update tooltip temporarily to show notification
                 var originalTooltip = _trayIcon.ToolTipText;
                 _trayIcon.ToolTipText = $"{title}: {message}";
 
-                // Reset tooltip after a delay (ensure UI thread)
-                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ =>
+                // Reset tooltip after a delay
+                System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
@@ -234,6 +236,47 @@ public class SystemTrayService : ISystemTrayService
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
+        }
+    }
+
+    private void ShowPlatformNotification(string title, string message)
+    {
+        try
+        {
+            var platform = AvaloniaLocator.Current.GetService<IRuntimePlatform>();
+            if (platform == null)
+            {
+                Log.Warning("Runtime platform not available, using fallback notification");
+                return;
+            }
+
+            // Use Avalonia's notification system if available
+            if (_trayIcon != null)
+            {
+                // For now, we'll use a simple approach that works across platforms
+                // In the future, this could be enhanced with platform-specific implementations
+                Log.Information("System notification: {Title} - {Message}", title, message);
+                
+                // Update tooltip to show the notification
+                var originalTooltip = _trayIcon.ToolTipText;
+                _trayIcon.ToolTipText = $"🔔 {title}: {message}";
+                
+                // Reset after delay
+                System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.ToolTipText = originalTooltip;
+                        }
+                    });
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to show platform notification");
         }
     }
 }
