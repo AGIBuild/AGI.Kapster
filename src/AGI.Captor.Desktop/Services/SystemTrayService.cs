@@ -208,66 +208,30 @@ public class SystemTrayService : ISystemTrayService
     {
         try
         {
-            Log.Information("🔔 NOTIFICATION: {Title} - {Message}", title, message);
+            Log.Debug("Showing notification: {Title} - {Message}", title, message);
 
-            if (_trayIcon == null)
+            if (_trayIcon != null)
             {
-                Log.Warning("Cannot show notification: tray icon is null");
-                return;
-            }
-
-            // Execute notification on UI thread
-            ExecuteOnUIThread(() =>
-            {
+                // Update tooltip temporarily to show notification
                 var originalTooltip = _trayIcon.ToolTipText;
-                var notificationText = $"🔔 {title}\n{message}";
-                
-                _trayIcon.ToolTipText = notificationText;
-                Log.Debug("Tray icon tooltip updated to: {NotificationText}", notificationText);
-                
-                // Schedule tooltip reset
-                _ = ResetTooltipAfterDelayAsync(originalTooltip ?? "AGI Captor - Screenshot Tool");
-            });
+                _trayIcon.ToolTipText = $"{title}: {message}";
+
+                // Reset tooltip after a delay
+                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ =>
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.ToolTipText = originalTooltip;
+                        }
+                    });
+                });
+            }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
-        }
-    }
-
-    private void ExecuteOnUIThread(Action action)
-    {
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Failed to execute action on UI thread");
-            }
-        });
-    }
-
-    private async System.Threading.Tasks.Task ResetTooltipAfterDelayAsync(string originalTooltip)
-    {
-        try
-        {
-            await System.Threading.Tasks.Task.Delay(8000);
-            
-            ExecuteOnUIThread(() =>
-            {
-                if (_trayIcon != null)
-                {
-                    _trayIcon.ToolTipText = originalTooltip;
-                    Log.Debug("Tray icon tooltip reset to original");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to reset tooltip after delay");
         }
     }
 }
