@@ -106,7 +106,7 @@ public class UpdateSettings
     /// When true, enables updates even in debug builds
     /// When false, disables updates (same as debug mode)
     /// </summary>
-    public bool? EnableInDebugMode { get; set; } = null;
+    public bool? EnableInDebugMode { get; set; } = false;
 
     /// <summary>
     /// GitHub repository URL for update checks
