@@ -8,8 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Events;
-using Serilog.Settings.Configuration;
 using AGI.Captor.Desktop.Services.Hotkeys;
 using AGI.Captor.Desktop.Services.Overlay;
 using AGI.Captor.Desktop.Services.Overlay.Platforms;
@@ -48,6 +46,15 @@ class Program
         var environment = builder.Environment.EnvironmentName ?? "Production";
         Log.Information("Starting AGI.Captor in {Environment} environment", environment);
 
+        // Configure with fallback protection
+        var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        if (!File.Exists(appsettingsPath))
+        {
+            // Create default configuration if file doesn't exist
+            CreateDefaultConfiguration(appsettingsPath);
+        }
+        
+        // Add base configuration with fallback protection
         builder.Configuration
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -191,4 +198,46 @@ class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+
+    /// <summary>
+    /// Creates a default configuration file if it doesn't exist
+    /// </summary>
+    /// <param name="filePath">Path where to create the configuration file</param>
+    private static void CreateDefaultConfiguration(string filePath)
+    {
+        try
+        {
+            var defaultConfig = new
+            {
+                Application = new
+                {
+                    Name = "AGI.Captor",
+                    Version = "1.2.0",
+                    Description = "Modern Cross-Platform Screenshot and Annotation Tool"
+                },
+                AutoUpdate = new
+                {
+                    Enabled = true,
+                    CheckFrequencyHours = 24,
+                    InstallAutomatically = true,
+                    NotifyBeforeInstall = false,
+                    UsePreReleases = false,
+                    RepositoryOwner = "AGIBuild",
+                    RepositoryName = "AGI.Captor"
+                }
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            File.WriteAllText(filePath, json);
+            Log.Information("Created default configuration file: {FilePath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to create default configuration file: {FilePath}", filePath);
+        }
+    }
 }

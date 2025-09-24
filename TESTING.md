@@ -6,20 +6,17 @@ This project uses .NET's built-in testing framework with xUnit and includes code
 
 ## Running Tests
 
-### Basic Test Execution
+### Quick Start
 
 ```powershell
 # Run all tests
-.\build.ps1 -Test
+./build.ps1 Test
 
 # Run tests with code coverage
-.\build.ps1 -Test -Coverage
+./build.ps1 Test -Coverage
 
 # Run tests with coverage and open report
-.\build.ps1 -Test -Coverage -OpenReport
-
-# Run specific test filter
-.\build.ps1 -Test -TestFilter "FullyQualifiedName~HotkeyManagerTests"
+./build.ps1 Test -Coverage -OpenReport
 ```
 
 ### Direct dotnet Commands
@@ -29,121 +26,143 @@ This project uses .NET's built-in testing framework with xUnit and includes code
 dotnet test tests/AGI.Captor.Tests
 
 # Run tests with coverage
-dotnet test tests/AGI.Captor.Tests --collect:"XPlat Code Coverage" --results-directory TestResults
+dotnet test tests/AGI.Captor.Tests --collect:"XPlat Code Coverage"
 
-# Run specific tests
-dotnet test tests/AGI.Captor.Tests --filter "FullyQualifiedName~AnnotationServiceTests"
+# Run specific test class
+dotnet test tests/AGI.Captor.Tests --filter "FullyQualifiedName~HotkeyManagerTests"
 ```
-
-## Code Coverage
-
-### Built-in Coverage Collection
-
-The project uses .NET's built-in XPlat Code Coverage collector, which generates:
-- **Cobertura XML format**: `coverage.cobertura.xml`
-- **Line coverage**: Percentage of lines executed
-- **Branch coverage**: Percentage of branches executed
-
-### Coverage Reports
-
-When using `-Coverage` flag, the build script automatically:
-1. Collects coverage data during test execution
-2. Generates a summary with line and branch coverage percentages
-3. Saves detailed coverage data in `TestResults/` directory
-4. Optionally opens the coverage file if `-OpenReport` is specified
-
-### Coverage Data Location
-
-Coverage files are saved in:
-```
-TestResults/
-└── [guid]/
-    └── coverage.cobertura.xml
-```
-
-The XML file contains detailed coverage information that can be:
-- Parsed by CI/CD systems
-- Imported into coverage analysis tools
-- Used for coverage thresholds and quality gates
 
 ## Test Structure
 
 ### Test Categories
 
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions (currently minimal)
-- **Service Tests**: Test business logic services
-- **Model Tests**: Test data models and validation
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Component interaction testing
+- **Service Tests**: Business logic testing
+- **Command Tests**: Undo/redo functionality testing
 
-### Test Organization
+### Test Files
 
 ```
 tests/AGI.Captor.Tests/
-├── Commands/           # Command pattern tests
-├── Models/            # Data model tests
-├── Services/          # Service layer tests
-│   ├── Hotkeys/       # Hotkey system tests
-│   └── Overlay/       # Overlay system tests
-└── TestHelpers/       # Test utilities and base classes
+├── Commands/
+│   └── CommandTests.cs          # Undo/redo command tests
+├── Models/
+│   ├── AnnotationTests.cs       # Annotation model tests
+│   └── SettingsTests.cs         # Settings model tests
+├── Services/
+│   ├── HotkeyServiceTests.cs    # Hotkey service tests
+│   ├── SettingsServiceTests.cs   # Settings service tests
+│   ├── ExportServiceTests.cs     # Export service tests
+│   ├── AnnotationServiceTests.cs # Annotation service tests
+│   └── OverlayControllerTests.cs # Overlay controller tests
+└── TestHelpers/
+    ├── MockHotkeyProvider.cs     # Mock hotkey provider
+    ├── MockSettingsService.cs     # Mock settings service
+    ├── MockOverlayController.cs   # Mock overlay controller
+    ├── TestDataBuilder.cs        # Test data builder
+    ├── UIThreadHelper.cs         # UI thread helper
+    └── AvaloniaTestBase.cs       # Avalonia test base class
 ```
 
-## Test Configuration
+## Coverage Reports
 
-### Timeout Settings
+### Generating Coverage
 
-Global test timeout is configured in `xunit.runner.json`:
-- Default timeout: 10 seconds
-- Long-running tests: Can specify custom timeout with `[Fact(Timeout = xxx)]`
+```powershell
+# Generate coverage report
+./build.ps1 Test -Coverage
 
-### Test Base Class
+# Coverage files are generated in:
+# - artifacts/coverage/coverage.cobertura.xml
+# - artifacts/coverage/coverage.opencover.xml
+```
 
-All tests inherit from `TestBase` which provides:
-- Custom logging to test output
-- Common setup and teardown
-- Test utilities
+### Coverage Targets
 
-## Best Practices
+- **Minimum Coverage**: 80%
+- **Critical Components**: 90%+ (Services, Commands)
+- **UI Components**: 70%+ (ViewModels, Views)
 
-### Writing Tests
+## Test Data
 
-1. **Use descriptive test names**: `Should_ExpectedBehavior_When_StateUnderTest`
-2. **Follow AAA pattern**: Arrange, Act, Assert
-3. **Test one thing per test**: Each test should verify a single behavior
-4. **Use meaningful assertions**: Prefer FluentAssertions for readable test code
+### Test Data Builder
 
-### Coverage Guidelines
+The `TestDataBuilder` class provides convenient methods for creating test data:
 
-1. **Aim for high coverage**: Target >80% line coverage for critical paths
-2. **Focus on business logic**: Prioritize coverage of core functionality
-3. **Test edge cases**: Include boundary conditions and error scenarios
-4. **Mock external dependencies**: Use NSubstitute for isolated unit tests
+```csharp
+// Create test annotation
+var annotation = TestDataBuilder.CreateAnnotation()
+    .WithType(AnnotationType.Arrow)
+    .WithColor(Color.Red)
+    .Build();
+
+// Create test settings
+var settings = TestDataBuilder.CreateSettings()
+    .WithHotkey("Alt+A")
+    .WithDefaultFormat(ImageFormat.Png)
+    .Build();
+```
+
+### Mock Services
+
+Mock services are provided for testing:
+
+- `MockHotkeyProvider`: Mock hotkey registration
+- `MockSettingsService`: Mock settings persistence
+- `MockOverlayController`: Mock overlay management
 
 ## Continuous Integration
 
-### Coverage Thresholds
+### GitHub Actions
 
-Consider setting minimum coverage thresholds:
-- Line coverage: >80%
-- Branch coverage: >70%
+Tests are automatically run on:
+- **Push to main**: Full test suite
+- **Pull Requests**: Full test suite with coverage
+- **Release**: Full test suite with coverage report
 
-### CI Integration
+### Test Results
 
-The coverage XML can be integrated with CI systems:
-- **GitHub Actions**: Use coverage reporting actions
-- **Azure DevOps**: Use built-in coverage reporting
-- **Jenkins**: Use Cobertura plugin
+Test results are available in:
+- GitHub Actions logs
+- Artifacts: `test-results-and-coverage`
+- Coverage reports: `coverage.cobertura.xml`
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Tests hanging**: Check for blocking operations in test setup
-2. **Low coverage**: Ensure tests cover all code paths
-3. **Coverage not generated**: Verify `coverlet.collector` package is installed
+1. **UI Tests Failing**: Ensure Avalonia test base is used
+2. **Hotkey Tests**: Use mock hotkey provider
+3. **Settings Tests**: Use mock settings service
+4. **Coverage Not Generated**: Check XPlat Code Coverage collector
 
 ### Debug Mode
 
-Run tests with detailed logging:
 ```powershell
+# Run tests in debug mode
+dotnet test tests/AGI.Captor.Tests --configuration Debug
+
+# Run with verbose output
 dotnet test tests/AGI.Captor.Tests --logger "console;verbosity=detailed"
 ```
+
+## Best Practices
+
+### Test Writing
+
+1. **Arrange-Act-Assert**: Follow AAA pattern
+2. **Descriptive Names**: Use clear test method names
+3. **Single Responsibility**: One assertion per test
+4. **Mock Dependencies**: Use mock services for isolation
+
+### Test Organization
+
+1. **Group Related Tests**: Use test classes for related functionality
+2. **Use Test Categories**: Organize tests by type
+3. **Shared Setup**: Use constructor or setup methods
+4. **Cleanup**: Dispose resources properly
+
+---
+
+For more detailed testing information, see the individual test files and the project's testing architecture documentation.

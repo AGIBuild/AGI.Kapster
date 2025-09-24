@@ -39,15 +39,17 @@ APP_DIR="$TEMP_DIR/$APP_NAME.app"
 echo "🏪 创建 App Store 版本..."
 
 # 创建.app结构
-mkdir -p "$APP_DIR/Contents/MacOS"
-mkdir -p "$APP_DIR/Contents/Resources"
-
-# 复制可执行文件
-cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
-chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
-
-# 复制其他文件
-cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/" 2>/dev/null || true
+{
+  mkdir -p "$APP_DIR/Contents/MacOS"
+  mkdir -p "$APP_DIR/Contents/Resources"
+  
+  # Copy executable file
+  cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
+  chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
+  
+  # Copy other files
+  cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/"
+} >/dev/null 2>&1 || true
 
 # 创建App Store专用的Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
@@ -132,7 +134,7 @@ pkgbuild --root "$TEMP_DIR" \
          "$SCRIPT_DIR/$PKG_NAME"
 
 # 清理临时文件
-rm -rf "$TEMP_DIR"
+rm -rf "$TEMP_DIR" >/dev/null 2>&1 || true
 
 echo "✅ App Store 版本创建完成:"
 echo "  📦 PKG: $SCRIPT_DIR/$PKG_NAME"

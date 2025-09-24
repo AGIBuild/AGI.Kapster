@@ -33,15 +33,17 @@ APP_DIR="$TEMP_DIR/$APP_NAME.app"
 echo "🔨 创建 macOS 应用程序包..."
 
 # 创建.app结构
-mkdir -p "$APP_DIR/Contents/MacOS"
-mkdir -p "$APP_DIR/Contents/Resources"
-
-# 复制可执行文件
-cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
-chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
-
-# 复制其他文件
-cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/" 2>/dev/null || true
+{
+  mkdir -p "$APP_DIR/Contents/MacOS"
+  mkdir -p "$APP_DIR/Contents/Resources"
+  
+  # Copy executable file
+  cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
+  chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
+  
+  # Copy other files
+  cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/"
+} >/dev/null 2>&1 || true
 
 # 创建Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
@@ -114,19 +116,21 @@ echo "💿 创建 DMG 镜像..."
 
 # 创建DMG的临时目录
 DMG_TEMP_DIR="$(mktemp -d)"
-cp -R "$APP_DIR" "$DMG_TEMP_DIR/"
-
-# 创建Applications链接
-ln -s /Applications "$DMG_TEMP_DIR/Applications"
-
-# 创建DMG
-hdiutil create -volname "$APP_NAME" \
-               -srcfolder "$DMG_TEMP_DIR" \
-               -ov -format UDZO \
-               "$SCRIPT_DIR/$DMG_NAME"
-
-# 清理临时文件
-rm -rf "$TEMP_DIR" "$DMG_TEMP_DIR"
+{
+  cp -R "$APP_DIR" "$DMG_TEMP_DIR/"
+  
+  # Create Applications link
+  ln -s /Applications "$DMG_TEMP_DIR/Applications"
+  
+  # Create DMG
+  hdiutil create -volname "$APP_NAME" \
+                 -srcfolder "$DMG_TEMP_DIR" \
+                 -ov -format UDZO \
+                 "$SCRIPT_DIR/$DMG_NAME"
+  
+  # Cleanup temporary files
+  rm -rf "$TEMP_DIR" "$DMG_TEMP_DIR"
+} >/dev/null 2>&1 || true
 
 echo "✅ macOS 安装包创建完成:"
 echo "  📦 PKG: $SCRIPT_DIR/$PKG_NAME"

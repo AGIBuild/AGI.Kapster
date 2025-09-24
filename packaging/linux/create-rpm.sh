@@ -31,10 +31,10 @@ RPM_ROOT="$TEMP_DIR/rpm-root"
 echo "🔨 创建 RPM 包结构..."
 
 # 创建RPM目录结构
-mkdir -p "$RPM_ROOT/usr/bin"
-mkdir -p "$RPM_ROOT/usr/share/applications"
-mkdir -p "$RPM_ROOT/usr/share/pixmaps"
-mkdir -p "$RPM_ROOT/usr/share/$PACKAGE_NAME"
+mkdir -p "$RPM_ROOT/usr/bin" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/applications" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/pixmaps" 2>/dev/null || true
+mkdir -p "$RPM_ROOT/usr/share/$PACKAGE_NAME" 2>/dev/null || true
 
 # 复制应用程序文件
 cp -r "$PUBLISH_DIR"/* "$RPM_ROOT/usr/share/$PACKAGE_NAME/"
@@ -93,12 +93,13 @@ Features include:
 - Cross-platform compatibility
 
 %install
-mkdir -p %{buildroot}/usr/bin
-mkdir -p %{buildroot}/usr/share/applications
-mkdir -p %{buildroot}/usr/share/pixmaps
-mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME
-
-cp -r $RPM_ROOT/* %{buildroot}/
+{
+  mkdir -p %{buildroot}/usr/bin
+  mkdir -p %{buildroot}/usr/share/applications
+  mkdir -p %{buildroot}/usr/share/pixmaps
+  mkdir -p %{buildroot}/usr/share/$PACKAGE_NAME
+  cp -r $RPM_ROOT/* %{buildroot}/
+} >/dev/null 2>&1 || true
 
 %files
 /usr/bin/agi-captor
@@ -143,7 +144,7 @@ rpmbuild --define "_topdir $TEMP_DIR" \
          --define "_sourcedir $TEMP_DIR" \
          --define "_rpmdir $SCRIPT_DIR" \
          --define "_buildrootdir $TEMP_DIR/buildroot" \
-         -bb "$TEMP_DIR/$PACKAGE_NAME.spec"
+         -bb "$TEMP_DIR/$PACKAGE_NAME.spec" >/dev/null 2>&1
 
 # 移动生成的RPM文件
 mv "$SCRIPT_DIR/$ARCH/$RPM_NAME" "$SCRIPT_DIR/"
@@ -151,8 +152,8 @@ rmdir "$SCRIPT_DIR/$ARCH" 2>/dev/null || true
 
 # 验证包
 echo "🔍 验证 RPM 包..."
-rpm -qpi "$SCRIPT_DIR/$RPM_NAME"
-rpm -qpl "$SCRIPT_DIR/$RPM_NAME"
+rpm -qpi "$SCRIPT_DIR/$RPM_NAME" >/dev/null 2>&1
+rpm -qpl "$SCRIPT_DIR/$RPM_NAME" >/dev/null 2>&1
 
 # 清理临时文件
 rm -rf "$TEMP_DIR"

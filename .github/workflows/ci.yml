@@ -1,6 +1,6 @@
 name: Main CI/CD
 
-# 主开发分支集成和预发布构建
+# Main development branch integration and pre-release builds
 on:
   push:
     branches: [ main ]

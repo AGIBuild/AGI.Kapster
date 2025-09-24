@@ -43,7 +43,7 @@ jobs:
           if ($changedCsproj) {
             $versionJsonChanged = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object { $_ -eq 'version.json' }
             if (-not $versionJsonChanged) {
-              Write-Host "Detected .csproj change(s) without version.json update:" -ForegroundColor Red
+              Write-Host "❌ Detected .csproj change(s) without version.json update:" -ForegroundColor Red
               $changedCsproj | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
               exit 1
             }
@@ -52,9 +52,10 @@ jobs:
             try { $baseVer = git show origin/${{ github.base_ref }}:version.json | ConvertFrom-Json | Select-Object -ExpandProperty version } catch { }
             $newVer = (Get-Content version.json | ConvertFrom-Json).version
             if ($baseVer -and ($baseVer -eq $newVer)) {
-              Write-Host "version.json not updated (same version) though .csproj modified." -ForegroundColor Red
+              Write-Host "❌ version.json not updated (same version) though .csproj modified." -ForegroundColor Red
               exit 1
             }
+            Write-Host "✅ Version consistency check passed" -ForegroundColor Green
           }
 
       - name: Summary

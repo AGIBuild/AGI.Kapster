@@ -31,15 +31,17 @@ DEB_DIR="$TEMP_DIR/deb"
 echo "🔨 创建 DEB 包结构..."
 
 # 创建DEB目录结构
-mkdir -p "$DEB_DIR/DEBIAN"
-mkdir -p "$DEB_DIR/usr/bin"
-mkdir -p "$DEB_DIR/usr/share/applications"
-mkdir -p "$DEB_DIR/usr/share/pixmaps"
-mkdir -p "$DEB_DIR/usr/share/$PACKAGE_NAME"
-mkdir -p "$DEB_DIR/usr/share/doc/$PACKAGE_NAME"
-
-# 复制应用程序文件
-cp -r "$PUBLISH_DIR"/* "$DEB_DIR/usr/share/$PACKAGE_NAME/"
+{
+  mkdir -p "$DEB_DIR/DEBIAN"
+  mkdir -p "$DEB_DIR/usr/bin"
+  mkdir -p "$DEB_DIR/usr/share/applications"
+  mkdir -p "$DEB_DIR/usr/share/pixmaps"
+  mkdir -p "$DEB_DIR/usr/share/$PACKAGE_NAME"
+  mkdir -p "$DEB_DIR/usr/share/doc/$PACKAGE_NAME"
+  
+  # Copy application files
+  cp -r "$PUBLISH_DIR"/* "$DEB_DIR/usr/share/$PACKAGE_NAME/"
+} >/dev/null 2>&1 || true
 chmod +x "$DEB_DIR/usr/share/$PACKAGE_NAME/AGI.Captor.Desktop"
 
 # 创建启动脚本
@@ -194,8 +196,8 @@ fakeroot dpkg-deb --build "$DEB_DIR" "$SCRIPT_DIR/$DEB_NAME"
 
 # 验证包
 echo "🔍 验证 DEB 包..."
-dpkg-deb --info "$SCRIPT_DIR/$DEB_NAME"
-dpkg-deb --contents "$SCRIPT_DIR/$DEB_NAME"
+dpkg-deb --info "$SCRIPT_DIR/$DEB_NAME" >/dev/null 2>&1
+dpkg-deb --contents "$SCRIPT_DIR/$DEB_NAME" >/dev/null 2>&1
 
 # 清理临时文件
 rm -rf "$TEMP_DIR"

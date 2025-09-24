@@ -52,6 +52,12 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
+    - name: 🔒 Validate locked version
+      shell: pwsh
+      run: |
+        if (-not (Test-Path version.json)) { Write-Host 'version.json missing'; exit 1 }
+        ./build.ps1 CheckVersionLocked
+        
     - name: 🔨 Build and Test
       id: build-test
       uses: ./.github/actions/build-and-test
@@ -64,8 +70,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: build-test-results-${{ inputs.configuration }}
-        path: |
-          artifacts/test-results/
-          artifacts/coverage/
+        path: artifacts/coverage/
         if-no-files-found: warn
         retention-days: ${{ inputs.artifact-retention-days }}

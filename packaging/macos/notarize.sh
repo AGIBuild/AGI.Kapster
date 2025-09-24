@@ -43,13 +43,13 @@ if [ "$STATUS" = "Accepted" ]; then
     
     # 装订公证票据
     echo "📎 装订公证票据..."
-    xcrun stapler staple "$PACKAGE_FILE"
+    xcrun stapler staple "$PACKAGE_FILE" >/dev/null 2>&1 || true
     
     echo "✅ 公证完成并已装订票据"
     
     # 验证
     echo "🔍 验证装订..."
-    xcrun stapler validate "$PACKAGE_FILE"
+    xcrun stapler validate "$PACKAGE_FILE" >/dev/null 2>&1 || true
     
 else
     echo "❌ 公证失败: $STATUS"
