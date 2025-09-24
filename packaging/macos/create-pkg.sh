@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AGI Captor macOS PKG creation script
+# AGI Kapster macOS PKG creation script
 # Usage: ./create-pkg.sh <publish_directory> <version> [sign_identity]
 
 set -e
@@ -23,8 +23,8 @@ if [ ! -d "$PUBLISH_DIR" ]; then
 fi
 
 # Configuration
-APP_NAME="AGI Captor"
-BUNDLE_ID="com.agi.captor"
+APP_NAME="AGI Kapster"
+BUNDLE_ID="com.agi.Kapster"
 # Get architecture from environment or detect from path
 ARCH=""
 if [[ "$PUBLISH_DIR" == *"osx-arm64"* ]]; then
@@ -40,7 +40,7 @@ else
         ARCH="osx-x64"
     fi
 fi
-PKG_NAME="AGI.Captor-${VERSION}-${ARCH}.pkg"
+PKG_NAME="AGI.Kapster-${VERSION}-${ARCH}.pkg"
 TEMP_DIR="$(mktemp -d)"
 APP_DIR="$TEMP_DIR/$APP_NAME.app"
 
@@ -56,12 +56,12 @@ ls -la "$PUBLISH_DIR" || true
 
 # Copy executable file
 echo "Copying executable..."
-if [ ! -f "$PUBLISH_DIR/AGI.Captor.Desktop" ]; then
-    echo "❌ Executable not found: $PUBLISH_DIR/AGI.Captor.Desktop"
+if [ ! -f "$PUBLISH_DIR/AGI.Kapster.Desktop" ]; then
+    echo "❌ Executable not found: $PUBLISH_DIR/AGI.Kapster.Desktop"
     exit 1
 fi
-cp "$PUBLISH_DIR/AGI.Captor.Desktop" "$APP_DIR/Contents/MacOS/"
-chmod +x "$APP_DIR/Contents/MacOS/AGI.Captor.Desktop"
+cp "$PUBLISH_DIR/AGI.Kapster.Desktop" "$APP_DIR/Contents/MacOS/"
+chmod +x "$APP_DIR/Contents/MacOS/AGI.Kapster.Desktop"
 
 # Copy other files
 echo "Copying other files..."
@@ -79,7 +79,7 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <key>CFBundleDisplayName</key>
     <string>$APP_NAME</string>
     <key>CFBundleExecutable</key>
-    <string>AGI.Captor.Desktop</string>
+    <string>AGI.Kapster.Desktop</string>
     <key>CFBundleIconFile</key>
     <string>logo.icns</string>
     <key>CFBundleIdentifier</key>
@@ -109,9 +109,9 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 EOF
 
 # Copy icon (if exists)
-if [ -f "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" ]; then
-    cp "$SCRIPT_DIR/../src/AGI.Captor.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
-elif [ -f "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" ]; then
+if [ -f "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" ]; then
+    cp "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
+elif [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
     echo "⚠️  Found .ico file but .icns file is needed, please convert icon format"
 fi
 

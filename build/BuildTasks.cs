@@ -187,7 +187,7 @@ class BuildTasks : NukeBuild
             {
                 var publishPath = PublishDirectory / rid;
                 Console.WriteLine($"📦 Publishing for {rid} to {publishPath}");
-                
+
                 DotNetPublish(s =>
                 {
                     // When publishing single-file, avoid trimming native code and enable self-extract so native
@@ -211,7 +211,7 @@ class BuildTasks : NukeBuild
 
                     return publishSettings;
                 });
-                    
+
                 Console.WriteLine($"✅ Published {rid} successfully to {publishPath}");
             }
         });
@@ -376,7 +376,7 @@ class BuildTasks : NukeBuild
 
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
-    var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
+        var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
 
         // Ensure WXS file exists
         if (!File.Exists(wxsFile))
@@ -469,7 +469,7 @@ class BuildTasks : NukeBuild
     {
         try
         {
-                var version = GetFixedVersionOrFallback();
+            var version = GetFixedVersionOrFallback();
             var requestedFormats = MacOSFormats?.Split(',')
                 .Select(f => f.Trim().ToUpperInvariant())
                 .ToArray() ?? new[] { "PKG", "DMG" };
@@ -521,7 +521,7 @@ class BuildTasks : NukeBuild
                 requestedFormats.Contains("PKG"))
             {
                 Console.WriteLine("🔐 Starting notarization process...");
-                    RunMacNotarization(version.File);
+                RunMacNotarization(version.File);
             }
         }
         catch (Exception ex)
@@ -550,7 +550,7 @@ class BuildTasks : NukeBuild
         {
             filesToNotarize.Add(file);
         }
-        
+
         foreach (var file in Directory.GetFiles(PackageOutputDirectory, dmgPattern))
         {
             filesToNotarize.Add(file);
@@ -701,21 +701,21 @@ class BuildTasks : NukeBuild
     {
         if (string.IsNullOrWhiteSpace(v)) return false;
 
-    // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
-    // Pattern groups: 1=year, 2=month, 3=day, 4=seconds
-    var pattern = @"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d{1,5})$";
+        // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
+        // Pattern groups: 1=year, 2=month, 3=day, 4=seconds
+        var pattern = @"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d{1,5})$";
         var m = System.Text.RegularExpressions.Regex.Match(v, pattern);
         if (!m.Success) return false;
 
-    // Validate numeric ranges for month, day and seconds
-    if (!int.TryParse(m.Groups[2].Value, out var month)) return false;
-    if (month < 1 || month > 12) return false;
+        // Validate numeric ranges for month, day and seconds
+        if (!int.TryParse(m.Groups[2].Value, out var month)) return false;
+        if (month < 1 || month > 12) return false;
 
-    if (!int.TryParse(m.Groups[3].Value, out var day)) return false;
-    if (day < 1 || day > 31) return false;
+        if (!int.TryParse(m.Groups[3].Value, out var day)) return false;
+        if (day < 1 || day > 31) return false;
 
-    if (!int.TryParse(m.Groups[4].Value, out var seconds)) return false;
-    if (seconds < 0 || seconds > 86399) return false;
+        if (!int.TryParse(m.Groups[4].Value, out var seconds)) return false;
+        if (seconds < 0 || seconds > 86399) return false;
 
         return true;
     }
@@ -764,7 +764,7 @@ class BuildTasks : NukeBuild
         .Executes(() =>
         {
             var display = !string.IsNullOrWhiteSpace(NewVersion) ? NewVersion : GenerateTimestampVersion();
-            
+
             if (!IsValidDisplayVersion(display))
                 throw new Exception($"Invalid version format: {display}");
 
@@ -792,7 +792,7 @@ class BuildTasks : NukeBuild
                     var xdoc = XDocument.Load(MainProject.Path);
                     var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
                     var projectVersion = xdoc.Descendants(ns + "Version").FirstOrDefault()?.Value;
-                    
+
                     if (projectVersion != display)
                         throw new Exception($"Version mismatch: version.json={display}, project={projectVersion}");
                 }
