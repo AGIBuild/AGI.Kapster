@@ -106,9 +106,9 @@ jobs:
         $json = Get-Content version.json -Raw | ConvertFrom-Json
         if (-not $json.version) { Write-Host '❌ version.json missing version field'; exit 1 }
         
-        # Validate version format
+        # Validate version format (four segments, last segment up to 5 digits)
         $locked = $json.version
-        if ($locked -notmatch '^[0-9]{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$') { 
+        if ($locked -notmatch '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,5}$') { 
           Write-Host "❌ Locked version format invalid: $locked"; exit 1 
         }
         

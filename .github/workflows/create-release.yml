@@ -37,7 +37,8 @@ jobs:
             exit 1
           fi
           VERSION=$(jq -r '.version' version.json)
-          if ! echo "$VERSION" | grep -Eq '^[0-9]{4}\.[1-9][0-9]?\.[1-9][0-9]?\.[0-2][0-9][0-5][0-9]$'; then
+          # Accept format: yyyy.M.d.S  (four segments, last segment up to 5 digits)
+          if ! echo "$VERSION" | grep -Eq '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,5}$'; then
             echo "Invalid version format: $VERSION" >&2
             exit 1
           fi
