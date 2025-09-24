@@ -15,14 +15,14 @@
     <!-- Disable AOT for easier packaging and deployment -->
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
-    <AssemblyVersion>2025.9.23.1532</AssemblyVersion>
-    <FileVersion>2025.9.23.1532</FileVersion>
-    <Version>2025.9.23.1532</Version>
+    <AssemblyVersion>2025.9.24.0254</AssemblyVersion>
+    <FileVersion>2025.9.24.0254</FileVersion>
+    <Version>2025.9.24.0254</Version>
     <Product>AGI Captor</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.9.23.1532</InformationalVersion>
+    <InformationalVersion>2025.9.24.0254</InformationalVersion>
   </PropertyGroup>
   <!-- macOS App Bundle Configuration -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">

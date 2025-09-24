@@ -133,7 +133,7 @@
         },
         "MacOSFormats": {
           "type": "string",
-          "description": "macOS package formats to create (PKG,DMG,AppStore)"
+          "description": "macOS package formats to create (PKG,DMG,AppStore,APP)"
         },
         "MacSigningIdentity": {
           "type": "string",
