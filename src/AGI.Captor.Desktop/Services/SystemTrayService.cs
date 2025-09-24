@@ -209,48 +209,11 @@ public class SystemTrayService : ISystemTrayService
         try
         {
             // Log the notification
-            Log.Information("Showing notification: {Title} - {Message}", title, message);
+            Log.Debug("Showing notification: {Title} - {Message}", title, message);
 
-            // Use platform-specific notification implementation
-            ShowPlatformNotification(title, message);
-
-            // Also update tray icon tooltip as fallback
+            // Ensure UI operations run on the UI thread
             if (_trayIcon != null)
             {
-                var originalTooltip = _trayIcon.ToolTipText;
-                _trayIcon.ToolTipText = $"{title}: {message}";
-
-                // Reset tooltip after a delay
-                System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ =>
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        if (_trayIcon != null)
-                        {
-                            _trayIcon.ToolTipText = originalTooltip;
-                        }
-                    });
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
-        }
-    }
-
-    private void ShowPlatformNotification(string title, string message)
-    {
-        try
-        {
-            // Use a simple cross-platform notification approach
-            if (_trayIcon != null)
-            {
-                // For now, we'll use a simple approach that works across platforms
-                // In the future, this could be enhanced with platform-specific implementations
-                Log.Debug("System notification: {Title} - {Message}", title, message);
-                
-                // Ensure UI operations run on the UI thread
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     try
@@ -283,7 +246,7 @@ public class SystemTrayService : ISystemTrayService
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to show platform notification");
+            Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
         }
     }
 }
