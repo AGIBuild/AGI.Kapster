@@ -101,14 +101,6 @@ public class UpdateSettings
     public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
 
     /// <summary>
-    /// Override to enable updates in debug mode (for testing)
-    /// When null, uses default build configuration behavior
-    /// When true, enables updates even in debug builds
-    /// When false, disables updates (same as debug mode)
-    /// </summary>
-    public bool? EnableInDebugMode { get; set; } = false;
-
-    /// <summary>
     /// GitHub repository URL for update checks
     /// When null, uses default AGIBuild/AGI.Kapster repository
     /// Format: "owner/repository" or full API URL

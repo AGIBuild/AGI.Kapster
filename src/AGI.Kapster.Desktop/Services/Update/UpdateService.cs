@@ -65,12 +65,6 @@ public class UpdateService : IUpdateService, IDisposable
     /// </summary>
     private bool IsDebugMode()
     {
-        // Check settings first for override capability
-        if (_settings?.EnableInDebugMode.HasValue == true)
-        {
-            return !_settings.EnableInDebugMode.Value; // Inverted logic: enable setting means NOT debug mode
-        }
-
         // Default behavior based on build configuration
 #if DEBUG
         return true;
