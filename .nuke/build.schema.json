@@ -155,10 +155,6 @@
           "type": "boolean",
           "description": "Single file publish"
         },
-        "SkipTests": {
-          "type": "boolean",
-          "description": "Skip tests during build/publish operations"
-        },
         "Solution": {
           "type": "string",
           "description": "Path to a solution file that is automatically loaded"

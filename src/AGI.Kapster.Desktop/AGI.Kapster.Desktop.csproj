@@ -16,14 +16,14 @@
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2025.9.25.12567</AssemblyVersion>
-    <FileVersion>2025.9.25.12567</FileVersion>
-    <Version>2025.9.25.12567</Version>
+    <AssemblyVersion>2025.9.25.56171</AssemblyVersion>
+    <FileVersion>2025.9.25.56171</FileVersion>
+    <Version>2025.9.25.56171</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.9.25.12567</InformationalVersion>
+    <InformationalVersion>2025.9.25.56171</InformationalVersion>
   </PropertyGroup>
   <!-- macOS App Bundle Configuration -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
@@ -43,7 +43,9 @@
     <AvaloniaXamlVerboseExceptions>True</AvaloniaXamlVerboseExceptions>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="logo.ico" />
+    <Content Include="logo.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.6" />

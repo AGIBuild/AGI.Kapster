@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+	<Package Name="AGI Kapster"
+	  Language="1033"
+	  Version="$(var.ProductVersion)"
+	  Manufacturer="AGIBuild"
+	  ProductCode="*"
+	  UpgradeCode="12345678-1234-1234-1234-123456789012"
+	  InstallerVersion="500"
+	  Compressed="yes">
+
+		<!-- Upgrade configuration: Support intelligent version upgrades and same-version fixes -->
+		<MajorUpgrade
+		  AllowSameVersionUpgrades="yes"
+		  AllowDowngrades="no"
+		  DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall the newer version first."
+		  Schedule="afterInstallInitialize" />
+
+		<!-- Custom action: Terminate running processes -->
+		<CustomAction Id="CA_KillProcess"
+		  Directory="INSTALLFOLDER"
+		  Execute="immediate"
+		  ExeCommand='taskkill /f /im "AGI.Kapster.Desktop.exe" /t'
+		  Return="ignore" />
+
+		<!-- Custom action: Clean up user data directory -->
+		<CustomAction Id="CA_RemoveUserData"
+		  Directory="INSTALLFOLDER"
+		  Execute="deferred"
+		  Impersonate="yes"
+		  ExeCommand='cmd.exe /c "if exist "%LOCALAPPDATA%\AGI.Kapster" rmdir /s /q "%LOCALAPPDATA%\AGI.Kapster""'
+		  Return="ignore" />
+
+		<!-- Custom action: Launch application after installation -->
+		<CustomAction Id="CA_LaunchApplication"
+		  Directory="INSTALLFOLDER"
+		  Execute="immediate"
+		  Impersonate="yes"
+		  ExeCommand='"[INSTALLFOLDER]AGI.Kapster.Desktop.exe"'
+		  Return="asyncNoWait" />
+
+		<!-- Media configuration -->
+		<Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
+
+		<!-- Installation directory structure -->
+		<StandardDirectory Id="ProgramFiles6432Folder">
+			<Directory Id="INSTALLFOLDER" Name="AGI Kapster" />
+		</StandardDirectory>
+
+		<!-- Start menu -->
+		<StandardDirectory Id="ProgramMenuFolder">
+			<Directory Id="ApplicationProgramsFolder" Name="AGI Kapster" />
+		</StandardDirectory>
+
+		<!-- Desktop -->
+		<StandardDirectory Id="DesktopFolder" />
+
+		<!-- Components: Main application files (only include files required for single-file installer) -->
+		<!--<ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+			<Component Id="File_AGI_Kapster_Desktop_exe" Guid="12345678-1234-1234-1234-123456789024">
+				<File Source="$(var.PublishDir)\AGI.Kapster.Desktop.exe" KeyPath="yes" />
+			</Component>
+		</ComponentGroup>-->
+
+		<ComponentGroupRef Id="ProductComponents" />
+
+		<!-- Start menu shortcut -->
+		<Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+			<Shortcut Id="ApplicationStartMenuShortcut"
+			  Name="AGI Kapster"
+			  Description="Advanced Screenshot and Annotation Tool"
+			  Target="[INSTALLFOLDER]AGI.Kapster.Desktop.exe"
+			  WorkingDirectory="INSTALLFOLDER" />
+			<RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+			<RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Kapster" Name="installed"
+			  Type="integer" Value="1" KeyPath="yes" />
+		</Component>
+
+		<!-- Desktop shortcut -->
+		<Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
+			<Shortcut Id="ApplicationDesktopShortcut"
+			  Name="AGI Kapster"
+			  Description="Advanced Screenshot and Annotation Tool"
+			  Target="[INSTALLFOLDER]AGI.Kapster.Desktop.exe"
+			  WorkingDirectory="INSTALLFOLDER" />
+			<RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Kapster" Name="desktop" Type="integer"
+			  Value="1" KeyPath="yes" />
+		</Component>
+
+		<!-- Registry entries: File associations and application information -->
+		<Component Id="RegistryEntries" Directory="INSTALLFOLDER" Guid="*">
+			<!-- Application registration -->
+			<RegistryKey Root="HKLM" Key="SOFTWARE\AGI Build\AGI Kapster">
+				<RegistryValue Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" />
+				<RegistryValue Name="Version" Type="string" Value="[ProductVersion]" />
+				<RegistryValue Name="Publisher" Type="string" Value="AGI Build" />
+				<RegistryValue Name="ProductCode" Type="string" Value="[ProductCode]" />
+				<RegistryValue Name="UpgradeCode" Type="string" Value="12345678-1234-1234-1234-123456789012" />
+				<RegistryValue Name="InstallDate" Type="string" Value="[Date]" />
+			</RegistryKey>
+
+			<!-- Uninstaller registration: Use ProductCode as unique key to avoid duplicate installation -->
+			<RegistryKey Root="HKLM"
+			  Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]">
+				<RegistryValue Name="DisplayName" Type="string" Value="AGI Kapster" />
+				<RegistryValue Name="DisplayVersion" Type="string" Value="[ProductVersion]" />
+				<RegistryValue Name="Publisher" Type="string" Value="AGI Build" />
+				<RegistryValue Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" />
+				<RegistryValue Name="UninstallString" Type="string"
+				  Value="[SystemFolder]msiexec.exe /x [ProductCode]" />
+				<RegistryValue Name="QuietUninstallString" Type="string"
+				  Value="[SystemFolder]msiexec.exe /x [ProductCode] /quiet" />
+				<RegistryValue Name="ModifyPath" Type="string"
+				  Value="[SystemFolder]msiexec.exe /i [ProductCode]" />
+				<RegistryValue Name="NoModify" Type="integer" Value="1" />
+				<RegistryValue Name="NoRepair" Type="integer" Value="0" />
+				<RegistryValue Name="EstimatedSize" Type="integer" Value="90000" />
+				<RegistryValue Name="HelpLink" Type="string" Value="https://github.com/AGIBuild/AGI.Kapster" />
+				<RegistryValue Name="URLInfoAbout" Type="string"
+				  Value="https://github.com/AGIBuild/AGI.Kapster" />
+				<RegistryValue Name="URLUpdateInfo" Type="string"
+				  Value="https://github.com/AGIBuild/AGI.Kapster/releases" />
+				<RegistryValue Name="InstallDate" Type="string" Value="[Date]" />
+				<RegistryValue Name="Language" Type="integer" Value="1033" />
+				<RegistryValue Name="SystemComponent" Type="integer" Value="0" />
+				<RegistryValue Name="VersionMajor" Type="integer" Value="1" />
+				<RegistryValue Name="VersionMinor" Type="integer" Value="2" />
+			</RegistryKey>
+
+			<!-- User data protection flags -->
+			<RegistryKey Root="HKLM" Key="SOFTWARE\AGI Build\AGI Kapster\UserData">
+				<RegistryValue Name="PreserveOnUninstall" Type="integer" Value="1" />
+				<RegistryValue Name="BackupOnUpgrade" Type="integer" Value="1" />
+				<RegistryValue Name="UserDataPath" Type="string" Value="%LOCALAPPDATA%\AGI.Kapster" />
+			</RegistryKey>
+		</Component>
+
+		<!-- User data protection component -->
+		<Component Id="UserDataProtection" Directory="INSTALLFOLDER" Guid="*">
+			<RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Kapster\UserData"
+			  Name="PreserveSettings" Type="integer" Value="1" KeyPath="yes" />
+			<RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Kapster\UserData"
+			  Name="LastUpgrade" Type="string" Value="[Date]" />
+			<RegistryValue Root="HKCU" Key="Software\AGI Build\AGI Kapster\UserData"
+			  Name="Version" Type="string" Value="[ProductVersion]" />
+		</Component>
+
+		<!-- Feature definition -->
+		<Feature Id="ProductFeature" Title="AGI Kapster" Level="1">
+			<ComponentGroupRef Id="ProductComponents" />
+			<ComponentRef Id="ApplicationShortcut" />
+			<ComponentRef Id="DesktopShortcut" />
+			<ComponentRef Id="RegistryEntries" />
+			<ComponentRef Id="UserDataProtection" />
+		</Feature>
+
+		<!-- Installation sequence: Define execution order of custom actions -->
+		<InstallExecuteSequence>
+			<!-- Before installation: Terminate running processes -->
+			<Custom Action="CA_KillProcess" Before="InstallValidate" Condition="NOT Installed" />
+
+			<!-- After installation: Launch application by default -->
+			<Custom Action="CA_LaunchApplication" After="InstallFinalize" Condition="NOT Installed" />
+		</InstallExecuteSequence>
+
+		<!-- Property definitions -->
+		<Property Id="CLEANUP_USER_DATA" Value="0" />
+
+		<!-- Disable certain installation options to simplify user experience -->
+		<Property Id="ARPHELPLINK" Value="https://github.com/AGIBuild/AGI.Kapster" />
+		<Property Id="ARPURLINFOABOUT" Value="https://github.com/AGIBuild/AGI.Kapster" />
+		<Property Id="ARPNOMODIFY" Value="1" />
+		<Property Id="ARPNOREPAIR" Value="0" />
+
+		<!-- Application icon -->
+		<Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+		<Icon Id="ProductIcon" SourceFile="$(var.SourceDir)\..\..\..\src\AGI.Kapster.Desktop\logo.ico" />
+
+		<!-- Self-contained .NET 9.0 applications do not require additional runtime checks -->
+
+	</Package>
+</Wix>

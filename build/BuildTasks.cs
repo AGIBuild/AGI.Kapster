@@ -39,9 +39,6 @@ class BuildTasks : NukeBuild
     [Parameter("Test filter expression (e.g., Category=Unit)")]
     readonly string TestFilter;
 
-    [Parameter("Skip tests during build/publish operations")]
-    readonly bool SkipTests;
-
     [Parameter("Enable code coverage collection")]
     readonly bool Coverage;
 
@@ -130,7 +127,6 @@ class BuildTasks : NukeBuild
 
     Target Test => _ => _
         .DependsOn(Build)
-        .OnlyWhenDynamic(() => !SkipTests)
         .Executes(() =>
         {
             try
@@ -231,7 +227,6 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"Self-contained: {SelfContained}");
             Console.WriteLine($"Single File: {SingleFile}");
             Console.WriteLine($"Trim: {Trim}");
-            Console.WriteLine($"Skip Tests: {SkipTests}");
             Console.WriteLine($"Coverage: {Coverage}");
 
             if (!string.IsNullOrWhiteSpace(TestFilter))
@@ -371,82 +366,70 @@ class BuildTasks : NukeBuild
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Windows package creation failed: {ex.Message}");
-            // Fallback to portable ZIP
-            var version = GetFixedVersionOrFallback();
-            CreatePortableZip(publishPath, rid, version.File);
+            throw;
         }
     }
 
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
-        var wxsFile = WindowsPackagingDirectory / "AGI.Kapster.v4.wxs";
+        var wxsFile = WindowsPackagingDirectory / "Product.wxs";
+        var componentFragment = WindowsPackagingDirectory / "ProductComponents.wxs";
+        //: WindowsPackagingDirectory/ "Product.wxs";
+        var sourceDir = publishPath;
 
-        // Ensure WXS file exists
+        // Check main wxs and fragment file
         if (!File.Exists(wxsFile))
         {
-            Console.WriteLine($"❌ WiX source file not found: {wxsFile}");
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            Console.WriteLine($"WiX source file not found: {wxsFile}");
             return;
         }
-
-        try
+        var processInfo = new System.Diagnostics.ProcessStartInfo
         {
-            Console.WriteLine($"🔨 Compiling WiX source...");
+            FileName = "wix",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
 
-            // Step 1: Compile .wxs to MSI using WiX v4
-            var processInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "wix",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            // WiX v4 build command with correct parameters
-            var wixArgs = new string[]
-            {
-                "build",
-                "-arch", rid == "win-arm64" ? "arm64" : "x64",
-                "-define", $"SourceDir={publishPath}",
-                "-define", $"ProductVersion={version.FileVersion}",
-                "-out", packagePath,
-                wxsFile
-            };
-
-            foreach (var arg in wixArgs)
-            {
-                processInfo.ArgumentList.Add(arg);
-            }
-
-            using var process = System.Diagnostics.Process.Start(processInfo);
-            if (process == null)
-                throw new InvalidOperationException("Failed to start WiX process");
-
-            // Read outputs to prevent deadlock
-            var outputBuilder = new System.Text.StringBuilder();
-            var errorBuilder = new System.Text.StringBuilder();
-
-            process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
-            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                var error = errorBuilder.ToString();
-                throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
-            }
-
-            Console.WriteLine($"✅ Created: {packagePath}");
-        }
-        catch (Exception ex)
+        // WiX v4 build command with fragment
+        var wixArgs = new string[]
         {
-            Console.WriteLine($"❌ WiX compilation failed: {ex.Message}");
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            "build",
+            "-arch", rid == "win-arm64" ? "arm64" : "x64",
+            "-define", $"SourceDir={sourceDir}",
+            "-define", $"ProductVersion={version.FileVersion}",
+            "-out", packagePath,
+            wxsFile.ToString(),
+            componentFragment.ToString()
+        };
+
+        foreach (var arg in wixArgs)
+        {
+            processInfo.ArgumentList.Add(arg);
         }
+
+        using var process = System.Diagnostics.Process.Start(processInfo);
+        if (process == null)
+            throw new InvalidOperationException("Failed to start WiX process");
+
+        var outputBuilder = new System.Text.StringBuilder();
+        var errorBuilder = new System.Text.StringBuilder();
+
+        process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
+        process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
+
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            var error = errorBuilder.ToString();
+            throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
+        }
+
+        Console.WriteLine($"Created: {packagePath}");
     }
 
     void CreatePortableZip(AbsolutePath publishPath, string rid, string version)
@@ -639,8 +622,7 @@ class BuildTasks : NukeBuild
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Linux package creation failed: {ex.Message}");
-            var version = GetFixedVersionOrFallback();
-            CreatePortableZip(publishPath, rid, version.File);
+            throw;
         }
     }
 
