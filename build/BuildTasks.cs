@@ -409,6 +409,8 @@ class BuildTasks : NukeBuild
             processInfo.ArgumentList.Add(arg);
         }
 
+        Console.WriteLine($"Run {string.Join(',', processInfo.ArgumentList)}");
+
         using var process = System.Diagnostics.Process.Start(processInfo);
         if (process == null)
             throw new InvalidOperationException("Failed to start WiX process");
