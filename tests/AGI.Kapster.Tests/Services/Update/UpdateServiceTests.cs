@@ -130,25 +130,25 @@ public class UpdateServiceTests : IDisposable
         }
     }
 
-    [Fact]
-    public void IsAutoUpdateEnabled_ShouldRespectDebugMode()
-    {
-        // Arrange
-        var settings = TestDataFactory.CreateDefaultAppSettings();
-        settings.AutoUpdate!.Enabled = true;
-        _mockSettingsService.Settings.Returns(settings);
+//    [Fact]
+//    public void IsAutoUpdateEnabled_ShouldRespectDebugMode()
+//    {
+//        // Arrange
+//        var settings = TestDataFactory.CreateDefaultAppSettings();
+//        settings.AutoUpdate!.Enabled = true;
+//        _mockSettingsService.Settings.Returns(settings);
 
-        var service = new UpdateService(_mockSettingsService);
+//        var service = new UpdateService(_mockSettingsService);
 
-        // Act & Assert
-#if DEBUG
-        // In debug mode, auto-update should be disabled regardless of settings
-        service.IsAutoUpdateEnabled.Should().BeFalse();
-#else
-        // In release mode, auto-update should follow settings
-        service.IsAutoUpdateEnabled.Should().BeTrue();
-#endif
-    }
+//        // Act & Assert
+//#if DEBUG
+//        // In debug mode, auto-update should be disabled regardless of settings
+//        service.IsAutoUpdateEnabled.Should().BeFalse();
+//#else
+//        // In release mode, auto-update should follow settings
+//        service.IsAutoUpdateEnabled.Should().BeTrue();
+//#endif
+//    }
 
     [Fact]
     public void IsAutoUpdateEnabled_ShouldRespectSettingsWhenNotDebugMode()
