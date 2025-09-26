@@ -1,94 +1,94 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<OutputType>WinExe</OutputType>
-		<TargetFramework>net9.0</TargetFramework>
-		<RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
-		<Nullable>enable</Nullable>
-		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-		<ApplicationManifest>app.manifest</ApplicationManifest>
-		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-		<ApplicationIcon>logo.ico</ApplicationIcon>
-		<!-- Suppress Avalonia XAML warnings -->
-		<NoWarn>$(NoWarn);AVLN3001</NoWarn>
-		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-		<!-- Disable AOT for easier packaging and deployment -->
-		<PublishAot>False</PublishAot>
-		<!-- Version Information -->
-		<!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-		<AssemblyVersion>2025.9.26.12620</AssemblyVersion>
-		<FileVersion>2025.9.26.12620</FileVersion>
-		<Version>2025.9.26.12620</Version>
-		<Product>AGI Kapster</Product>
-		<Company>AGI Build</Company>
-		<Copyright>Copyright © AGI Build 2025</Copyright>
-		<Description>Advanced Screenshot and Annotation Tool</Description>
-		<InformationalVersion>2025.9.26.12620</InformationalVersion>
-	</PropertyGroup>
-	<!-- macOS App Bundle Configuration -->
-	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
-		<CFBundleName>AGI Kapster</CFBundleName>
-		<CFBundleDisplayName>AGI Kapster</CFBundleDisplayName>
-		<CFBundleIdentifier>com.AGI.Kapster</CFBundleIdentifier>
-		<CFBundleVersion>1.2.0</CFBundleVersion>
-		<CFBundleShortVersionString>1.2.0</CFBundleShortVersionString>
-		<CFBundlePackageType>APPL</CFBundlePackageType>
-		<CFBundleSignature>????</CFBundleSignature>
-		<CFBundleExecutable>AGI.Kapster.Desktop</CFBundleExecutable>
-		<CFBundleIconFile>logo.icns</CFBundleIconFile>
-		<NSHighResolutionCapable>true</NSHighResolutionCapable>
-		<LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
-	</PropertyGroup>
-	<PropertyGroup Label="Avalonia">
-		<AvaloniaXamlVerboseExceptions>True</AvaloniaXamlVerboseExceptions>
-	</PropertyGroup>
-	<ItemGroup>
-	  <None Remove="appsettings.json" />
-	</ItemGroup>
-	<ItemGroup>
-		<Content Include="appsettings.json" />
-		<Content Include="logo.ico">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-	</ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="Avalonia" Version="11.3.6" />
-		<PackageReference Include="Avalonia.Desktop" Version="11.3.6" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6" />
-		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.6" />
-		<!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.6">
-			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
-		</PackageReference>
-		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
-		<PackageReference Include="Serilog.Extensions.Logging" Version="9.0.2" />
-		<PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-		<PackageReference Include="SharpHook" Version="7.0.2" />
-		<PackageReference Include="System.Drawing.Common" Version="9.0.9" />
-		<PackageReference Include="SkiaSharp" Version="3.119.1" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
-	</ItemGroup>
-	<ItemGroup>
-		<Content Update="appsettings.json">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-		<Content Update="appsettings.Development.json">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-		<Content Update="appsettings.Production.json">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-	</ItemGroup>
-	<ItemGroup>
-		<Folder Include="Properties\" />
-	</ItemGroup>
-	<ItemGroup>
-		<AvaloniaResource Include="logo.ico" />
-	</ItemGroup>
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
+    <!-- Suppress Avalonia XAML warnings -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <!-- Disable AOT for easier packaging and deployment -->
+    <PublishAot>False</PublishAot>
+    <!-- Version Information -->
+    <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
+    <AssemblyVersion>2025.9.26.48676</AssemblyVersion>
+    <FileVersion>2025.9.26.48676</FileVersion>
+    <Version>2025.9.26.48676</Version>
+    <Product>AGI Kapster</Product>
+    <Company>AGI Build</Company>
+    <Copyright>Copyright © AGI Build 2025</Copyright>
+    <Description>Advanced Screenshot and Annotation Tool</Description>
+    <InformationalVersion>2025.9.26.48676</InformationalVersion>
+  </PropertyGroup>
+  <!-- macOS App Bundle Configuration -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <CFBundleName>AGI Kapster</CFBundleName>
+    <CFBundleDisplayName>AGI Kapster</CFBundleDisplayName>
+    <CFBundleIdentifier>com.AGI.Kapster</CFBundleIdentifier>
+    <CFBundleVersion>1.2.0</CFBundleVersion>
+    <CFBundleShortVersionString>1.2.0</CFBundleShortVersionString>
+    <CFBundlePackageType>APPL</CFBundlePackageType>
+    <CFBundleSignature>????</CFBundleSignature>
+    <CFBundleExecutable>AGI.Kapster.Desktop</CFBundleExecutable>
+    <CFBundleIconFile>logo.icns</CFBundleIconFile>
+    <NSHighResolutionCapable>true</NSHighResolutionCapable>
+    <LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Avalonia">
+    <AvaloniaXamlVerboseExceptions>True</AvaloniaXamlVerboseExceptions>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="appsettings.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json" />
+    <Content Include="logo.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.6" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.6">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="9.0.2" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="SharpHook" Version="7.0.2" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.9" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.Development.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.Production.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="logo.ico" />
+  </ItemGroup>
 </Project>
