@@ -16,14 +16,14 @@
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2025.9.26.10477</AssemblyVersion>
-    <FileVersion>2025.9.26.10477</FileVersion>
-    <Version>2025.9.26.10477</Version>
+    <AssemblyVersion>2025.9.26.12621</AssemblyVersion>
+    <FileVersion>2025.9.26.12621</FileVersion>
+    <Version>2025.9.26.12621</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.9.26.10477</InformationalVersion>
+    <InformationalVersion>2025.9.26.12621</InformationalVersion>
   </PropertyGroup>
   <!-- macOS App Bundle Configuration -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
