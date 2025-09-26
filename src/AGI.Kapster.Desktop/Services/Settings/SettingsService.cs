@@ -3,7 +3,6 @@ using Serilog;
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using AGI.Kapster.Desktop.Services.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -154,21 +153,19 @@ public class SettingsService : ISettingsService
         if (_configuration == null) return;
 
         // If AutoUpdate settings don't exist in user settings, use configuration defaults
-        if (_settings.AutoUpdate == null)
+        var autoUpdateSection = _configuration.GetSection("AutoUpdate");
+        if (autoUpdateSection.Exists())
         {
-            var autoUpdateSection = _configuration.GetSection("AutoUpdate");
-            if (autoUpdateSection.Exists())
+            _settings.AutoUpdate = new AutoUpdateSettings
             {
-                _settings.AutoUpdate = new AutoUpdateSettings
-                {
-                    Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
-                    CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
-                    InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
-                    NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
-                    UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
-                    LastCheckTime = DateTime.MinValue
-                };
-            }
+                Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
+                CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
+                InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
+                NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
+                UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
+                LastCheckTime = DateTime.MinValue
+            };
         }
+
     }
 }

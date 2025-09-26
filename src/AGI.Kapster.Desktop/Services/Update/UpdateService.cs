@@ -4,7 +4,6 @@ using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -46,7 +45,6 @@ public class UpdateService : IUpdateService, IDisposable
         _updateTimer = new Timer();
         _updateTimer.Elapsed += OnTimerElapsed;
         _updateTimer.AutoReset = true;
-
         UpdateTimerInterval();
 
         _logger.Information("Update service initialized. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
@@ -67,7 +65,7 @@ public class UpdateService : IUpdateService, IDisposable
     {
         // Default behavior based on build configuration
 #if DEBUG
-        return true;
+        return false;
 #else
         return Debugger.IsAttached;
 #endif
