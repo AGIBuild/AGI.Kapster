@@ -95,7 +95,7 @@ jobs:
       if: ${{ github.ref_type == 'tag' }}
       uses: actions/checkout@v4
       with:
-        ref: release
+        ref: main
         fetch-depth: 0
 
     - name: 🔒 Validate release consistency

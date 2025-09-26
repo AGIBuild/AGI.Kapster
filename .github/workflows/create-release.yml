@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: release
+          ref: main
           
       - name: 🛠️ Setup Environment
         uses: ./.github/actions/setup-environment
@@ -80,7 +80,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           name: AGI.Kapster v${{ env.VERSION }}
-          target_commitish: release
+          target_commitish: main
           draft: false
           prerelease: ${{ github.event.inputs.prerelease }}
           token: ${{ secrets.GH_PAT }}   
