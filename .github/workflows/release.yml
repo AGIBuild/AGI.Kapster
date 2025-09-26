@@ -303,11 +303,12 @@ jobs:
         Get-ChildItem "release-artifacts" -Directory | ForEach-Object {
           $platformDir = $_.FullName
           Write-Host "📂 Processing: $($_.Name)"
-          Get-ChildItem "$platformDir" -File -Recurse | ForEach-Object {
-            $file = $_
-            Copy-Item $file.FullName "$releaseDir/$($file.Name)"
-            Write-Host "  ✅ $($file.Name)"
-          }
+          # Copy all files except build/debug artifacts like .wixpdb
+          Get-ChildItem "$platformDir" -File -Recurse | Where-Object { $_.Extension -ne '.wixpdb' } | ForEach-Object {
+              $file = $_
+              Copy-Item $file.FullName "$releaseDir/$($file.Name)"
+              Write-Host "  ✅ $($file.Name)"
+            }
         }
         $expected = @(
           @{ Rid='win-x64';    Pattern='*-win-x64.msi';    Friendly='Windows x64 MSI' }
@@ -332,7 +333,7 @@ jobs:
         $manifest = "SHASUMS-$version.txt"
         $manifestPath = Join-Path $releaseDir $manifest
         if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
-        Get-ChildItem $releaseDir -File | Sort-Object Name | ForEach-Object {
+        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
           $hash = Get-FileHash $_.FullName -Algorithm SHA256
           "$($hash.Hash)  $($_.Name)"
         } | Out-File -FilePath $manifestPath -Encoding ASCII
@@ -346,7 +347,7 @@ jobs:
         Write-Host "🧾 Wrote checksum manifest: $manifest"
         Get-Content $manifestPath | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
         Write-Host "📋 Final release assets:"
-        Get-ChildItem $releaseDir | Sort-Object Name | ForEach-Object { 
+        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object { 
           Write-Host "  • $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
         }
     
