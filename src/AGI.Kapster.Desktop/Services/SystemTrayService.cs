@@ -5,6 +5,9 @@ using Avalonia.Controls;
 using Avalonia.Platform;
 using AGI.Kapster.Desktop.Dialogs;
 using Serilog;
+using System.Threading.Tasks;
+using Avalonia.Layout;
+using Avalonia.Media;
 
 namespace AGI.Kapster.Desktop.Services;
 
@@ -233,5 +236,124 @@ public class SystemTrayService : ISystemTrayService
         {
             Log.Error(ex, "Failed to show notification: {Title} - {Message}", title, message);
         }
+    }
+
+    /// <summary>
+    /// Show an install confirmation prompt to the user. Attempts to show a modal dialog on the UI thread.
+    /// Falls back to a notification and returns false if user interaction isn't available.
+    /// </summary>
+    /// <param name="installerPath">Path to the installer file (used for display only)</param>
+    /// <returns>True if user agreed to install</returns>
+    public async Task<bool> ShowInstallConfirmationAsync(string installerPath)
+    {
+        try
+        {
+            if (Avalonia.Application.Current != null && Avalonia.Threading.Dispatcher.UIThread != null)
+            {
+                var tcs = new TaskCompletionSource<bool>();
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var window = new Window
+                        {
+                            Width = 420,
+                            Height = 160,
+                            CanResize = false,
+                            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                            Title = "Install Update",
+                        };
+
+                        var panel = new StackPanel
+                        {
+                            Margin = new Thickness(12),
+                            Orientation = Orientation.Vertical
+                        };
+
+                        var textBlock = new TextBlock
+                        {
+                            Text = $"An update installer was downloaded:\n{Path.GetFileName(installerPath)}\n\nDo you want to install it now?",
+                            TextWrapping = TextWrapping.Wrap,
+                            Margin = new Thickness(4)
+                        };
+
+                        var buttons = new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            HorizontalAlignment = HorizontalAlignment.Right,
+                            Margin = new Thickness(4)
+                        };
+
+                        var yes = new Button { Content = "Install", IsDefault = true, Width = 90, Margin = new Thickness(4) };
+                        var no = new Button { Content = "Later", IsCancel = true, Width = 90, Margin = new Thickness(4) };
+
+                        yes.Click += (_, _) =>
+                        {
+                            tcs.TrySetResult(true);
+                            window.Close();
+                        };
+
+                        no.Click += (_, _) =>
+                        {
+                            tcs.TrySetResult(false);
+                            window.Close();
+                        };
+
+                        buttons.Children.Add(yes);
+                        buttons.Children.Add(no);
+
+                        panel.Children.Add(textBlock);
+                        panel.Children.Add(buttons);
+
+                        window.Content = panel;
+
+
+                        // Determine owner window if available
+                        Avalonia.Controls.Window? mainWindow = null;
+                        if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
+                        {
+                            mainWindow = desktop.MainWindow;
+                        }
+
+                        window.Closed += (_, _) => tcs.TrySetResult(false);
+
+                        // Show modal when owner available, otherwise show non-modal window
+                        if (mainWindow != null)
+                        {
+                            window.ShowDialog(mainWindow);
+                        }
+                        else
+                        {
+                            window.Show();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Failed to show install confirmation dialog");
+                        tcs.TrySetResult(false);
+                    }
+                });
+
+                var result = await tcs.Task.ConfigureAwait(false);
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error showing install confirmation dialog");
+        }
+
+        // Fallback: notify via tray and decline
+        try
+        {
+            ShowNotification("Update Ready to Install", $"An update was downloaded: {Path.GetFileName(installerPath)}. Open the app to install later.");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to show tray fallback for install confirmation");
+        }
+
+        return false;
     }
 }
