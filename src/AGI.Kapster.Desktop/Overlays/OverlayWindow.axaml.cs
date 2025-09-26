@@ -385,6 +385,20 @@ public partial class OverlayWindow : Window
             _elementDetector?.ToggleDetectionMode();
             e.Handled = true;
         }
+        else if (e.Key == Key.S && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            // Ctrl+S: Export current selection to file
+            if (_hasEditableSelection && _annotator != null)
+            {
+                Log.Information("Ctrl+S pressed - triggering export via annotator");
+                _annotator.RequestExport();
+            }
+            else
+            {
+                Log.Debug("Ctrl+S pressed but no editable selection or annotator found");
+            }
+            e.Handled = true;
+        }
         else if (e.Key == Key.Enter)
         {
             if (this.FindControl<SelectionOverlay>("Selector") is { } selector && selector is not null)
@@ -907,6 +921,7 @@ public partial class OverlayWindow : Window
             Log.Error(ex, "Failed to handle export request");
         }
     }
+
 
     /// <summary>
     /// Create file types for file picker from supported export formats

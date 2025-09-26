@@ -54,6 +54,9 @@ Download from [GitHub Releases](../../releases/latest):
 **macOS:**
 - `AGI.Kapster-osx-x64.pkg` - Intel Mac
 - `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
+> Since the installation package is not signed, you need to run the following command in the command line to lift the system restriction by removing the quarantine attribute from the installation file. You must perform this operation each time you install a new version.
+
+`xattr -d com.apple.quarantine AGI.Kapster-2025.9.26.48676-osx-arm64.pkg`
 
 **Linux:**
 - `agi-kapster_*_amd64.deb` - Debian/Ubuntu

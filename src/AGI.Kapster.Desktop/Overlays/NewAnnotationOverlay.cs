@@ -41,9 +41,7 @@ public sealed class NewAnnotationOverlay : Canvas
     private readonly IAnnotationService _annotationService;
     private readonly IAnnotationRenderer _renderer;
     private readonly CommandManager _commandManager;
-    private readonly IExportService _exportService;
     private IAnnotationItem? _creatingItem;
-    private Point _startPoint;
     private bool _isCreating;
 
     // Text editing
@@ -104,7 +102,6 @@ public sealed class NewAnnotationOverlay : Canvas
         _annotationService = new AnnotationService(settingsService);
         _renderer = new AnnotationRenderer();
         _commandManager = new CommandManager();
-        _exportService = new ExportService();
 
         Background = Brushes.Transparent;
         IsHitTestVisible = false; // Start as non-interactive
@@ -697,7 +694,6 @@ public sealed class NewAnnotationOverlay : Canvas
         // Normal creation flow for other tools
         try
         {
-            _startPoint = point;
             _creatingItem = _annotationService.StartAnnotation(point);
 
             if (_creatingItem != null)
