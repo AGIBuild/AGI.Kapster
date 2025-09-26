@@ -2,7 +2,7 @@ name: verify-version
 
 on:
   pull_request:
-    branches: [ main, release ]
+    branches: [ main ]
 
 jobs:
   verify:
