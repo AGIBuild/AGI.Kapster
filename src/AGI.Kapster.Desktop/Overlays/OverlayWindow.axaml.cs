@@ -219,6 +219,9 @@ public partial class OverlayWindow : Window
 
             // Subscribe to export events
             _annotator.ExportRequested += HandleExportRequest;
+            
+            // Subscribe to color picker events
+            _annotator.ColorPickerRequested += HandleColorPickerRequest;
 
             // Handle double-click confirm (unified cross-platform logic)
             _annotator.ConfirmRequested += async r =>
@@ -922,6 +925,40 @@ public partial class OverlayWindow : Window
         }
     }
 
+    /// <summary>
+    /// Handle color picker request from annotation overlay
+    /// </summary>
+    private void HandleColorPickerRequest()
+    {
+        try
+        {
+            // Find the toolbar and trigger color picker
+            if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } toolbar)
+            {
+                // Use reflection to call the private ShowColorPicker method
+                var showColorPickerMethod = toolbar.GetType()
+                    .GetMethod("ShowColorPicker", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                
+                if (showColorPickerMethod != null)
+                {
+                    showColorPickerMethod.Invoke(toolbar, null);
+                    Log.Debug("Color picker opened via keyboard shortcut");
+                }
+                else
+                {
+                    Log.Warning("Could not find ShowColorPicker method in toolbar");
+                }
+            }
+            else
+            {
+                Log.Warning("Could not find toolbar to open color picker");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to handle color picker request");
+        }
+    }
 
     /// <summary>
     /// Create file types for file picker from supported export formats
