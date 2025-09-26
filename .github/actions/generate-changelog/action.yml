@@ -1,6 +1,6 @@
 name: 'Generate Changelog'
 description: 'Generate professional changelog using conventional commits'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   version:

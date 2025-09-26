@@ -2,7 +2,7 @@
 
 ## Overview
 
-The overlay system in AGI.Captor provides transparent overlay windows for screen capture and annotation across multiple platforms. The architecture uses dependency injection without factory patterns, running purely in background mode with system tray integration.
+The overlay system in AGI.Kapster provides transparent overlay windows for screen capture and annotation across multiple platforms. The architecture uses dependency injection without factory patterns, running purely in background mode with system tray integration.
 
 ## Core Components
 

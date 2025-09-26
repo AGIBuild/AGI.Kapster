@@ -133,7 +133,7 @@
         },
         "MacOSFormats": {
           "type": "string",
-          "description": "macOS package formats to create (PKG,DMG,AppStore)"
+          "description": "macOS package formats to create (PKG,DMG,AppStore,APP)"
         },
         "MacSigningIdentity": {
           "type": "string",
@@ -141,7 +141,7 @@
         },
         "NewVersion": {
           "type": "string",
-          "description": "Manual new version (display format: yyyy.M.d.HHmmss — month/day no leading zero, time HHmmss). If omitted auto-generate"
+          "description": "Manual new version (display format: yyyy.M.d.S — 4 segments where S is seconds since midnight, range 0..86399, max 5 digits. Example: 2025.9.4.3605). If omitted auto-generate"
         },
         "Rids": {
           "type": "string",
@@ -154,10 +154,6 @@
         "SingleFile": {
           "type": "boolean",
           "description": "Single file publish"
-        },
-        "SkipTests": {
-          "type": "boolean",
-          "description": "Skip tests during build/publish operations"
         },
         "Solution": {
           "type": "string",

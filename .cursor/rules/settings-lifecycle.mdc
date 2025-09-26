@@ -76,6 +76,6 @@ public SomeService()
 - Thread-safe by design (each thread gets own instance)
 
 ## Files Following This Pattern
-- [SettingsService.cs](mdc:src/AGI.Captor.App/Services/SettingsService.cs): Core implementation
-- [ExportService.cs](mdc:src/AGI.Captor.App/Services/ExportService.cs): Uses `new SettingsService()`
-- [OverlayWindow.axaml.cs](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs): Creates own instance
+- [SettingsService.cs](mdc:src/AGI.Kapster.App/Services/SettingsService.cs): Core implementation
+- [ExportService.cs](mdc:src/AGI.Kapster.App/Services/ExportService.cs): Uses `new SettingsService()`
+- [OverlayWindow.axaml.cs](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs): Creates own instance

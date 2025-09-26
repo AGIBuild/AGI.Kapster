@@ -1,0 +1,136 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AGI.Kapster.Desktop.Dialogs.AccessibilityPermissionDialog"
+        Title="Accessibility Permission Settings"
+        Width="500"
+        Height="400"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True">
+    
+    <Window.Styles>
+        <Style Selector="Window">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="10"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 标题 -->
+        <TextBlock Grid.Row="0" 
+                   Text="Accessibility Permission Required" 
+                   FontSize="18" 
+                   FontWeight="Bold"
+                   Margin="0,0,0,20"/>
+        
+        <!-- 说明内容 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="15">
+                <TextBlock TextWrapping="Wrap" FontSize="14">
+                    AGI.Kapster requires accessibility permission to monitor global hotkeys. Please follow these steps to enable permissions:
+                </TextBlock>
+                
+                <Border Background="#2D2D2D" Padding="15" CornerRadius="5">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Step 1: Open System Settings" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Click Apple menu → System Settings (or System Preferences)
+                        </TextBlock>
+                        
+                        <TextBlock Text="Step 2: Find Privacy &amp;amp; Security" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • macOS Ventura+: Privacy &amp;amp; Security → Accessibility
+                            • macOS Big Sur/Monterey: Security &amp;amp; Privacy → Privacy → Accessibility
+                        </TextBlock>
+                        
+                        <TextBlock Text="Step 3: Add Application" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Click the lock icon and enter password to unlock
+                            • Click "+" button to add application
+                        </TextBlock>
+                        
+                        <TextBlock Text="Step 4: Select Correct Application" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • The current application path is:
+                        </TextBlock>
+                        <TextBlock x:Name="CurrentAppPathText" 
+                                   TextWrapping="Wrap" 
+                                   FontFamily="Consolas,Monaco,monospace" 
+                                   Background="#3D3D3D" 
+                                   Padding="5" 
+                                   FontSize="12" 
+                                   Foreground="Gray"/>
+                        
+                        <TextBlock Text="Step 5: Enable Permissions" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="White"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            • Ensure the checkbox next to the added app is checked
+                            • Restart AGI.Kapster application
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                
+                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Gray">
+                    Note: The release version will show as "AGI.Kapster.Desktop", but the development version requires adding the dotnet runtime.
+                </TextBlock>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- 权限状态 -->
+        <Border Grid.Row="2" 
+                Background="#3D3D3D" 
+                Padding="10" 
+                CornerRadius="5" 
+                Margin="0,15,0,15">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock x:Name="PermissionStatusIcon" 
+                           Text="❌" 
+                           FontSize="16" 
+                           VerticalAlignment="Center"
+                           Foreground="Gray"/>
+                <TextBlock x:Name="PermissionStatusText" 
+                           Text="Permission Status: Not Granted" 
+                           VerticalAlignment="Center"
+                           Foreground="Gray"/>
+                <Button x:Name="RefreshButton" 
+                        Content="Refresh Status" 
+                        Padding="8,4" 
+                        Click="RefreshPermissionStatus"
+                        Background="#555555"
+                        Foreground="White"
+                        BorderBrush="Transparent"
+                        CornerRadius="5"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 按钮 -->
+        <StackPanel Grid.Row="3" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    Spacing="10">
+            <Button Content="Open System Settings" 
+                    Click="OpenSystemPreferences" 
+                    Padding="15,8"
+                    Background="#555555"
+                    Foreground="White"
+                    BorderBrush="Transparent"
+                    CornerRadius="5"/>
+            <Button Content="Set Later" 
+                    Click="CloseDialog" 
+                    Padding="15,8"
+                    Background="#555555"
+                    Foreground="White"
+                    BorderBrush="Transparent"
+                    CornerRadius="5"/>
+        </StackPanel>
+    </Grid>
+</Window>

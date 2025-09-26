@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in AGI.Captor! We welcome all forms of contributions.
+Thank you for your interest in AGI.Kapster! We welcome all forms of contributions.
 
 ## 🚀 Quick Start
 
@@ -8,8 +8,8 @@ Thank you for your interest in AGI.Captor! We welcome all forms of contributions
 
 1. **Clone Repository**
    ```bash
-   git clone https://github.com/AGIBuild/AGI.Captor.git
-   cd AGI.Captor
+   git clone https://github.com/AGIBuild/AGI.Kapster.git
+   cd AGI.Kapster
    ```
 
 2. **Install Dependencies**
@@ -24,7 +24,7 @@ Thank you for your interest in AGI.Captor! We welcome all forms of contributions
 
 4. **Run Application**
    ```bash
-   dotnet run --project src/AGI.Captor.Desktop
+   dotnet run --project src/AGI.Kapster.Desktop
    ```
 
 ## 🛠️ Development
@@ -32,9 +32,9 @@ Thank you for your interest in AGI.Captor! We welcome all forms of contributions
 ### Project Structure
 
 ```
-AGI.Captor/
-├── src/AGI.Captor.Desktop/     # Main application
-├── tests/AGI.Captor.Tests/     # Test projects
+AGI.Kapster/
+├── src/AGI.Kapster.Desktop/     # Main application
+├── tests/AGI.Kapster.Tests/     # Test projects
 ├── build/                      # Build scripts
 ├── packaging/                  # Package creation scripts
 └── docs/                      # Documentation
@@ -113,7 +113,7 @@ refactor: simplify overlay management
 ./build.ps1 Test -Coverage
 
 # Run specific test
-dotnet test tests/AGI.Captor.Tests --filter "FullyQualifiedName~HotkeyManagerTests"
+dotnet test tests/AGI.Kapster.Tests --filter "FullyQualifiedName~HotkeyManagerTests"
 ```
 
 #### Test Requirements
@@ -230,7 +230,7 @@ Any other relevant information
 
 ## 📄 License
 
-By contributing to AGI.Captor, you agree that your contributions will be licensed under the MIT License.
+By contributing to AGI.Kapster, you agree that your contributions will be licensed under the MIT License.
 
 ## 🤝 Community
 
@@ -247,4 +247,4 @@ By contributing to AGI.Captor, you agree that your contributions will be license
 
 ---
 
-Thank you for contributing to AGI.Captor! 🚀
+Thank you for contributing to AGI.Kapster! 🚀

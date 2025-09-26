@@ -1,4 +1,4 @@
-# AGI.Captor 📸
+# AGI.Kapster 📸
 
 **现代化跨平台截图与标注工具**
 
@@ -8,7 +8,7 @@
 ![Framework](https://img.shields.io/badge/.NET-9.0-purple)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
-![CI/CD](https://github.com/AGIBuild/AGI.Captor/actions/workflows/ci.yml/badge.svg)
+![CI/CD](https://github.com/AGIBuild/AGI.Kapster/actions/workflows/ci.yml/badge.svg)
 
 [English](README.md) | [贡献指南](CONTRIBUTING.md) | [测试指南](TESTING.md)
 
@@ -48,22 +48,22 @@
 从 [GitHub Releases](../../releases/latest) 下载：
 
 **Windows:**
-- `AGI.Captor-win-x64.msi` - Windows安装包
-- `AGI.Captor-win-x64-portable.zip` - 便携版
+- `AGI.Kapster-win-x64.msi` - Windows安装包
+- `AGI.Kapster-win-x64-portable.zip` - 便携版
 
 **macOS:**
-- `AGI.Captor-osx-x64.pkg` - Intel Mac
-- `AGI.Captor-osx-arm64.pkg` - Apple Silicon
+- `AGI.Kapster-osx-x64.pkg` - Intel Mac
+- `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
 
 **Linux:**
-- `agi-captor_*_amd64.deb` - Debian/Ubuntu
-- `agi-captor-*-1.x86_64.rpm` - Red Hat/CentOS/Fedora
-- `AGI.Captor-linux-x64-portable.zip` - 便携版
+- `agi-kapster_*_amd64.deb` - Debian/Ubuntu
+- `agi-kapster-*-1.x86_64.rpm` - Red Hat/CentOS/Fedora
+- `AGI.Kapster-linux-x64-portable.zip` - 便携版
 
 #### 从源码构建
 ```bash
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+git clone https://github.com/AGIBuild/AGI.Kapster.git
+cd AGI.Kapster
 ./build.ps1                    # 构建和测试
 ./build.ps1 Publish           # 创建包
 ```
@@ -104,13 +104,13 @@ cd AGI.Captor
 
 ### 开发环境设置
 ```bash
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+git clone https://github.com/AGIBuild/AGI.Kapster.git
+cd AGI.Kapster
 dotnet restore
 ./build.ps1
 
 # 运行应用
-dotnet run --project src/AGI.Captor.Desktop
+dotnet run --project src/AGI.Kapster.Desktop
 ```
 
 ### 测试
@@ -128,4 +128,4 @@ dotnet run --project src/AGI.Captor.Desktop
 
 ---
 
-**AGI.Captor** - 让截图标注更简单、更高效！🚀
+**AGI.Kapster** - 让截图标注更简单、更高效！🚀

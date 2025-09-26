@@ -3,7 +3,7 @@ globs: *.axaml,*.axaml.cs
 description: Avalonia XAML and code-behind standards
 ---
 
-# Avalonia XAML Standards for AGI.Captor
+# Avalonia XAML Standards for AGI.Kapster
 
 ## XAML Naming and Structure
 - Use PascalCase for control names: `<Button Name="SaveButton" />`
@@ -39,7 +39,7 @@ description: Avalonia XAML and code-behind standards
 - Be aware of XAML vs code-created control instances
 - Use FindControl<>() carefully - prefer direct references
 - Store control references in fields when needed frequently
-- Example from [OverlayWindow.axaml.cs](mdc:src/AGI.Captor.App/Overlays/OverlayWindow.axaml.cs):
+- Example from [OverlayWindow.axaml.cs](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs):
   ```csharp
   private NewAnnotationOverlay? _annotator; // Direct reference
   // Instead of: this.FindControl<NewAnnotationOverlay>("Annotator")

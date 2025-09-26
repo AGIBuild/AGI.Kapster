@@ -2,7 +2,7 @@
 
 ## Overview
 
-AGI.Captor uses a **locked time-based versioning strategy** that provides predictable, deterministic version management with full CI/CD integration and strict validation.
+AGI.Kapster uses a **locked time-based versioning strategy** that provides predictable, deterministic version management with full CI/CD integration and strict validation.
 
 ## Version Format
 

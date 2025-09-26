@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AGI Captor macOS 公证脚本
+# AGI Kapster macOS 公证脚本
 # 用法: ./notarize.sh <pkg_or_dmg_file> <apple_id> <app_password> <team_id>
 
 set -e
@@ -12,7 +12,7 @@ TEAM_ID="$4"
 
 if [ -z "$PACKAGE_FILE" ] || [ -z "$APPLE_ID" ] || [ -z "$APP_PASSWORD" ] || [ -z "$TEAM_ID" ]; then
     echo "用法: $0 <package_file> <apple_id> <app_password> <team_id>"
-    echo "示例: $0 AGI.Captor-1.2.0.pkg developer@example.com app-password TEAM123456"
+    echo "示例: $0 AGI.Kapster-1.2.0.pkg developer@example.com app-password TEAM123456"
     exit 1
 fi
 

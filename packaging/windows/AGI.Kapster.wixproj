@@ -1,0 +1,55 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+	<PropertyGroup>
+		<OutputName>AGI.Kapster</OutputName>
+		<OutputType>Package</OutputType>
+		<WixToolPath Condition="'$(WixToolPath)' == ''">$(MSBuildThisFileDirectory)tools\</WixToolPath>
+		<WixExtDir Condition="'$(WixExtDir)' == ''">$(MSBuildThisFileDirectory)tools\</WixExtDir>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Use WiX v4 source file to match build tasks and WiX v4 tool usage -->
+		<WixSource Include="AGI.Kapster.wxs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<WixExtension Include="WixUIExtension">
+			<HintPath>$(WixExtDir)WixUIExtension.dll</HintPath>
+			<Name>WixUIExtension</Name>
+		</WixExtension>
+		<WixExtension Include="WixUtilExtension">
+			<HintPath>$(WixExtDir)WixUtilExtension.dll</HintPath>
+			<Name>WixUtilExtension</Name>
+		</WixExtension>
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="WixToolset.Heat" Version="4.0.1" />
+		<PackageReference Include="WixToolset.UI.wixext" Version="4.0.1" />
+	</ItemGroup>
+	<PropertyGroup>
+		<DefineConstants>
+			SourceDir=$(PublishDir);Version=$(Version)
+		</DefineConstants>
+	</PropertyGroup>
+
+	<!-- Harvest published files into an intermediate ProductComponents.wxs before packaging -->
+	<Target Name="HarvestFiles" BeforeTargets="Build">
+		<ItemGroup>
+			<HarvestDirectory Include="$(PublishDir)" />
+		</ItemGroup>
+
+		<HeatDirectory
+		  Directory="$(PublishDir)"
+		  DirectoryRefId="INSTALLFOLDER"
+		  ComponentGroupName="ProductComponents"
+		  OutputFile="$(IntermediateOutputPath)ProductComponents.wxs"
+		  SuppressCom="true"
+		  SuppressRegistry="true"
+		  SuppressRootDirectory="true"
+		  GenerateGuidsNow="true"
+		  ToolPath="$(WixToolPath)" />
+
+		<ItemGroup>
+			<WixSource Include="$(IntermediateOutputPath)ProductComponents.wxs" />
+		</ItemGroup>
+	</Target>
+</Project>

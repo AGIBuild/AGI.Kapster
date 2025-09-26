@@ -88,18 +88,18 @@ This action generates:
 artifacts/
 ├── publish/
 │   ├── win-x64/
-│   │   ├── AGI.Captor.exe
+│   │   ├── AGI.Kapster.exe
 │   │   └── ... (dependencies)
 │   ├── linux-x64/
-│   │   ├── AGI.Captor
+│   │   ├── AGI.Kapster
 │   │   └── ... (dependencies)
 │   └── osx-x64/
-│       ├── AGI.Captor
+│       ├── AGI.Kapster
 │       └── ... (dependencies)
 └── packages/
-    ├── AGI.Captor-win-x64.msi
-    ├── AGI.Captor-linux-x64.deb
-    └── AGI.Captor-osx-x64.pkg
+    ├── AGI.Kapster-win-x64.msi
+    ├── AGI.Kapster-linux-x64.deb
+    └── AGI.Kapster-osx-x64.pkg
 ```
 
 ## Prerequisites

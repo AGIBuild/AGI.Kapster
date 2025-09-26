@@ -1,9 +1,9 @@
 ---
 globs: *.cs
-description: C# coding standards and patterns for AGI.Captor
+description: C# coding standards and patterns for AGI.Kapster
 ---
 
-# C# Coding Standards for AGI.Captor
+# C# Coding Standards for AGI.Kapster
 
 ## Naming Conventions
 - **PascalCase**: Classes, methods, properties, enums, public fields
@@ -36,7 +36,7 @@ description: C# coding standards and patterns for AGI.Captor
 - Implement `INotifyPropertyChanged` through base classes
 
 ## Dependency Injection
-- Register services in [Program.cs](mdc:src/AGI.Captor.App/Program.cs)
+- Register services in [Program.cs](mdc:src/AGI.Kapster.App/Program.cs)
 - Use appropriate lifetimes: Singleton for stateless, Transient for stateful
 - Prefer constructor injection over service locator pattern
 - Use interfaces for testability and abstraction

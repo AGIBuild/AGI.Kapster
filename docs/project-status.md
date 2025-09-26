@@ -2,7 +2,7 @@
 
 ## Current Status: Active Development
 
-AGI.Captor is in active development with a focus on cross-platform screen capture and overlay annotation functionality.
+AGI.Kapster is in active development with a focus on cross-platform screen capture and overlay annotation functionality.
 
 ## Recent Major Changes
 
@@ -109,7 +109,7 @@ AGI.Captor is in active development with a focus on cross-platform screen captur
 
 ### Development Setup
 1. Install .NET 9.0 SDK
-2. Clone repository: `gh repo clone AGIBuild/AGI.Captor`
+2. Clone repository: `gh repo clone AGIBuild/AGI.Kapster`
 3. Run initial build: `.\build.ps1`
 4. Run tests: `.\build.ps1 Test`
 

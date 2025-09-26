@@ -2,7 +2,7 @@
 
 ## Overview
 
-AGI.Captor uses an automated release workflow powered by GitHub Actions, featuring multi-platform builds, automated packaging, and seamless GitHub Release creation with a locked version + tag-driven deterministic model.
+AGI.Kapster uses an automated release workflow powered by GitHub Actions, featuring multi-platform builds, automated packaging, and seamless GitHub Release creation with a locked version + tag-driven deterministic model.
 
 ## Core Components
 

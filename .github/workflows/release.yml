@@ -106,9 +106,9 @@ jobs:
         $json = Get-Content version.json -Raw | ConvertFrom-Json
         if (-not $json.version) { Write-Host '❌ version.json missing version field'; exit 1 }
         
-        # Validate version format
+        # Validate version format (four segments, last segment up to 5 digits)
         $locked = $json.version
-        if ($locked -notmatch '^[0-9]{4}\.[1-9]\d?\.[1-9]\d?\.[0-2]\d[0-5]\d$') { 
+        if ($locked -notmatch '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,5}$') { 
           Write-Host "❌ Locked version format invalid: $locked"; exit 1 
         }
         
@@ -174,7 +174,7 @@ jobs:
             Write-Host "✅ WiX already installed: $wixVersion"
           } catch {
             Write-Host "📦 Installing WiX toolset..."
-            dotnet tool install --global wix --version 4.0.0
+            dotnet tool install --global wix --version 6.0.2
             # Add to PATH
             $wixPath = "$env:USERPROFILE\.dotnet\tools"
             if (Test-Path $wixPath) {
@@ -303,17 +303,18 @@ jobs:
         Get-ChildItem "release-artifacts" -Directory | ForEach-Object {
           $platformDir = $_.FullName
           Write-Host "📂 Processing: $($_.Name)"
-          Get-ChildItem "$platformDir" -File -Recurse | ForEach-Object {
-            $file = $_
-            Copy-Item $file.FullName "$releaseDir/$($file.Name)"
-            Write-Host "  ✅ $($file.Name)"
-          }
+          # Copy all files except build/debug artifacts like .wixpdb
+          Get-ChildItem "$platformDir" -File -Recurse | Where-Object { $_.Extension -ne '.wixpdb' } | ForEach-Object {
+              $file = $_
+              Copy-Item $file.FullName "$releaseDir/$($file.Name)"
+              Write-Host "  ✅ $($file.Name)"
+            }
         }
         $expected = @(
-          @{ Rid='win-x64';    Pattern='*-win-x64-portable.zip';    Friendly='Windows x64 Portable ZIP' }
-          @{ Rid='win-arm64';  Pattern='*-win-arm64-portable.zip';  Friendly='Windows ARM64 Portable ZIP' }
-          @{ Rid='osx-x64';    Pattern='*-osx-x64-portable.zip';    Friendly='macOS Intel Portable ZIP' }
-          @{ Rid='osx-arm64';  Pattern='*-osx-arm64-portable.zip';  Friendly='macOS Apple Silicon Portable ZIP' }
+          @{ Rid='win-x64';    Pattern='*-win-x64.msi';    Friendly='Windows x64 MSI' }
+          @{ Rid='win-arm64';  Pattern='*-win-arm64.msi';  Friendly='Windows ARM64 MSI' }
+          @{ Rid='osx-x64';    Pattern='*-osx-x64.pkg';             Friendly='macOS Intel PKG' }
+          @{ Rid='osx-arm64';  Pattern='*-osx-arm64.pkg';           Friendly='macOS Apple Silicon PKG' }
           @{ Rid='linux-x64';  Pattern='*-linux-x64-portable.zip'; Friendly='Linux x64 Portable ZIP' }
         )
         $missing = @()
@@ -332,7 +333,7 @@ jobs:
         $manifest = "SHASUMS-$version.txt"
         $manifestPath = Join-Path $releaseDir $manifest
         if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
-        Get-ChildItem $releaseDir -File | Sort-Object Name | ForEach-Object {
+        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
           $hash = Get-FileHash $_.FullName -Algorithm SHA256
           "$($hash.Hash)  $($_.Name)"
         } | Out-File -FilePath $manifestPath -Encoding ASCII
@@ -346,7 +347,7 @@ jobs:
         Write-Host "🧾 Wrote checksum manifest: $manifest"
         Get-Content $manifestPath | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
         Write-Host "📋 Final release assets:"
-        Get-ChildItem $releaseDir | Sort-Object Name | ForEach-Object { 
+        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object { 
           Write-Host "  • $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
         }
     
@@ -367,7 +368,7 @@ jobs:
         
         # Create release body with package info and changelog
         {
-          printf '%s\n' "## 🎉 AGI.Captor $TAG" "" "### 📦 Portable Packages" "" "**Windows:**" "- AGI.Captor-*-win-x64-portable.zip" "- AGI.Captor-*-win-arm64-portable.zip" "" "**macOS:**" "- AGI.Captor-*-osx-x64-portable.zip" "- AGI.Captor-*-osx-arm64-portable.zip" "" "**Linux:**" "- AGI.Captor-*-linux-x64-portable.zip" "" "### 📋 Additional Packages" "**Linux:**" "- agi-captor_*_amd64.deb (Debian/Ubuntu)" "- agi-captor-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "Single file example:" '```bash' "grep AGI.Captor-*linux-x64-portable.zip SHASUMS-$TAG.txt | shasum -a 256 -c -" '```' "" "PowerShell single file:" '```powershell' "\$f = Get-Item .\\AGI.Captor-*win-x64-portable.zip" "\$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern \$f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "\$actual = (Get-FileHash \$f.FullName -Algorithm SHA256).Hash" "if (\$expected -ieq \$actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "";
+          printf '%s\n' "## 🎉 AGI.Kapster $TAG" "" "### 📦 Installer Packages" "" "**Windows:**" "- AGI.Kapster-*-win-x64.msi (MSI, x64)" "- AGI.Kapster-*-win-arm64.msi (MSI, arm64)" "" "**macOS:**" "- AGI.Kapster-*-osx-x64.pkg (Intel Mac)" "- AGI.Kapster-*-osx-arm64.pkg (Apple Silicon)" "" "**Linux:**" "- AGI.Kapster-*-linux-x64-portable.zip (Portable)" "" "### 📋 Additional Linux Packages" "- agi-kapster_*_amd64.deb (Debian/Ubuntu)" "- agi-kapster-*-1.x86_64.rpm (Red Hat/CentOS/Fedora)" "" "### 🔄 Auto-Update" "This release includes automatic update functionality. The application will:" "- Check for updates in the background (every 24 hours by default)" "- Download and install updates automatically (configurable)" "- Support cross-platform update distribution" "" "### 🔐 Integrity & Verification" "SHA-256 manifest: SHASUMS-$TAG.txt" "" "Linux/macOS verify all:" '```bash' "shasum -a 256 -c SHASUMS-$TAG.txt" '```' "" "PowerShell sample for verifying MSI (Windows):" '```powershell' "\$f = Get-Item .\\AGI.Kapster-*win-x64.msi" "\$expected = (Select-String -Path .\\SHASUMS-$TAG.txt -Pattern \$f.Name).Line.Split(' ',[System.StringSplitOptions]::RemoveEmptyEntries)[0]" "\$actual = (Get-FileHash \$f.FullName -Algorithm SHA256).Hash" "if (\$expected -ieq \$actual) { Write-Host 'Hash OK' } else { Write-Host 'Mismatch!' ; exit 1 }" '```' "" "### 🧾 Changelog" "";
           cat changelog.md;
         } > custom-release-body.md
         
@@ -379,7 +380,7 @@ jobs:
       with:
         files: final-release/*
         tag_name: ${{ needs.prepare-release.outputs.version }}
-        name: AGI.Captor ${{ needs.prepare-release.outputs.version }}
+        name: AGI.Kapster ${{ needs.prepare-release.outputs.version }}
         prerelease: ${{ needs.prepare-release.outputs.is-prerelease }}
         generate_release_notes: true  # Use GitHub official generation
         body_path: custom-release-body.md

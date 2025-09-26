@@ -97,11 +97,14 @@ jobs:
     - name: 🛡️ Run security audit
       shell: pwsh
       run: |
+        # Explicitly target the primary solution to avoid ambiguity when multiple .sln files exist
+        $sln = "AGI.Kapster.sln"
+
         # Check for known vulnerabilities in NuGet packages
-        dotnet list package --vulnerable --include-transitive 2>&1 | Tee-Object -FilePath "security-audit.log"
+        dotnet list $sln package --vulnerable --include-transitive 2>&1 | Tee-Object -FilePath "security-audit.log"
         
         # Check for outdated packages
-        dotnet list package --outdated 2>&1 | Tee-Object -FilePath "outdated-packages.log"
+        dotnet list $sln package --outdated 2>&1 | Tee-Object -FilePath "outdated-packages.log"
         
     - name: 📄 Upload security reports
       uses: actions/upload-artifact@v4

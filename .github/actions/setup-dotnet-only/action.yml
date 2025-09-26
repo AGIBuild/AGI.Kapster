@@ -1,6 +1,6 @@
 name: 'Setup .NET Environment'
 description: 'Setup .NET and NuGet cache without checkout (assumes repository already checked out)'
-author: 'AGI.Captor Team'
+author: 'AGI.Kapster Team'
 
 inputs:
   dotnet-version:

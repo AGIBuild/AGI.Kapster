@@ -28,10 +28,10 @@ class BuildTasks : NukeBuild
     readonly string Framework;
 
     [Parameter("Self-contained deployment")]
-    readonly bool SelfContained = true;
+    readonly bool SelfContained = true; // Required for Avalonia + SkiaSharp apps
 
     [Parameter("Single file publish")]
-    readonly bool SingleFile = true;
+    readonly bool SingleFile = true; // Default to single-file publish for installers
 
     [Parameter("Enable IL trimming (use with caution for Avalonia apps)")]
     readonly bool Trim;
@@ -39,14 +39,11 @@ class BuildTasks : NukeBuild
     [Parameter("Test filter expression (e.g., Category=Unit)")]
     readonly string TestFilter;
 
-    [Parameter("Skip tests during build/publish operations")]
-    readonly bool SkipTests;
-
     [Parameter("Enable code coverage collection")]
     readonly bool Coverage;
 
     [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
-    [Parameter("Manual new version (display format: yyyy.M.d.HHmmss — month/day no leading zero, time HHmmss). If omitted auto-generate.")] readonly string NewVersion; // updated
+    [Parameter("Manual new version (display format: yyyy.M.d.S — 4 segments where S is seconds since midnight, range 0..86399, max 5 digits. Example: 2025.9.4.3605). If omitted auto-generate.")] readonly string NewVersion; // updated
 
     AbsolutePath VersionFile => RootDirectory / "version.json"; // added
     static (string Display, string Assembly, string File, string Info)? _versionCache; // added
@@ -58,8 +55,11 @@ class BuildTasks : NukeBuild
     AbsolutePath CoverageDirectory => ArtifactsDirectory / "coverage";
 
     // Project references
-    Project MainProject => Solution?.AllProjects?.FirstOrDefault(p => p.Name == "AGI.Captor.Desktop");
+    Project MainProject => Solution?.AllProjects?.FirstOrDefault(p => p.Name == "AGI.Kapster.Desktop");
     Project[] TestProjects => Solution?.AllProjects?.Where(p => p.Name.Contains("Tests")).ToArray() ?? Array.Empty<Project>();
+
+    // Tests are located in a separate solution file
+    AbsolutePath TestSolutionPath => RootDirectory / "AGI.Kapster.Tests.sln";
 
     // Runtime detection
     string CurrentRuntimeIdentifier => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win-x64" :
@@ -127,17 +127,19 @@ class BuildTasks : NukeBuild
 
     Target Test => _ => _
         .DependsOn(Build)
-        .OnlyWhenDynamic(() => !SkipTests)
         .Executes(() =>
         {
             try
             {
+                // Ensure test solution is restored first so project.assets.json is generated
+                DotNetRestore(s => s.SetProjectFile(TestSolutionPath));
+
                 var testSettings = new DotNetTestSettings()
-                    .SetProjectFile(Solution)
+                    .SetProjectFile(TestSolutionPath)
                     .SetConfiguration(Configuration)
                     .SetResultsDirectory(TestResultsDirectory)
-                    .EnableNoBuild()
                     .EnableNoRestore();
+                // Tests always run from AGI.Kapster.Tests.sln (separate tests solution)
 
                 if (!string.IsNullOrWhiteSpace(TestFilter))
                     testSettings = testSettings.SetFilter(TestFilter);
@@ -167,7 +169,7 @@ class BuildTasks : NukeBuild
         {
             if (MainProject == null)
             {
-                throw new InvalidOperationException("Main project (AGI.Captor.Desktop) not found");
+                throw new InvalidOperationException("Main project (AGI.Kapster.Desktop) not found");
             }
 
             DotNetRun(s => s
@@ -184,17 +186,31 @@ class BuildTasks : NukeBuild
             {
                 var publishPath = PublishDirectory / rid;
                 Console.WriteLine($"📦 Publishing for {rid} to {publishPath}");
-                
-                DotNetPublish(s => s
-                    .SetProject(MainProject)
-                    .SetConfiguration(Configuration)
-                    .SetRuntime(rid)
-                    .SetSelfContained(SelfContained)
-                    .SetPublishSingleFile(SingleFile)
-                    .SetPublishTrimmed(Trim)
-                    .EnableNoRestore()
-                    .SetOutput(publishPath));
-                    
+
+                DotNetPublish(s =>
+                {
+                    // When publishing single-file, avoid trimming native code and enable self-extract so native
+                    // libraries (SkiaSharp, HarfBuzz, etc.) are available at runtime.
+                    var publishSettings = s
+                        .SetProject(MainProject)
+                        .SetConfiguration(Configuration)
+                        .SetRuntime(rid)
+                        .SetSelfContained(true)
+                        .SetPublishSingleFile(SingleFile)
+                        .SetPublishTrimmed(SingleFile ? false : Trim)
+                        .EnableNoRestore()
+                        .SetOutput(publishPath);
+
+                    if (SingleFile)
+                    {
+                        publishSettings = publishSettings
+                            .SetProperty("IncludeNativeLibrariesForSelfExtract", "true")
+                            .SetProperty("IncludeAllContentForSelfExtract", "true");
+                    }
+
+                    return publishSettings;
+                });
+
                 Console.WriteLine($"✅ Published {rid} successfully to {publishPath}");
             }
         });
@@ -211,7 +227,6 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"Self-contained: {SelfContained}");
             Console.WriteLine($"Single File: {SingleFile}");
             Console.WriteLine($"Trim: {Trim}");
-            Console.WriteLine($"Skip Tests: {SkipTests}");
             Console.WriteLine($"Coverage: {Coverage}");
 
             if (!string.IsNullOrWhiteSpace(TestFilter))
@@ -243,6 +258,10 @@ class BuildTasks : NukeBuild
                 }
             }
 
+            // Show test solution path (tests are in AGI.Kapster.Tests.sln)
+            Console.WriteLine();
+            Console.WriteLine($"ℹ️ Test solution: {TestSolutionPath}");
+
             var version = GetFixedVersionOrFallback();
             Console.WriteLine();
             Console.WriteLine("🏷️ Version Information:");
@@ -267,8 +286,8 @@ class BuildTasks : NukeBuild
     [Parameter("Apple Team ID for notarization")]
     readonly string TeamId;
 
-    [Parameter("macOS package formats to create (PKG,DMG,AppStore)")]
-    readonly string MacOSFormats = "PKG,DMG";
+    [Parameter("macOS package formats to create (PKG,DMG,AppStore,APP)")]
+    readonly string MacOSFormats = "PKG";
 
     [Parameter("Windows code signing certificate thumbprint")]
     readonly string WindowsSigningThumbprint;
@@ -334,160 +353,90 @@ class BuildTasks : NukeBuild
         try
         {
             var version = GetFixedVersionOrFallback();
-            var packageName = $"AGI.Captor-{version.File}-{rid}.msi";
+            var packageName = $"AGI.Kapster-{version.File}-{rid}.msi";
             var packagePath = PackageOutputDirectory / packageName;
 
             Console.WriteLine($"🪟 Creating Windows MSI package: {packageName}");
 
-            // Check if WiX v4+ is available
-            string wixPath = null;
-            try
-            {
-                // Try to find wix.exe (WiX v4+)
-                var process = ProcessTasks.StartProcess("wix", "--version", logOutput: false);
-                process.AssertZeroExitCode();
-                wixPath = "wix";
-            }
-            catch
-            {
-                try
-                {
-                    // Fallback to older WiX toolset
-                    wixPath = ToolPathResolver.GetPathExecutable("heat") ??
-                             ToolPathResolver.GetPathExecutable("candle");
-                }
-                catch
-                {
-                    // WiX not available
-                }
-            }
-
-            if (wixPath == null)
-            {
-                Console.WriteLine("⚠️ WiX Toolset not found. Creating portable ZIP instead...");
-                CreatePortableZip(publishPath, rid, version.File);
-                return;
-            }
-
-            // Use WiX v4+ syntax
-            if (wixPath == "wix")
-            {
-                try
-                {
-                    CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ MSI creation failed: {ex.Message}. Creating portable ZIP instead...");
-                    CreatePortableZip(publishPath, rid, version.File);
-                }
-            }
-            else
-            {
-                Console.WriteLine("⚠️ WiX v3 detected but v4+ required for MSI creation. Creating portable ZIP...");
-                CreatePortableZip(publishPath, rid, version.File);
-            }
+            // Check if WiX v4+ is available by running `wix --version`.
+            var process = ProcessTasks.StartProcess("wix", "--version", logOutput: false);
+            process.AssertZeroExitCode();
+            CreateMsiWithWixV4(publishPath, rid, packagePath, (version.Assembly, version.File, version.Info));
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Windows package creation failed: {ex.Message}");
-            // Fallback to portable ZIP
-            var version = GetFixedVersionOrFallback();
-            CreatePortableZip(publishPath, rid, version.File);
+            throw;
         }
     }
 
     void CreateMsiWithWixV4(AbsolutePath publishPath, string rid, AbsolutePath packagePath, (string AssemblyVersion, string FileVersion, string InformationalVersion) version)
     {
-        var wxsFile = WindowsPackagingDirectory / "AGI.Captor.v4.wxs";
-        var wixobjFile = WindowsPackagingDirectory / "AGI.Captor.wixobj";
+        var wxsFile = WindowsPackagingDirectory / "Product.wxs";
+        var componentFragment = WindowsPackagingDirectory / "ProductComponents.wxs";
+        //: WindowsPackagingDirectory/ "Product.wxs";
+        var sourceDir = publishPath;
 
-        // Ensure WXS file exists
+        // Check main wxs and fragment file
         if (!File.Exists(wxsFile))
         {
-            Console.WriteLine($"❌ WiX source file not found: {wxsFile}");
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            Console.WriteLine($"WiX source file not found: {wxsFile}");
             return;
         }
-
-        try
+        var processInfo = new System.Diagnostics.ProcessStartInfo
         {
-            Console.WriteLine($"🔨 Compiling WiX source...");
+            FileName = "wix",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
 
-            // Step 1: Compile .wxs to .wixobj
-            var compileArgs = new List<string>
-            {
-                "build",
-                "-arch", rid == "win-arm64" ? "arm64" : "x64",
-                "-define", $"SourceDir={publishPath}",
-                "-define", $"ProductVersion={version.FileVersion}",
-                "-out", packagePath,
-                wxsFile
-            };
-
-            // Create ProcessStartInfo for safer argument handling
-            var processInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "wix",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            // Add arguments safely without manual escaping using foreach for better readability
-            var wixArgs = new string[]
-            {
-                "build",
-                "-arch",
-                rid == "win-arm64" ? "arm64" : "x64",
-                "-define",
-                $"SourceDir={publishPath}",
-                "-define",
-                $"ProductVersion={version.FileVersion}",
-                "-out",
-                packagePath,
-                wxsFile
-            };
-
-            foreach (var arg in wixArgs)
-            {
-                processInfo.ArgumentList.Add(arg);
-            }
-
-            using var process = System.Diagnostics.Process.Start(processInfo);
-            if (process == null)
-                throw new InvalidOperationException("Failed to start WiX process");
-
-            // Read outputs to prevent deadlock
-            var outputBuilder = new System.Text.StringBuilder();
-            var errorBuilder = new System.Text.StringBuilder();
-
-            process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
-            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                var error = errorBuilder.ToString();
-                throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
-            }
-
-            Console.WriteLine($"✅ Created: {packagePath}");
-        }
-        catch (Exception ex)
+        // WiX v4 build command with fragment
+        var wixArgs = new string[]
         {
-            Console.WriteLine($"❌ WiX compilation failed: {ex.Message}");
-            CreatePortableZip(publishPath, rid, version.FileVersion);
+            "build",
+            "-arch", rid == "win-arm64" ? "arm64" : "x64",
+            "-define", $"SourceDir={sourceDir}",
+            "-define", $"ProductVersion={version.FileVersion}",
+            "-out", packagePath,
+            wxsFile.ToString(),
+            componentFragment.ToString()
+        };
+
+        foreach (var arg in wixArgs)
+        {
+            processInfo.ArgumentList.Add(arg);
         }
+
+        Console.WriteLine($"Run {string.Join(',', processInfo.ArgumentList)}");
+
+        using var process = System.Diagnostics.Process.Start(processInfo);
+        if (process == null)
+            throw new InvalidOperationException("Failed to start WiX process");
+
+        var outputBuilder = new System.Text.StringBuilder();
+        var errorBuilder = new System.Text.StringBuilder();
+
+        process.OutputDataReceived += (sender, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
+        process.ErrorDataReceived += (sender, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
+
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            var error = errorBuilder.ToString();
+            throw new InvalidOperationException($"WiX process failed with exit code {process.ExitCode}: {error}");
+        }
+
+        Console.WriteLine($"Created: {packagePath}");
     }
 
     void CreatePortableZip(AbsolutePath publishPath, string rid, string version)
     {
-        var zipName = $"AGI.Captor-{version}-{rid}-portable.zip";
+        var zipName = $"AGI.Kapster-{version}-{rid}-portable.zip";
         var zipPath = PackageOutputDirectory / zipName;
 
         Console.WriteLine($"📁 Creating portable ZIP: {zipName}");
@@ -508,7 +457,7 @@ class BuildTasks : NukeBuild
     {
         try
         {
-                var version = GetFixedVersionOrFallback();
+            var version = GetFixedVersionOrFallback();
             var requestedFormats = MacOSFormats?.Split(',')
                 .Select(f => f.Trim().ToUpperInvariant())
                 .ToArray() ?? new[] { "PKG", "DMG" };
@@ -516,108 +465,58 @@ class BuildTasks : NukeBuild
             Console.WriteLine($"🍎 Creating macOS packages for {rid}...");
             Console.WriteLine($"   Requested formats: {string.Join(", ", requestedFormats)}");
 
-            // Create traditional PKG and DMG
-            if (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG"))
+            // Create PKG package only
+            if (requestedFormats.Contains("PKG"))
             {
                 var standardScript = MacPackagingDirectory / "create-pkg.sh";
                 if (File.Exists(standardScript))
                 {
-                    Console.WriteLine("📦 Creating standard PKG and DMG packages...");
+                    Console.WriteLine("📦 Creating PKG package...");
 
-                        var args = $"{publishPath} {version.File}";
+                    var args = new[] { standardScript.ToString(), publishPath.ToString(), version.File };
                     if (!string.IsNullOrWhiteSpace(MacSigningIdentity))
-                        args += $" \"{MacSigningIdentity}\"";
+                    {
+                        args = args.Concat(new[] { MacSigningIdentity }).ToArray();
+                    }
 
                     using var process = ProcessTasks.StartProcess(
                         "bash",
-                        $"{standardScript} {args}",
+                        string.Join(" ", args),
                         MacPackagingDirectory);
 
                     process.AssertZeroExitCode();
 
-                    // Move packages to output directory
-                    if (requestedFormats.Contains("PKG"))
+                    // Move PKG to output directory
+                    var pkgPattern = $"AGI.Kapster-{version.File}-{rid}.pkg";
+                    foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
                     {
-                            var pkgPattern = $"AGI.Captor-{version.File}.pkg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, pkgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
-                    }
-
-                    if (requestedFormats.Contains("DMG"))
-                    {
-                            var dmgPattern = $"AGI.Captor-{version.File}.dmg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, dmgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
+                        var targetPath = PackageOutputDirectory / Path.GetFileName(file);
+                        File.Move(file, targetPath);
+                        Console.WriteLine($"✅ Created: {targetPath}");
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"⚠️ Standard macOS packaging script not found: {standardScript}");
+                    Console.WriteLine($"⚠️ macOS packaging script not found: {standardScript}");
                 }
             }
 
-            // Create App Store version
-            if (requestedFormats.Contains("APPSTORE"))
-            {
-                var appStoreScript = MacPackagingDirectory / "create-appstore.sh";
-                if (File.Exists(appStoreScript))
-                {
-                    if (string.IsNullOrWhiteSpace(MacSigningIdentity))
-                    {
-                        Console.WriteLine("⚠️ App Store packaging requires signing identity, skipping...");
-                    }
-                    else
-                    {
-                        Console.WriteLine("🏪 Creating App Store package...");
 
-                            var args = $"{publishPath} {version.File} \"{MacSigningIdentity}\"";
-
-                        using var process = ProcessTasks.StartProcess(
-                            "bash",
-                            $"{appStoreScript} {args}",
-                            MacPackagingDirectory);
-
-                        process.AssertZeroExitCode();
-
-                        // Move App Store package to output directory
-                            var appStorePkgPattern = $"AGI.Captor-{version.File}-AppStore.pkg";
-                        foreach (var file in Directory.GetFiles(MacPackagingDirectory, appStorePkgPattern))
-                        {
-                            var targetPath = PackageOutputDirectory / Path.GetFileName(file);
-                            File.Move(file, targetPath);
-                            Console.WriteLine($"✅ Created: {targetPath}");
-                        }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"⚠️ App Store packaging script not found: {appStoreScript}");
-                }
-            }
-
-            // Run notarization if credentials provided and not App Store only
+            // Run notarization if credentials provided
             if (!string.IsNullOrWhiteSpace(AppleId) &&
                 !string.IsNullOrWhiteSpace(AppPassword) &&
                 !string.IsNullOrWhiteSpace(TeamId) &&
-                (requestedFormats.Contains("PKG") || requestedFormats.Contains("DMG")))
+                requestedFormats.Contains("PKG"))
             {
                 Console.WriteLine("🔐 Starting notarization process...");
-                    RunMacNotarization(version.File);
+                RunMacNotarization(version.File);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ macOS package creation failed: {ex.Message}");
-                var version = GetFixedVersionOrFallback();
-                CreatePortableZip(publishPath, rid, version.File);
+            // Don't fallback to portable ZIP for macOS - PKG is required
+            throw;
         }
     }
 
@@ -631,15 +530,15 @@ class BuildTasks : NukeBuild
         }
 
         // Find all PKG and DMG files to notarize
-        var pkgPattern = $"AGI.Captor-{version}.pkg";
-        var dmgPattern = $"AGI.Captor-{version}.dmg";
+        var pkgPattern = $"AGI.Kapster-{version}.pkg";
+        var dmgPattern = $"AGI.Kapster-{version}.dmg";
         var filesToNotarize = new List<string>();
 
         foreach (var file in Directory.GetFiles(PackageOutputDirectory, pkgPattern))
         {
             filesToNotarize.Add(file);
         }
-        
+
         foreach (var file in Directory.GetFiles(PackageOutputDirectory, dmgPattern))
         {
             filesToNotarize.Add(file);
@@ -687,7 +586,7 @@ class BuildTasks : NukeBuild
                 debProcess.AssertZeroExitCode();
 
                 // Move DEB to output directory
-                var debPattern = $"agi-captor_{version.File}_{arch}.deb";
+                var debPattern = $"agi-kapster_{version.File}_{arch}.deb";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, debPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -710,7 +609,7 @@ class BuildTasks : NukeBuild
                 rpmProcess.AssertZeroExitCode();
 
                 // Move RPM to output directory
-                var rpmPattern = $"agi-captor-{version.File}-1.{rpmArch}.rpm";
+                var rpmPattern = $"agi-kapster-{version.File}-1.{rpmArch}.rpm";
                 foreach (var file in Directory.GetFiles(LinuxPackagingDirectory, rpmPattern))
                 {
                     var targetPath = PackageOutputDirectory / Path.GetFileName(file);
@@ -725,8 +624,7 @@ class BuildTasks : NukeBuild
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Linux package creation failed: {ex.Message}");
-            var version = GetFixedVersionOrFallback();
-            CreatePortableZip(publishPath, rid, version.File);
+            throw;
         }
     }
 
@@ -779,12 +677,35 @@ class BuildTasks : NukeBuild
 
     string GenerateTimestampVersion()
     {
+        // Produce 4-segment version: Year.Month.Day.SecondsSinceMidnight
+        // Example: 2025.9.4.3605 (where 3605 = 1*3600 + 0*60 + 5)
         var utc = DateTime.UtcNow;
-        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{utc:HHmm}";
+        var secondsSinceMidnight = utc.Hour * 3600 + utc.Minute * 60 + utc.Second; // 0..86399
+        return $"{utc:yyyy}.{utc.Month}.{utc.Day}.{secondsSinceMidnight}";
     }
 
     bool IsValidDisplayVersion(string v)
-        => System.Text.RegularExpressions.Regex.IsMatch(v ?? string.Empty, "^\\d{4}\\.[1-9]\\d?\\.[1-9]\\d?\\.[0-2]\\d[0-5]\\d$");
+    {
+        if (string.IsNullOrWhiteSpace(v)) return false;
+
+        // Expect four segments: yyyy.M.d.S where S is 1-5 digit number (seconds since midnight)
+        // Pattern groups: 1=year, 2=month, 3=day, 4=seconds
+        var pattern = @"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d{1,5})$";
+        var m = System.Text.RegularExpressions.Regex.Match(v, pattern);
+        if (!m.Success) return false;
+
+        // Validate numeric ranges for month, day and seconds
+        if (!int.TryParse(m.Groups[2].Value, out var month)) return false;
+        if (month < 1 || month > 12) return false;
+
+        if (!int.TryParse(m.Groups[3].Value, out var day)) return false;
+        if (day < 1 || day > 31) return false;
+
+        if (!int.TryParse(m.Groups[4].Value, out var seconds)) return false;
+        if (seconds < 0 || seconds > 86399) return false;
+
+        return true;
+    }
 
     (string Display, string Assembly, string File, string Info) BuildVersionModel(string display)
         => (display, display, display, display);
@@ -830,7 +751,7 @@ class BuildTasks : NukeBuild
         .Executes(() =>
         {
             var display = !string.IsNullOrWhiteSpace(NewVersion) ? NewVersion : GenerateTimestampVersion();
-            
+
             if (!IsValidDisplayVersion(display))
                 throw new Exception($"Invalid version format: {display}");
 
@@ -858,7 +779,7 @@ class BuildTasks : NukeBuild
                     var xdoc = XDocument.Load(MainProject.Path);
                     var ns = xdoc.Root?.Name.Namespace ?? XNamespace.None;
                     var projectVersion = xdoc.Descendants(ns + "Version").FirstOrDefault()?.Value;
-                    
+
                     if (projectVersion != display)
                         throw new Exception($"Version mismatch: version.json={display}, project={projectVersion}");
                 }
@@ -871,3 +792,4 @@ class BuildTasks : NukeBuild
             }
         });
 }
+

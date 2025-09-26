@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AGI Captor Linux RPM包创建脚本
+# AGI Kapster Linux RPM包创建脚本
 # 用法: ./create-rpm.sh <publish_directory> <version> <architecture>
 
 set -e
@@ -23,7 +23,7 @@ if [ ! -d "$PUBLISH_DIR" ]; then
 fi
 
 # 配置
-PACKAGE_NAME="agi-captor"
+PACKAGE_NAME="agi-kapster"
 RPM_NAME="${PACKAGE_NAME}-${VERSION}-1.${ARCH}.rpm"
 TEMP_DIR="$(mktemp -d)"
 RPM_ROOT="$TEMP_DIR/rpm-root"
@@ -38,23 +38,23 @@ mkdir -p "$RPM_ROOT/usr/share/$PACKAGE_NAME" 2>/dev/null || true
 
 # 复制应用程序文件
 cp -r "$PUBLISH_DIR"/* "$RPM_ROOT/usr/share/$PACKAGE_NAME/"
-chmod +x "$RPM_ROOT/usr/share/$PACKAGE_NAME/AGI.Captor.Desktop"
+chmod +x "$RPM_ROOT/usr/share/$PACKAGE_NAME/AGI.Kapster.Desktop"
 
 # 创建启动脚本
-cat > "$RPM_ROOT/usr/bin/agi-captor" << 'EOF'
+cat > "$RPM_ROOT/usr/bin/agi-kapster" << 'EOF'
 #!/bin/bash
-exec /usr/share/agi-captor/AGI.Captor.Desktop "$@"
+exec /usr/share/agi-kapster/AGI.Kapster.Desktop "$@"
 EOF
-chmod +x "$RPM_ROOT/usr/bin/agi-captor"
+chmod +x "$RPM_ROOT/usr/bin/agi-kapster"
 
 # 创建desktop文件
-cat > "$RPM_ROOT/usr/share/applications/agi-captor.desktop" << EOF
+cat > "$RPM_ROOT/usr/share/applications/agi-kapster.desktop" << EOF
 [Desktop Entry]
-Name=AGI Captor
+Name=AGI Kapster
 Comment=Advanced Screenshot and Annotation Tool
 GenericName=Screenshot Tool
-Exec=agi-captor %F
-Icon=agi-captor
+Exec=agi-kapster %F
+Icon=agi-kapster
 Terminal=false
 Type=Application
 Categories=Graphics;Photography;
@@ -64,8 +64,8 @@ Keywords=screenshot;annotation;capture;
 EOF
 
 # 复制图标
-if [ -f "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" ]; then
-    cp "$SCRIPT_DIR/../../src/AGI.Captor.Desktop/logo.ico" "$RPM_ROOT/usr/share/pixmaps/agi-captor.png"
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" "$RPM_ROOT/usr/share/pixmaps/agi-kapster.png"
 fi
 
 # 创建spec文件
@@ -75,13 +75,13 @@ Version: $VERSION
 Release: 1
 Summary: Advanced Screenshot and Annotation Tool
 License: MIT
-URL: https://github.com/AGIBuild/AGI.Captor
+URL: https://github.com/AGIBuild/AGI.Kapster
 Group: Applications/Graphics
 BuildArch: $ARCH
 Requires: glibc, openssl-libs, zlib
 
 %description
-AGI Captor is a powerful cross-platform screenshot and annotation tool
+AGI Kapster is a powerful cross-platform screenshot and annotation tool
 built with modern .NET technology. It provides intuitive tools for
 capturing, annotating, and sharing screenshots with professional quality.
 
@@ -102,9 +102,9 @@ Features include:
 } >/dev/null 2>&1 || true
 
 %files
-/usr/bin/agi-captor
-/usr/share/applications/agi-captor.desktop
-/usr/share/pixmaps/agi-captor.png
+/usr/bin/agi-kapster
+/usr/share/applications/agi-kapster.desktop
+/usr/share/pixmaps/agi-kapster.png
 /usr/share/$PACKAGE_NAME/*
 
 %post
@@ -131,7 +131,7 @@ fi
 
 %changelog
 * $(date "+%a %b %d %Y") AGI Build <support@agibuild.com> - $VERSION-1
-- Initial release of AGI Captor
+- Initial release of AGI Kapster
 - Cross-platform screenshot and annotation tool
 - Built with .NET and Avalonia UI
 EOF

@@ -1,4 +1,4 @@
-# AGI.Captor 📸
+# AGI.Kapster 📸
 
 **Modern Cross-Platform Screen Capture and Annotation Tool**
 
@@ -8,7 +8,7 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 ![Framework](https://img.shields.io/badge/.NET-9.0-purple)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
-![CI/CD](https://github.com/AGIBuild/AGI.Captor/actions/workflows/ci.yml/badge.svg)
+![CI/CD](https://github.com/AGIBuild/AGI.Kapster/actions/workflows/ci.yml/badge.svg)
 
 [🌍 中文文档](README_CN.md) | [🤝 Contributing](CONTRIBUTING.md) | [🧪 Testing](TESTING.md)
 
@@ -48,22 +48,22 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 Download from [GitHub Releases](../../releases/latest):
 
 **Windows:**
-- `AGI.Captor-win-x64.msi` - Windows Installer
-- `AGI.Captor-win-x64-portable.zip` - Portable version
+- `AGI.Kapster-win-x64.msi` - Windows Installer
+- `AGI.Kapster-win-x64-portable.zip` - Portable version
 
 **macOS:**
-- `AGI.Captor-osx-x64.pkg` - Intel Mac
-- `AGI.Captor-osx-arm64.pkg` - Apple Silicon
+- `AGI.Kapster-osx-x64.pkg` - Intel Mac
+- `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
 
 **Linux:**
-- `agi-captor_*_amd64.deb` - Debian/Ubuntu
-- `agi-captor-*-1.x86_64.rpm` - Red Hat/CentOS/Fedora
-- `AGI.Captor-linux-x64-portable.zip` - Portable version
+- `agi-kapster_*_amd64.deb` - Debian/Ubuntu
+- `agi-kapster-*-1.x86_64.rpm` - Red Hat/CentOS/Fedora
+- `AGI.Kapster-linux-x64-portable.zip` - Portable version
 
 #### Build from Source
 ```bash
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+git clone https://github.com/AGIBuild/AGI.Kapster.git
+cd AGI.Kapster
 ./build.ps1                    # Build and test
 ./build.ps1 Publish           # Create packages
 ```
@@ -104,13 +104,13 @@ cd AGI.Captor
 
 ### Development Setup
 ```bash
-git clone https://github.com/AGIBuild/AGI.Captor.git
-cd AGI.Captor
+git clone https://github.com/AGIBuild/AGI.Kapster.git
+cd AGI.Kapster
 dotnet restore
 ./build.ps1
 
 # Run application
-dotnet run --project src/AGI.Captor.Desktop
+dotnet run --project src/AGI.Kapster.Desktop
 ```
 
 ### Testing
@@ -128,4 +128,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-**AGI.Captor** - Making screenshot annotation simpler and more efficient! 🚀
+**AGI.Kapster** - Making screenshot annotation simpler and more efficient! 🚀

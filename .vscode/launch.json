@@ -10,9 +10,9 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/src/AGI.Captor.Desktop/bin/Debug/net9.0/AGI.Captor.Desktop.dll",
+            "program": "${workspaceFolder}/src/AGI.Kapster.Desktop/bin/Debug/net9.0/AGI.Kapster.Desktop.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/AGI.Captor.Desktop",
+            "cwd": "${workspaceFolder}/src/AGI.Kapster.Desktop",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false

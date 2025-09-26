@@ -1,0 +1,30 @@
+﻿<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputName>AGI.Kapster</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <Version>1.0.0</Version>
+    <ProductName>AGI.Kapster</ProductName>
+    <Manufacturer>Agibuild</Manufacturer>
+    <UpgradeCode>12345678-1234-1234-1234-123456789012</UpgradeCode>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="License.rtf" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" Version="4.0.1" />
+    <!--<PackageReference Include="WixToolset.UI.wixext" Version="4.0.1" />-->
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>
+		SourceDir=$(PublishDir);ProductVersion=$(ProductVersion);UpgradeCode=$(UpgradeCode);ProductName=$(ProductName)
+	</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutputPath>..\artifacts\publish\win-x64</OutputPath>
+    <VerboseOutput>true</VerboseOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="ProductComponents.wxs" />
+  </ItemGroup>
+</Project>

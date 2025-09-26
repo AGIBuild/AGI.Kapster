@@ -1,4 +1,4 @@
-# AGI.Captor Technical Documentation
+# AGI.Kapster Technical Documentation
 
 Complete technical documentation for a cross-platform screen capture and overlay annotation tool.
 
@@ -63,7 +63,7 @@ Complete technical documentation for a cross-platform screen capture and overlay
 
 ### Directory Structure
 ```
-src/AGI.Captor.Desktop/
+src/AGI.Kapster.Desktop/
 ├── Services/           # Services grouped by functionality
 │   ├── Clipboard/     # Clipboard operations
 │   ├── Capture/       # Screen capture
