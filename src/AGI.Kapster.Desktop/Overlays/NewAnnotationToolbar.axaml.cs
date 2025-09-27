@@ -153,6 +153,8 @@ public partial class NewAnnotationToolbar : UserControl
         if (_colorPickerButton != null)
         {
             _colorPickerButton.Click += OnColorPickerButtonClick;
+            // Set tooltip with hotkey
+            ToolTip.SetTip(_colorPickerButton, "Choose color (C)");
         }
 
         // Initialize current color display
