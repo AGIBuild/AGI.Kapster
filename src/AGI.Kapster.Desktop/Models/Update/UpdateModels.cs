@@ -71,7 +71,7 @@ public class UpdateInfo
 public class UpdateSettings
 {
     public bool Enabled { get; set; } = true;
-    public bool NotifyBeforeInstall { get; set; } = false;
+    public bool NotifyBeforeInstall { get; set; } = true;
     public bool UsePreReleases { get; set; } = false;
     public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
     public string? RepositoryOwner { get; set; }

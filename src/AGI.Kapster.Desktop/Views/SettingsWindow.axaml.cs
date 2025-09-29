@@ -131,10 +131,6 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsCheckedChanged += OnEnableAutoUpdateChanged;
         }
 
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            notifyOnUpdates.IsCheckedChanged += OnNotifyOnUpdatesChanged;
-        }
 
         if (this.FindControl<Button>("CheckForUpdatesButton") is { } checkForUpdatesButton)
         {
@@ -349,18 +345,13 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsChecked = _currentSettings.AutoUpdate.Enabled;
         }
 
-        // Notify on updates
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            notifyOnUpdates.IsChecked = _currentSettings.AutoUpdate.NotifyBeforeInstall;
-        }
 
         // Current version info
         if (this.FindControl<TextBlock>("CurrentVersionText") is { } currentVersionText)
         {
             // Get version from assembly
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            currentVersionText.Text = version?.ToString(3) ?? "1.0.0";
+            currentVersionText.Text = version?.ToString() ?? "1.0.0.0";
         }
 
         if (this.FindControl<TextBlock>("ReleaseDateText") is { } releaseDateText)
@@ -494,11 +485,6 @@ public partial class SettingsWindow : Window
             _currentSettings.AutoUpdate.Enabled = enableAutoUpdate.IsChecked ?? true;
         }
 
-        // Notify on updates
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            _currentSettings.AutoUpdate.NotifyBeforeInstall = notifyOnUpdates.IsChecked == true;
-        }
     }
 
     private async void OnOkClick(object? sender, RoutedEventArgs e)
@@ -950,14 +936,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnNotifyOnUpdatesChanged(object? sender, RoutedEventArgs e)
-    {
-        if (sender is CheckBox checkBox && _currentSettings.AutoUpdate != null)
-        {
-            _currentSettings.AutoUpdate.NotifyBeforeInstall = checkBox.IsChecked == true;
-            Log.Debug("Notify on updates changed: {Notify}", _currentSettings.AutoUpdate.NotifyBeforeInstall);
-        }
-    }
 
     private async void OnCheckForUpdatesClick(object? sender, RoutedEventArgs e)
     {

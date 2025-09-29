@@ -223,7 +223,7 @@ class Program
                 AutoUpdate = new
                 {
                     Enabled = true,
-                    NotifyBeforeInstall = false,
+    NotifyBeforeInstall = true,
                     UsePreReleases = false,
                     RepositoryOwner = "AGIBuild",
                     RepositoryName = "AGI.Kapster"

@@ -136,7 +136,7 @@ public class SettingsService : ISettingsService
                 defaultSettings.AutoUpdate = new AutoUpdateSettings
                 {
                     Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
-                    NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
+                    NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", true),
                     UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false)
                 };
             }
@@ -156,7 +156,7 @@ public class SettingsService : ISettingsService
             _settings.AutoUpdate = new AutoUpdateSettings
             {
                 Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
-                NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
+                NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", true),
                 UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false)
             };
         }

@@ -425,7 +425,7 @@ public class UpdateService : IUpdateService, IDisposable
         return new UpdateSettings
         {
             Enabled = settings.AutoUpdate?.Enabled ?? true,
-            NotifyBeforeInstall = settings.AutoUpdate?.NotifyBeforeInstall ?? false,
+            NotifyBeforeInstall = settings.AutoUpdate?.NotifyBeforeInstall ?? true,
             UsePreReleases = settings.AutoUpdate?.UsePreReleases ?? false,
             RepositoryOwner = settings.AutoUpdate?.RepositoryOwner,
             RepositoryName = settings.AutoUpdate?.RepositoryName,

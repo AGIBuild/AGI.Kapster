@@ -131,7 +131,7 @@ public class UpdateModelsTests
 
         // Assert
         settings.Enabled.Should().BeTrue();
-        settings.NotifyBeforeInstall.Should().BeFalse();
+        settings.NotifyBeforeInstall.Should().BeTrue();
         settings.UsePreReleases.Should().BeFalse();
         settings.LastCheckTime.Should().Be(DateTime.MinValue);
         settings.RepositoryOwner.Should().BeNull();
