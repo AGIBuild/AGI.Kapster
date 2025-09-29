@@ -8,7 +8,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Microsoft.Win32;
 using Serilog;
 using AGI.Kapster.Desktop.Services.Settings;
-using AGI.Kapster.Desktop.Services.Update;
 
 namespace AGI.Kapster.Desktop.Services;
 
@@ -21,12 +20,10 @@ public class ApplicationController : IApplicationController
     private const string AppName = "AGI.Kapster";
 
     private readonly ISettingsService _settingsService;
-    private readonly IUpdateService _updateService;
 
-    public ApplicationController(ISettingsService settingsService, IUpdateService updateService)
+    public ApplicationController(ISettingsService settingsService)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
     }
 
     public async Task InitializeAsync()
@@ -44,17 +41,6 @@ public class ApplicationController : IApplicationController
             if (shouldStartWithWindows != currentlyEnabled)
             {
                 await SetStartupWithWindowsAsync(shouldStartWithWindows);
-            }
-
-            // Initialize update service if enabled
-            if (_settingsService.Settings.AutoUpdate?.Enabled == true)
-            {
-                _updateService.StartBackgroundChecking();
-                Log.Information("Auto-update service started");
-            }
-            else
-            {
-                Log.Debug("Auto-update service disabled in settings");
             }
 
             Log.Debug("Application controller initialized. Startup with Windows: {StartupEnabled}", shouldStartWithWindows);

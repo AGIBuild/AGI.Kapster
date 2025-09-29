@@ -70,42 +70,12 @@ public class UpdateInfo
 /// </summary>
 public class UpdateSettings
 {
-    /// <summary>
-    /// Whether automatic updates are enabled
-    /// </summary>
     public bool Enabled { get; set; } = true;
-
-    /// <summary>
-    /// Frequency of update checks in hours
-    /// </summary>
-    public int CheckFrequencyHours { get; set; } = 24;
-
-    /// <summary>
-    /// Whether to install updates automatically
-    /// </summary>
-    public bool InstallAutomatically { get; set; } = true;
-
-    /// <summary>
-    /// Whether to notify user before installing
-    /// </summary>
-    public bool NotifyBeforeInstall { get; set; } = false;
-
-    /// <summary>
-    /// Whether to include pre-release versions
-    /// </summary>
+    public bool NotifyBeforeInstall { get; set; } = true;
     public bool UsePreReleases { get; set; } = false;
-
-    /// <summary>
-    /// Last successful update check time
-    /// </summary>
     public DateTime LastCheckTime { get; set; } = DateTime.MinValue;
-
-    /// <summary>
-    /// GitHub repository URL for update checks
-    /// When null, uses default AGIBuild/AGI.Kapster repository
-    /// Format: "owner/repository" or full API URL
-    /// </summary>
-    public string? GitHubRepository { get; set; } = null;
+    public string? RepositoryOwner { get; set; }
+    public string? RepositoryName { get; set; }
 }
 
 /// <summary>

@@ -1,74 +1,92 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls"
         x:Class="AGI.Kapster.Desktop.Dialogs.AboutDialog"
         Title="About AGI Kapster"
-        Width="400"
-        Height="300"
-        MinWidth="400"
-        MinHeight="300"
-        MaxWidth="400"
-        MaxHeight="300"
-        CanResize="False"
+        Width="520"
+        Height="360"
+        MinWidth="520"
+        MinHeight="360"
+        MaxWidth="520"
+        MaxHeight="360"
+        CanResize="True"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
-        Icon="avares://AGI.Kapster.Desktop/logo.ico">
-    
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        
-        <!-- Application Icon and Name -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
-            <Image Source="avares://AGI.Kapster.Desktop/logo.ico" Width="48" Height="48" Margin="0,0,15,0"/>
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="AGI Kapster" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
-                <TextBlock x:Name="VersionText" Text="Version 1.0.0" FontSize="14" Foreground="Gray" HorizontalAlignment="Center"/>
-            </StackPanel>
-        </StackPanel>
-        
-        <!-- Description -->
-        <TextBlock Grid.Row="1" 
-                   Text="A powerful cross-platform screenshot and annotation tool"
-                   FontSize="14"
-                   TextAlignment="Center"
-                   Margin="0,0,0,20"/>
-        
-        <!-- Features -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,20">
-            <TextBlock Text="Features:" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-            <TextBlock Text="• Screenshot capture with selection" FontSize="12" Margin="10,2"/>
-            <TextBlock Text="• Annotation tools (arrows, rectangles, text, emoji)" FontSize="12" Margin="10,2"/>
-            <TextBlock Text="• Multiple export formats (PNG, JPEG, BMP, WebP)" FontSize="12" Margin="10,2"/>
-            <TextBlock Text="• Global hotkey support" FontSize="12" Margin="10,2"/>
-            <TextBlock Text="• Cross-platform (Windows, macOS)" FontSize="12" Margin="10,2"/>
-        </StackPanel>
-        
-        <!-- Copyright and Links -->
-        <StackPanel Grid.Row="3" VerticalAlignment="Bottom">
-            <TextBlock Text="Built with Avalonia UI and .NET 9" 
-                       FontSize="12" 
-                       Foreground="Gray" 
-                       HorizontalAlignment="Center" 
-                       Margin="0,0,0,5"/>
-            <TextBlock Text="© 2025 AGI Kapster" 
-                       FontSize="12" 
-                       Foreground="Gray" 
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
-        
-        <!-- Close Button -->
-        <Button Grid.Row="4" 
-                x:Name="CloseButton"
-                Content="Close" 
-                Width="80" 
-                Height="30"
-                HorizontalAlignment="Center"
-                Margin="0,20,0,0"
-                IsDefault="True"/>
-    </Grid>
+        Icon="avares://AGI.Kapster.Desktop/logo.ico"
+        ExtendClientAreaToDecorationsHint="True"
+        SystemDecorations="None"
+        TransparencyLevelHint="AcrylicBlur"
+        TransparencyBackgroundFallback="Transparent"
+        Background="Transparent">
+    <Border Background="#C0122233" CornerRadius="3" BorderBrush="#30336699" BorderThickness="1" Padding="24" Margin="0" BoxShadow="0 12 36 0 #30000000">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0" HorizontalAlignment="Center" Spacing="16">
+                    <Image Source="avares://AGI.Kapster.Desktop/logo.ico" Width="48" Height="48"/>
+                    <StackPanel>
+                        <TextBlock Text="AGI Kapster" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF"/>
+                        <TextBlock x:Name="VersionText" Text="Version" FontSize="14" Foreground="#D0FFFFFF"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        x:Name="CloseButton"
+                        Content="✕"
+                        Width="32"
+                        Height="32"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        BorderBrush="Transparent"
+                        Foreground="#FFFFFF"
+                        FontSize="16"
+                        Cursor="Hand"
+                        Padding="0"
+                        Margin="0"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center">
+                    <Button.Styles>
+                        <Style Selector="Button">
+                            <Setter Property="CornerRadius" Value="16"/>
+                        </Style>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#40FFFFFF"/>
+                        </Style>
+                        <Style Selector="Button:pressed">
+                            <Setter Property="Background" Value="#60FFFFFF"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+            </Grid>
+
+            <Border Grid.Row="1" Background="#40224466" CornerRadius="6" Padding="18" Margin="0,24,0,18" BorderBrush="#50336699" BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="License" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                    <TextBlock Text="MIT License" FontSize="12" Foreground="#E0FFFFFF"/>
+
+                    <TextBlock Text="Developer" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,8,0,0"/>
+                    <TextBlock Text="AGI Build Team" FontSize="12" Foreground="#E0FFFFFF"/>
+
+                    <TextBlock Text="GitHub Issues" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,8,0,0"/>
+                    <controls:HyperlinkButton Content="github.com/AGIBuild/AGI.Kapster/issues"
+                                              FontSize="12" Padding="0" Margin="0"
+                                              Foreground="#8FD0FFFF"
+                                              NavigateUri="https://github.com/AGIBuild/AGI.Kapster/issues"
+                                              HorizontalAlignment="Left"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Grid.Row="2" Text="Cross-platform screenshot and annotation tool" FontSize="12" Foreground="#B0FFFFFF" TextAlignment="Center" Margin="0,0,0,8"/>
+        </Grid>
+    </Border>
 </Window>

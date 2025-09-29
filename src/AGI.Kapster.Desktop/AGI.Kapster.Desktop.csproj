@@ -16,14 +16,17 @@
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2025.9.27.56791</AssemblyVersion>
-    <FileVersion>2025.9.27.56791</FileVersion>
-    <Version>2025.9.27.56791</Version>
+    <AssemblyVersion>2025.9.29.55837</AssemblyVersion>
+    <FileVersion>2025.9.29.55837</FileVersion>
+    <Version>2025.9.29.55837</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.9.27.56791</InformationalVersion>
+    <InformationalVersion>2025.9.29.55837</InformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
   <!-- macOS App Bundle Configuration -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
@@ -35,7 +38,7 @@
     <CFBundlePackageType>APPL</CFBundlePackageType>
     <CFBundleSignature>????</CFBundleSignature>
     <CFBundleExecutable>AGI.Kapster.Desktop</CFBundleExecutable>
-    <CFBundleIconFile>logo.icns</CFBundleIconFile>
+    <CFBundleIconFile>logo.incs</CFBundleIconFile>
     <NSHighResolutionCapable>true</NSHighResolutionCapable>
     <LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
   </PropertyGroup>
@@ -73,6 +76,7 @@
     <PackageReference Include="System.Drawing.Common" Version="9.0.9" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
+    <PackageReference Include="Polly" Version="8.6.4" />
   </ItemGroup>
   <ItemGroup>
     <Content Update="appsettings.json">

@@ -5,7 +5,7 @@
         mc:Ignorable="d" d:DesignWidth="650" d:DesignHeight="550"
         x:Class="AGI.Kapster.Desktop.Views.SettingsWindow"
         Title="Settings"
-        Width="580" Height="480"
+        Width="580" Height="580"
         MinWidth="500" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
@@ -24,7 +24,7 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BoxShadow" Value="0 8 32 0 #60000000"/>
 		</Style>
-		
+
 		<!-- Title bar style -->
 		<Style Selector="Border.title-bar">
 			<Setter Property="Background" Value="#40224466"/>
@@ -33,45 +33,45 @@
 			<Setter Property="BorderThickness" Value="0,0,0,1"/>
 			<Setter Property="BorderBrush" Value="#40336699"/>
 		</Style>
-		
+
 		<Style Selector="TextBlock.title">
 			<Setter Property="FontSize" Value="16"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
-		
+
 		<!-- Tab control styles -->
 		<Style Selector="TabControl">
 			<Setter Property="Margin" Value="0"/>
 			<Setter Property="Background" Value="Transparent"/>
 		</Style>
-		
+
 		<Style Selector="TabItem">
 			<Setter Property="Padding" Value="12,6"/>
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="FontWeight" Value="Medium"/>
-			<Setter Property="Margin" Value="0,0,2,0"/>
+			<Setter Property="Margin" Value="3,0,0,0"/>
 			<Setter Property="Background" Value="#30224466"/>
 			<Setter Property="Foreground" Value="#C0E6F7FF"/>
 			<Setter Property="CornerRadius" Value="5,5,0,0"/>
 			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
-		
+
 		<Style Selector="TabItem:selected">
 			<Setter Property="Background" Value="#60336699"/>
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
-		
+
 		<Style Selector="TabItem:pointerover">
 			<Setter Property="Background" Value="#50336699"/>
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
-		
+
 		<!-- Content area -->
 		<Style Selector="ScrollViewer">
 			<Setter Property="Background" Value="Transparent"/>
 		</Style>
-		
+
 		<!-- Group styles -->
 		<Style Selector="Border.group">
 			<Setter Property="Background" Value="#40224466"/>
@@ -82,29 +82,29 @@
 			<Setter Property="Margin" Value="0,0,0,8"/>
 			<Setter Property="BoxShadow" Value="0 2 8 0 #40000000"/>
 		</Style>
-		
+
 		<Style Selector="TextBlock.header">
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="FontWeight" Value="Bold"/>
 			<Setter Property="Margin" Value="0,0,0,8"/>
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
-		
+
 		<!-- Form controls -->
 		<Style Selector="CheckBox">
 			<Setter Property="FontSize" Value="11"/>
 			<Setter Property="Margin" Value="0,2"/>
 		</Style>
-		
+
 		<Style Selector="CheckBox ContentPresenter">
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 		</Style>
-		
+
 		<Style Selector="TextBlock">
 			<Setter Property="Foreground" Value="#F0FFFFFF"/>
 			<Setter Property="FontSize" Value="12"/>
 		</Style>
-		
+
 		<Style Selector="TextBox">
 			<Setter Property="Background" Value="#40224466"/>
 			<Setter Property="BorderThickness" Value="1"/>
@@ -114,29 +114,29 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontSize" Value="11"/>
 		</Style>
-		
+
 		<Style Selector="TextBox:focus">
 			<Setter Property="Background" Value="#50336699"/>
 		</Style>
-		
+
 		<Style Selector="TextBox /template/ Border#PART_BorderElement">
 			<Setter Property="Background" Value="#40224466"/>
 		</Style>
-		
+
 		<Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
 			<Setter Property="Background" Value="#50336699"/>
 		</Style>
-		
+
 		<Style Selector="ComboBox">
 			<Setter Property="Background" Value="#50336699"/>
 			<Setter Property="FontSize" Value="11"/>
 			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
-		
+
 		<Style Selector="ComboBoxItem">
 			<Setter Property="Background" Value="#40224466"/>
 		</Style>
-		
+
 		<Style Selector="Button">
 			<Setter Property="Background" Value="#50336699"/>
 			<Setter Property="BorderThickness" Value="1"/>
@@ -147,41 +147,41 @@
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="FontSize" Value="11"/>
 		</Style>
-		
+
 		<Style Selector="Button:pointerover">
 			<Setter Property="Background" Value="#7044AACC"/>
 		</Style>
-		
+
 		<Style Selector="Button:pressed">
 			<Setter Property="Background" Value="#9055BBDD"/>
 		</Style>
-		
+
 		<Style Selector="Button.action">
 			<Setter Property="Padding" Value="14,8"/>
 			<Setter Property="Margin" Value="4"/>
 			<Setter Property="MinWidth" Value="80"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 		</Style>
-		
+
 		<Style Selector="Button.primary">
 			<Setter Property="Background" Value="#FF4477BB"/>
 			<Setter Property="Foreground" Value="#FFFFFF"/>
 			<Setter Property="BorderBrush" Value="#FF336699"/>
 		</Style>
-		
+
 		<Style Selector="Button.primary:pointerover">
 			<Setter Property="Background" Value="#FF5588CC"/>
 		</Style>
-		
+
 		<Style Selector="Button.primary:pressed">
 			<Setter Property="Background" Value="#FF336699"/>
 		</Style>
-		
+
 		<!-- Slider styles -->
 		<Style Selector="Slider">
 			<Setter Property="Foreground" Value="#FF4477BB"/>
 		</Style>
-		
+
 		<!-- Bottom bar styles -->
 		<Style Selector="Border.bottom-bar">
 			<Setter Property="Background" Value="#40224466"/>
@@ -190,7 +190,7 @@
 			<Setter Property="Padding" Value="12,8"/>
 			<Setter Property="CornerRadius" Value="0,0,5,5"/>
 		</Style>
-		
+
 	</Window.Styles>
 
 	<!-- Main container with glass effect -->
@@ -204,394 +204,369 @@
 
 			<!-- Custom title bar -->
 			<Border Grid.Row="0" Classes="title-bar">
-				<TextBlock Classes="title" Text="AGI Kapster Settings" 
+				<TextBlock Classes="title" Text="AGI Kapster Settings"
 						   VerticalAlignment="Center" HorizontalAlignment="Center"/>
 			</Border>
 
 			<!-- Main content -->
-			<TabControl Grid.Row="1" x:Name="MainTabControl" Margin="8,4,8,0">
+			<TabControl Grid.Row="1" x:Name="MainTabControl" Margin="0,4,0,0">
 
-			<!-- General Settings Tab -->
-			<TabItem Header="General">
-				<ScrollViewer Padding="8">
-					<StackPanel Spacing="8">
+				<!-- General Settings Tab -->
+				<TabItem Header="General">
+					<ScrollViewer Padding="0,8">
+						<StackPanel Spacing="8">
 
-						<!-- Application Settings -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Application"/>
+							<!-- Application Settings -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Application"/>
 
-								<CheckBox x:Name="StartWithSystemCheckBox"
-										  Content="Start with Windows"
-										  Margin="0,5"/>
-
-
-							</StackPanel>
-						</Border>
-
-						<!-- Capture Settings -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Capture"/>
-
-								<Grid ColumnDefinitions="Auto,*,Auto" Margin="0,5">
-									<TextBlock Grid.Column="0" Text="Default save format:" VerticalAlignment="Center"/>
-									<ComboBox Grid.Column="2" x:Name="DefaultFormatComboBox" Width="120">
-										<ComboBoxItem Content="PNG" IsSelected="True"/>
-										<ComboBoxItem Content="JPEG"/>
-										<ComboBoxItem Content="BMP"/>
-									</ComboBox>
-								</Grid>
+									<CheckBox x:Name="StartWithSystemCheckBox"
+											  Content="Start with Windows"
+											  Margin="0,5"/>
 
 
-							</StackPanel>
-						</Border>
-
-					</StackPanel>
-				</ScrollViewer>
-			</TabItem>
-
-			<!-- Hotkeys Tab -->
-			<TabItem Header="Hotkeys">
-				<ScrollViewer Padding="8">
-					<StackPanel Spacing="8">
-
-						<!-- Capture Hotkeys -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Screenshot Hotkeys"/>
-
-								<Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto"
-									  Margin="0,6,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5"/>
-										</Style>
-										<Style Selector="TextBox">
-											<Setter Property="Margin" Value="10,5"/>
-											<Setter Property="IsReadOnly" Value="False"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Capture Screenshot:"/>
-									<TextBox Grid.Row="0" Grid.Column="1" x:Name="CaptureRegionHotkeyTextBox" Text="Alt+A"/>
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="Open Settings:"/>
-									<TextBox Grid.Row="1" Grid.Column="1" x:Name="OpenSettingsHotkeyTextBox" Text="Alt+S"/>
-								</Grid>
-
-								<TextBlock Text="Note: Focus the text box and press your desired key combination"
-										   FontSize="12" Foreground="Gray" Margin="0,10,0,0"/>
-								
-								<!-- macOS Permission Status -->
-								<Border x:Name="MacPermissionPanel" 
-										Classes="group"
-										Margin="0,15,0,0"
-										IsVisible="False">
-									<StackPanel Spacing="8">
-										<StackPanel Orientation="Horizontal" Spacing="8">
-											<TextBlock x:Name="PermissionStatusIcon" 
-													   Text="[!]" 
-													   FontSize="16" 
-													   VerticalAlignment="Center"/>
-											<TextBlock x:Name="PermissionStatusText" 
-													   Text="macOS Accessibility Permission: Not Granted" 
-													   FontWeight="SemiBold" 
-													   VerticalAlignment="Center"/>
-										</StackPanel>
-										<TextBlock Text="Global hotkeys require accessibility permission to function properly." 
-												   FontSize="12" 
-												   TextWrapping="Wrap"/>
-										<StackPanel Orientation="Horizontal" Spacing="10">
-											<Button x:Name="OpenPermissionGuideButton" 
-													Content="Permission Guide" 
-													Padding="8,4" 
-													Click="ShowPermissionGuide"
-													Classes="action"/>
-											<Button x:Name="RefreshPermissionButton" 
-													Content="Refresh Status" 
-													Padding="8,4" 
-													Click="RefreshPermissionStatus"
-													Classes="action"/>
-											<Button x:Name="DebugPermissionButton" 
-													Content="Debug Info" 
-													Padding="8,4" 
-													Click="ShowPermissionDebugInfo"
-													Classes="action"/>
-										</StackPanel>
-									</StackPanel>
-								</Border>
-							</StackPanel>
-						</Border>
-
-					</StackPanel>
-				</ScrollViewer>
-			</TabItem>
-
-			<!-- Styles Tab -->
-			<TabItem Header="Default Styles">
-				<ScrollViewer Padding="8">
-					<StackPanel Spacing="8">
-
-						<!-- Text Style -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Text Annotations"/>
-
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto"
-									  Margin="0,6,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5,10,5"/>
-											<Setter Property="Width" Value="80"/>
-										</Style>
-										<Style Selector="Slider">
-											<Setter Property="Margin" Value="0,5"/>
-											<Setter Property="Width" Value="200"/>
-											<Setter Property="HorizontalAlignment" Value="Left"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Font Size:"/>
-									<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-										<Slider x:Name="TextFontSizeSlider" Minimum="8" Maximum="72" Value="16" TickFrequency="4" Width="200"/>
-										<TextBlock x:Name="TextFontSizeValueText" Text="16" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
-									</StackPanel>
-
-
-								</Grid>
-							</StackPanel>
-						</Border>
-
-						<!-- Shape Style -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Shape Annotations"/>
-
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
-									  Margin="0,6,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5,10,5"/>
-											<Setter Property="Width" Value="80"/>
-										</Style>
-										<Style Selector="Slider">
-											<Setter Property="Margin" Value="0,5"/>
-											<Setter Property="Width" Value="200"/>
-											<Setter Property="HorizontalAlignment" Value="Left"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Thickness:"/>
-									<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-										<Slider x:Name="ShapeThicknessSlider" Minimum="1" Maximum="20" Value="3" TickFrequency="1" Width="200"/>
-										<TextBlock x:Name="ShapeThicknessValueText" Text="3" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
-									</StackPanel>
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="Color:"/>
-									<Border Grid.Row="1" Grid.Column="1" Width="40" Height="25"
-											Background="Blue" BorderThickness="1" BorderBrush="Gray"
-											Margin="0,5" HorizontalAlignment="Left" CornerRadius="3"
-											x:Name="ShapeColorPreview"/>
-								</Grid>
-							</StackPanel>
-						</Border>
-
-						<!-- Export Quality -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Export Quality"/>
-
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
-									  Margin="0,6,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5,10,5"/>
-											<Setter Property="Width" Value="80"/>
-										</Style>
-										<Style Selector="Slider">
-											<Setter Property="Margin" Value="0,5"/>
-											<Setter Property="Width" Value="200"/>
-											<Setter Property="HorizontalAlignment" Value="Left"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="JPEG Quality:"/>
-									<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-										<Slider x:Name="JpegQualitySlider" Minimum="10" Maximum="100" Value="90" TickFrequency="10" Width="200"/>
-										<TextBlock x:Name="JpegQualityValueText" Text="90" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
-									</StackPanel>
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="PNG Compression:"/>
-									<StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
-										<Slider x:Name="PngCompressionSlider" Minimum="0" Maximum="9" Value="6" TickFrequency="1" Width="200"/>
-										<TextBlock x:Name="PngCompressionValueText" Text="6" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
-									</StackPanel>
-								</Grid>
-							</StackPanel>
-						</Border>
-
-					</StackPanel>
-				</ScrollViewer>
-			</TabItem>
-
-			<!-- Updates Tab -->
-			<TabItem Header="Updates">
-				<ScrollViewer Padding="8">
-					<StackPanel Spacing="8">
-
-						<!-- Auto-Update Settings -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Automatic Updates"/>
-
-								<CheckBox x:Name="EnableAutoUpdateCheckBox"
-										  Content="Enable automatic update checking"
-										  Margin="0,5"/>
-
-								<TextBlock Text="Check for updates in the background and install them automatically."
-										   FontSize="12" Foreground="Gray" Margin="0,0,0,10"
-										   TextWrapping="Wrap"/>
-
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5,10,5"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Check frequency:" Width="120"/>
-									<ComboBox Grid.Row="0" Grid.Column="1" x:Name="UpdateFrequencyComboBox" Width="180" HorizontalAlignment="Left">
-										<ComboBoxItem Content="Every hour" Tag="1"/>
-										<ComboBoxItem Content="Every 2 hours" Tag="2"/>
-										<ComboBoxItem Content="Every 6 hours" Tag="6" IsSelected="True"/>
-										<ComboBoxItem Content="Every 12 hours" Tag="12"/>
-										<ComboBoxItem Content="Daily" Tag="24"/>
-									</ComboBox>
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="Notify on updates:" />
-									<CheckBox Grid.Row="1" Grid.Column="1" x:Name="NotifyOnUpdatesCheckBox"
-											  Content="Show notification when updates are available"
-											  IsChecked="True"/>
-								</Grid>
-
-							</StackPanel>
-						</Border>
-
-						<!-- Manual Update Check -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Manual Update Check"/>
-
-								<StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-									<Button x:Name="CheckForUpdatesButton" 
-											Content="Check for Updates" 
-											Classes="action"/>
-									<TextBlock x:Name="UpdateStatusText" 
-											   Text="Click 'Check for Updates' to check for the latest version."
-											   VerticalAlignment="Center" 
-											   Foreground="Gray"/>
 								</StackPanel>
+							</Border>
 
-								<ProgressBar x:Name="UpdateProgressBar" 
-											 Height="4" 
-											 IsVisible="False" 
-											 Margin="0,10,0,0"/>
+							<!-- Capture Settings -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Capture"/>
 
-								<TextBlock x:Name="UpdateDetailsText"
-										   Text=""
-										   FontSize="12"
-										   Foreground="Gray"
-										   Margin="0,5,0,0"
-										   TextWrapping="Wrap"
-										   IsVisible="False"/>
-
-							</StackPanel>
-						</Border>
-
-						<!-- Current Version Info -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Version Information"/>
-
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,10,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,3"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Current Version:" FontWeight="SemiBold" Width="120"/>
-									<TextBlock Grid.Row="0" Grid.Column="1" x:Name="CurrentVersionText" Text="1.0.0" />
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="Release Date:" FontWeight="SemiBold"/>
-									<TextBlock Grid.Row="1" Grid.Column="1" x:Name="ReleaseDateText" Text="-" />
-
-									<TextBlock Grid.Row="2" Grid.Column="0" Text="Update Channel:" FontWeight="SemiBold"/>
-									<TextBlock Grid.Row="2" Grid.Column="1" Text="Stable" />
-								</Grid>
-
-							</StackPanel>
-						</Border>
-
-					</StackPanel>
-				</ScrollViewer>
-			</TabItem>
-
-			<!-- Advanced Tab -->
-			<TabItem Header="Advanced">
-				<ScrollViewer Padding="8">
-					<StackPanel Spacing="8">
-
-						<!-- Performance Settings -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Performance"/>
-
-								<CheckBox x:Name="EnableHardwareAccelerationCheckBox"
-										  Content="Enable hardware acceleration for rendering"
-										  Margin="0,5"/>
-
-								<CheckBox x:Name="LimitFrameRateCheckBox"
-										  Content="Limit frame rate during annotation drawing"
-										  Margin="0,5"/>
-
-								<Grid ColumnDefinitions="Auto,*" Margin="0,8,0,0">
-									<TextBlock Grid.Column="0" Text="Render quality:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-									<ComboBox Grid.Column="1" x:Name="RenderQualityComboBox" Width="150" HorizontalAlignment="Left">
-										<ComboBoxItem Content="Low" />
-										<ComboBoxItem Content="Medium" IsSelected="True"/>
-										<ComboBoxItem Content="High" />
-									</ComboBox>
-								</Grid>
-
-							</StackPanel>
-						</Border>
+									<Grid ColumnDefinitions="Auto,*,Auto" Margin="0,5">
+										<TextBlock Grid.Column="0" Text="Default save format:" VerticalAlignment="Center"/>
+										<ComboBox Grid.Column="2" x:Name="DefaultFormatComboBox" Width="120">
+											<ComboBoxItem Content="PNG" IsSelected="True"/>
+											<ComboBoxItem Content="JPEG"/>
+											<ComboBoxItem Content="BMP"/>
+										</ComboBox>
+									</Grid>
 
 
-						<!-- Security & Privacy -->
-						<Border Classes="group">
-							<StackPanel>
-								<TextBlock Classes="header" Text="Security &amp; Privacy"/>
+								</StackPanel>
+							</Border>
 
-								<CheckBox x:Name="AllowTelemetryCheckBox"
-										  Content="Allow anonymous usage data collection"
-										  Margin="0,5"/>
+						</StackPanel>
+					</ScrollViewer>
+				</TabItem>
+
+				<!-- Hotkeys Tab -->
+				<TabItem Header="Hotkeys">
+					<ScrollViewer Padding="0,8">
+						<StackPanel Spacing="8">
+
+							<!-- Capture Hotkeys -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Screenshot Hotkeys"/>
+
+									<Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto"
+										  Margin="0,6,0,0">
+										<Grid.Styles>
+											<Style Selector="TextBlock">
+												<Setter Property="VerticalAlignment" Value="Center"/>
+												<Setter Property="Margin" Value="0,5"/>
+											</Style>
+											<Style Selector="TextBox">
+												<Setter Property="Margin" Value="10,5"/>
+												<Setter Property="IsReadOnly" Value="False"/>
+											</Style>
+										</Grid.Styles>
+
+										<TextBlock Grid.Row="0" Grid.Column="0" Text="Capture Screenshot:"/>
+										<TextBox Grid.Row="0" Grid.Column="1" x:Name="CaptureRegionHotkeyTextBox" Text="Alt+A"/>
+
+										<TextBlock Grid.Row="1" Grid.Column="0" Text="Open Settings:"/>
+										<TextBox Grid.Row="1" Grid.Column="1" x:Name="OpenSettingsHotkeyTextBox" Text="Alt+S"/>
+									</Grid>
+
+									<TextBlock Text="Note: Focus the text box and press your desired key combination"
+											   FontSize="12" Foreground="Gray" Margin="0,10,0,0"/>
+
+									<!-- macOS Permission Status -->
+									<Border x:Name="MacPermissionPanel"
+											Classes="group"
+											Margin="0,15,0,0"
+											IsVisible="False">
+										<StackPanel Spacing="8">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock x:Name="PermissionStatusIcon"
+														   Text="[!]"
+														   FontSize="16"
+														   VerticalAlignment="Center"/>
+												<TextBlock x:Name="PermissionStatusText"
+														   Text="macOS Accessibility Permission: Not Granted"
+														   FontWeight="SemiBold"
+														   VerticalAlignment="Center"/>
+											</StackPanel>
+											<TextBlock Text="Global hotkeys require accessibility permission to function properly."
+													   FontSize="12"
+													   TextWrapping="Wrap"/>
+											<StackPanel Orientation="Horizontal" Spacing="10">
+												<Button x:Name="OpenPermissionGuideButton"
+														Content="Permission Guide"
+														Padding="8,4"
+														Click="ShowPermissionGuide"
+														Classes="action"/>
+												<Button x:Name="RefreshPermissionButton"
+														Content="Refresh Status"
+														Padding="8,4"
+														Click="RefreshPermissionStatus"
+														Classes="action"/>
+												<Button x:Name="DebugPermissionButton"
+														Content="Debug Info"
+														Padding="8,4"
+														Click="ShowPermissionDebugInfo"
+														Classes="action"/>
+											</StackPanel>
+										</StackPanel>
+									</Border>
+								</StackPanel>
+							</Border>
+
+						</StackPanel>
+					</ScrollViewer>
+				</TabItem>
+
+				<!-- Styles Tab -->
+				<TabItem Header="Default Styles">
+					<ScrollViewer Padding="0,8">
+						<StackPanel Spacing="8">
+
+							<!-- Text Style -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Text Annotations"/>
+
+									<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto"
+										  Margin="0,6,0,0">
+										<Grid.Styles>
+											<Style Selector="TextBlock">
+												<Setter Property="VerticalAlignment" Value="Center"/>
+												<Setter Property="Margin" Value="0,5,10,5"/>
+												<Setter Property="Width" Value="80"/>
+											</Style>
+											<Style Selector="Slider">
+												<Setter Property="Margin" Value="0,5"/>
+												<Setter Property="Width" Value="200"/>
+												<Setter Property="HorizontalAlignment" Value="Left"/>
+											</Style>
+										</Grid.Styles>
+
+										<TextBlock Grid.Row="0" Grid.Column="0" Text="Font Size:"/>
+										<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+											<Slider x:Name="TextFontSizeSlider" Minimum="8" Maximum="72" Value="16" TickFrequency="4" Width="200"/>
+											<TextBlock x:Name="TextFontSizeValueText" Text="16" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
+										</StackPanel>
 
 
-							</StackPanel>
-						</Border>
+									</Grid>
+								</StackPanel>
+							</Border>
+
+							<!-- Shape Style -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Shape Annotations"/>
+
+									<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+										  Margin="0,6,0,0">
+										<Grid.Styles>
+											<Style Selector="TextBlock">
+												<Setter Property="VerticalAlignment" Value="Center"/>
+												<Setter Property="Margin" Value="0,5,10,5"/>
+												<Setter Property="Width" Value="80"/>
+											</Style>
+											<Style Selector="Slider">
+												<Setter Property="Margin" Value="0,5"/>
+												<Setter Property="Width" Value="200"/>
+												<Setter Property="HorizontalAlignment" Value="Left"/>
+											</Style>
+										</Grid.Styles>
+
+										<TextBlock Grid.Row="0" Grid.Column="0" Text="Thickness:"/>
+										<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+											<Slider x:Name="ShapeThicknessSlider" Minimum="1" Maximum="20" Value="3" TickFrequency="1" Width="200"/>
+											<TextBlock x:Name="ShapeThicknessValueText" Text="3" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
+										</StackPanel>
+
+										<TextBlock Grid.Row="1" Grid.Column="0" Text="Color:"/>
+										<Border Grid.Row="1" Grid.Column="1" Width="40" Height="25"
+												Background="Blue" BorderThickness="1" BorderBrush="Gray"
+												Margin="0,5" HorizontalAlignment="Left" CornerRadius="3"
+												x:Name="ShapeColorPreview"/>
+									</Grid>
+								</StackPanel>
+							</Border>
+
+							<!-- Export Quality -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Export Quality"/>
+
+									<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+										  Margin="0,6,0,0">
+										<Grid.Styles>
+											<Style Selector="TextBlock">
+												<Setter Property="VerticalAlignment" Value="Center"/>
+												<Setter Property="Margin" Value="0,5,10,5"/>
+												<Setter Property="Width" Value="80"/>
+											</Style>
+											<Style Selector="Slider">
+												<Setter Property="Margin" Value="0,5"/>
+												<Setter Property="Width" Value="200"/>
+												<Setter Property="HorizontalAlignment" Value="Left"/>
+											</Style>
+										</Grid.Styles>
+
+										<TextBlock Grid.Row="0" Grid.Column="0" Text="JPEG Quality:"/>
+										<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+											<Slider x:Name="JpegQualitySlider" Minimum="10" Maximum="100" Value="90" TickFrequency="10" Width="200"/>
+											<TextBlock x:Name="JpegQualityValueText" Text="90" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
+										</StackPanel>
+
+										<TextBlock Grid.Row="1" Grid.Column="0" Text="PNG Compression:"/>
+										<StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+											<Slider x:Name="PngCompressionSlider" Minimum="0" Maximum="9" Value="6" TickFrequency="1" Width="200"/>
+											<TextBlock x:Name="PngCompressionValueText" Text="6" Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
+
+						</StackPanel>
+					</ScrollViewer>
+				</TabItem>
+
+				<!-- Updates Tab -->
+				<TabItem Header="Updates">
+					<ScrollViewer Padding="0,8">
+						<StackPanel Spacing="8">
+
+							<!-- Auto-Update Settings -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Automatic Updates"/>
+
+									<CheckBox x:Name="EnableAutoUpdateCheckBox"
+											  Content="Enable automatic update checking"
+											  Margin="0,5"/>
+
+									<TextBlock Text="Check for updates every 12 hours and notify before installing." FontSize="12" Foreground="Gray" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+								</StackPanel>
+							</Border>
+
+							<!-- Manual Update Check -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Manual Update Check"/>
+
+									<StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+										<Button x:Name="CheckForUpdatesButton"
+												Content="Check for Updates"
+												Classes="action"/>
+										<TextBlock x:Name="UpdateStatusText"
+												   Text="Click 'Check for Updates' to check for the latest version."
+												   VerticalAlignment="Center"
+												   Foreground="Gray"/>
+									</StackPanel>
+
+									<ProgressBar x:Name="UpdateProgressBar"
+												 Height="4"
+												 IsVisible="False"
+												 Margin="0,10,0,0"/>
+
+									<TextBlock x:Name="UpdateDetailsText"
+											   Text=""
+											   FontSize="12"
+											   Foreground="Gray"
+											   Margin="0,5,0,0"
+											   TextWrapping="Wrap"
+											   IsVisible="False"/>
+
+								</StackPanel>
+							</Border>
+
+							<!-- Current Version Info -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Version Information"/>
+
+									<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,10,0,0">
+										<Grid.Styles>
+											<Style Selector="TextBlock">
+												<Setter Property="VerticalAlignment" Value="Center"/>
+												<Setter Property="Margin" Value="0,3"/>
+											</Style>
+										</Grid.Styles>
+
+										<TextBlock Grid.Row="0" Grid.Column="0" Text="Current Version:" FontWeight="SemiBold" Width="120"/>
+										<TextBlock Grid.Row="0" Grid.Column="1" x:Name="CurrentVersionText" Text="1.0.0" />
+
+										<TextBlock Grid.Row="1" Grid.Column="0" Text="Release Date:" FontWeight="SemiBold"/>
+										<TextBlock Grid.Row="1" Grid.Column="1" x:Name="ReleaseDateText" Text="-" />
+
+										<TextBlock Grid.Row="2" Grid.Column="0" Text="Update Channel:" FontWeight="SemiBold"/>
+										<TextBlock Grid.Row="2" Grid.Column="1" Text="Stable" />
+									</Grid>
+
+								</StackPanel>
+							</Border>
+
+						</StackPanel>
+					</ScrollViewer>
+				</TabItem>
+
+				<!-- Advanced Tab -->
+				<TabItem Header="Advanced">
+					<ScrollViewer Padding="0,8">
+						<StackPanel Spacing="8">
+
+							<!-- Performance Settings -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Performance"/>
+
+									<CheckBox x:Name="EnableHardwareAccelerationCheckBox"
+											  Content="Enable hardware acceleration for rendering"
+											  Margin="0,5"/>
+
+									<CheckBox x:Name="LimitFrameRateCheckBox"
+											  Content="Limit frame rate during annotation drawing"
+											  Margin="0,5"/>
+
+									<Grid ColumnDefinitions="Auto,*" Margin="0,8,0,0">
+										<TextBlock Grid.Column="0" Text="Render quality:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+										<ComboBox Grid.Column="1" x:Name="RenderQualityComboBox" Width="150" HorizontalAlignment="Left">
+											<ComboBoxItem Content="Low" />
+											<ComboBoxItem Content="Medium" IsSelected="True"/>
+											<ComboBoxItem Content="High" />
+										</ComboBox>
+									</Grid>
+
+								</StackPanel>
+							</Border>
 
 
-					</StackPanel>
-				</ScrollViewer>
-			</TabItem>
+							<!-- Security & Privacy -->
+							<Border Classes="group">
+								<StackPanel>
+									<TextBlock Classes="header" Text="Security &amp; Privacy"/>
+
+									<CheckBox x:Name="AllowTelemetryCheckBox"
+											  Content="Allow anonymous usage data collection"
+											  Margin="0,5"/>
+
+
+								</StackPanel>
+							</Border>
+
+
+						</StackPanel>
+					</ScrollViewer>
+				</TabItem>
 
 			</TabControl>
 

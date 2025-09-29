@@ -131,15 +131,6 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsCheckedChanged += OnEnableAutoUpdateChanged;
         }
 
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
-        {
-            updateFrequency.SelectionChanged += OnUpdateFrequencyChanged;
-        }
-
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            notifyOnUpdates.IsCheckedChanged += OnNotifyOnUpdatesChanged;
-        }
 
         if (this.FindControl<Button>("CheckForUpdatesButton") is { } checkForUpdatesButton)
         {
@@ -354,34 +345,13 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsChecked = _currentSettings.AutoUpdate.Enabled;
         }
 
-        // Update frequency
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
-        {
-            var hours = _currentSettings.AutoUpdate.CheckFrequencyHours;
-            foreach (ComboBoxItem item in updateFrequency.Items.OfType<ComboBoxItem>())
-            {
-                if (item.Tag is string tagValue &&
-                    int.TryParse(tagValue, out int itemHours) &&
-                    itemHours == hours)
-                {
-                    updateFrequency.SelectedItem = item;
-                    break;
-                }
-            }
-        }
-
-        // Notify on updates
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            notifyOnUpdates.IsChecked = _currentSettings.AutoUpdate.NotifyBeforeInstall;
-        }
 
         // Current version info
         if (this.FindControl<TextBlock>("CurrentVersionText") is { } currentVersionText)
         {
             // Get version from assembly
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            currentVersionText.Text = version?.ToString(3) ?? "1.0.0";
+            currentVersionText.Text = version?.ToString() ?? "1.0.0.0";
         }
 
         if (this.FindControl<TextBlock>("ReleaseDateText") is { } releaseDateText)
@@ -515,20 +485,6 @@ public partial class SettingsWindow : Window
             _currentSettings.AutoUpdate.Enabled = enableAutoUpdate.IsChecked ?? true;
         }
 
-        // Update frequency
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency &&
-            updateFrequency.SelectedItem is ComboBoxItem selectedItem &&
-            selectedItem.Tag is string tagValue &&
-            int.TryParse(tagValue, out int hours))
-        {
-            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
-        }
-
-        // Notify on updates
-        if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
-        {
-            _currentSettings.AutoUpdate.NotifyBeforeInstall = notifyOnUpdates.IsChecked ?? false;
-        }
     }
 
     private async void OnOkClick(object? sender, RoutedEventArgs e)
@@ -980,27 +936,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnUpdateFrequencyChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
-    {
-        if (sender is ComboBox comboBox &&
-            comboBox.SelectedItem is ComboBoxItem selectedItem &&
-            selectedItem.Tag is string tagValue &&
-            int.TryParse(tagValue, out int hours) &&
-            _currentSettings.AutoUpdate != null)
-        {
-            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
-            Log.Debug("Update frequency changed: {Hours} hours", hours);
-        }
-    }
-
-    private void OnNotifyOnUpdatesChanged(object? sender, RoutedEventArgs e)
-    {
-        if (sender is CheckBox checkBox && _currentSettings.AutoUpdate != null)
-        {
-            _currentSettings.AutoUpdate.NotifyBeforeInstall = checkBox.IsChecked == true;
-            Log.Debug("Notify on updates changed: {Notify}", _currentSettings.AutoUpdate.NotifyBeforeInstall);
-        }
-    }
 
     private async void OnCheckForUpdatesClick(object? sender, RoutedEventArgs e)
     {
