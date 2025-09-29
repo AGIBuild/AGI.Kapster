@@ -70,4 +70,10 @@ public interface IUpdateService
     /// Event fired when download progress changes
     /// </summary>
     event EventHandler<DownloadProgress>? DownloadProgressChanged;
+
+    string? PendingInstallerPath { get; }
+
+    void ClearPendingInstaller();
+
+    void ScheduleRetryDownload(UpdateInfo updateInfo);
 }

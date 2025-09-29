@@ -453,33 +453,16 @@
 										  Content="Enable automatic update checking"
 										  Margin="0,5"/>
 
-								<TextBlock Text="Check for updates in the background and install them automatically."
-										   FontSize="12" Foreground="Gray" Margin="0,0,0,10"
-										   TextWrapping="Wrap"/>
+								<TextBlock Text="Check for updates every 12 hours and notify before installing." FontSize="12" Foreground="Gray" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
-								<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
-									<Grid.Styles>
-										<Style Selector="TextBlock">
-											<Setter Property="VerticalAlignment" Value="Center"/>
-											<Setter Property="Margin" Value="0,5,10,5"/>
-										</Style>
-									</Grid.Styles>
-
-									<TextBlock Grid.Row="0" Grid.Column="0" Text="Check frequency:" Width="120"/>
-									<ComboBox Grid.Row="0" Grid.Column="1" x:Name="UpdateFrequencyComboBox" Width="180" HorizontalAlignment="Left">
-										<ComboBoxItem Content="Every hour" Tag="1"/>
-										<ComboBoxItem Content="Every 2 hours" Tag="2"/>
-										<ComboBoxItem Content="Every 6 hours" Tag="6" IsSelected="True"/>
-										<ComboBoxItem Content="Every 12 hours" Tag="12"/>
-										<ComboBoxItem Content="Daily" Tag="24"/>
-									</ComboBox>
-
-									<TextBlock Grid.Row="1" Grid.Column="0" Text="Notify on updates:" />
-									<CheckBox Grid.Row="1" Grid.Column="1" x:Name="NotifyOnUpdatesCheckBox"
-											  Content="Show notification when updates are available"
-											  IsChecked="True"/>
+								<Grid Margin="0,12,0,0">
+									<TextBlock Text="Check for updates every 12 hours and notify before installing." FontSize="12" Foreground="Gray" Margin="0,4,0,0" TextWrapping="Wrap"/>
 								</Grid>
 
+								<TextBlock Grid.Row="1" Grid.Column="0" Text="Notify on updates:" />
+								<CheckBox Grid.Row="1" Grid.Column="1" x:Name="NotifyOnUpdatesCheckBox"
+											  Content="Show notification when updates are available"
+											  IsChecked="True"/>
 							</StackPanel>
 						</Border>
 

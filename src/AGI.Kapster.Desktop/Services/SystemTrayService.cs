@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
@@ -8,19 +10,40 @@ using Serilog;
 using System.Threading.Tasks;
 using Avalonia.Layout;
 using Avalonia.Media;
+using AGI.Kapster.Desktop.Models;
+using Microsoft.Extensions.DependencyInjection;
+using AGI.Kapster.Desktop.Services.Settings;
+using AGI.Kapster.Desktop.Services.Update;
+using AGI.Kapster.Desktop.Models.Update;
 
 namespace AGI.Kapster.Desktop.Services;
 
 /// <summary>
 /// System tray service implementation
 /// </summary>
-public class SystemTrayService : ISystemTrayService
+public class SystemTrayService : ISystemTrayService, IDisposable
 {
+    private readonly INotificationService _notificationService;
+    private readonly IUpdateService _updateService;
+    private readonly AppSettings _appSettings;
     private TrayIcon? _trayIcon;
     private NativeMenu? _contextMenu;
 
     public event EventHandler? OpenSettingsRequested;
     public event EventHandler? ExitRequested;
+
+    public SystemTrayService()
+    {
+        var services = App.Services ?? throw new InvalidOperationException("Service container not initialized");
+
+        _notificationService = services.GetRequiredService<INotificationService>();
+        _updateService = services.GetRequiredService<IUpdateService>();
+        var settingsService = services.GetService<ISettingsService>();
+        _appSettings = settingsService?.Settings ?? new AppSettings();
+
+        _updateService.UpdateAvailable += OnUpdateAvailable;
+        _updateService.UpdateCompleted += OnUpdateCompleted;
+    }
 
     public void Initialize()
     {
@@ -29,12 +52,160 @@ public class SystemTrayService : ISystemTrayService
             CreateTrayIcon();
             CreateContextMenu();
             Log.Debug("System tray initialized");
+
+            _updateService.StartBackgroundChecking();
+
+            if (_updateService.PendingInstallerPath is { } pending && _appSettings.General.ShowNotifications)
+            {
+                _ = NotifyUpdateReadyAsync(pending, null);
+            }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to initialize system tray");
             throw;
         }
+    }
+
+    private async Task NotifyUpdateReadyAsync(string installerPath, UpdateInfo? updateInfo)
+    {
+        try
+        {
+            var versionLabel = updateInfo?.Version ?? Path.GetFileNameWithoutExtension(installerPath);
+
+            var installNow = new NotificationButton(
+                "install-now",
+                "Install Now",
+                async token =>
+                {
+                    if (_updateService.PendingInstallerPath is not { } path)
+                    {
+                        return;
+                    }
+
+                    var success = await _updateService.InstallUpdateAsync(path);
+                    if (success)
+                    {
+                        _updateService.ClearPendingInstaller();
+                    }
+                });
+
+            var later = new NotificationButton(
+                "install-later",
+                "Later",
+                token => Task.CompletedTask);
+
+            await _notificationService.ShowAsync(new NotificationRequest(
+                Title: "Update Ready",
+                Message: "AGI Kapster has a new update ready to install. Proceed now?",
+                Buttons: new[] { installNow, later },
+                IsAutoDismissEnabled: false
+            ));
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to notify update ready state");
+        }
+    }
+
+    private async void OnUpdateAvailable(object? sender, UpdateAvailableEventArgs e)
+    {
+        try
+        {
+            if (IsMacOS())
+            {
+                await ShowMacManualUpdatePromptAsync(e.UpdateInfo);
+                return;
+            }
+
+            var downloadSuccess = await _updateService.DownloadUpdateAsync(e.UpdateInfo);
+            if (!downloadSuccess)
+            {
+                _updateService.ScheduleRetryDownload(e.UpdateInfo);
+                return;
+            }
+
+            if (_updateService.PendingInstallerPath is { } pending)
+            {
+                if (!_appSettings.General.ShowNotifications)
+                {
+                    return;
+                }
+
+                await NotifyUpdateReadyAsync(pending, e.UpdateInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to handle update availability");
+        }
+    }
+
+    private void OnUpdateCompleted(object? sender, UpdateCompletedEventArgs e)
+    {
+        // Intentionally no user notification on failure; rely on logs
+    }
+
+    private async Task ShowMacManualUpdatePromptAsync(UpdateInfo updateInfo)
+    {
+        try
+        {
+            if (!_appSettings.General.ShowNotifications)
+            {
+                return;
+            }
+
+            var releaseUrl = !string.IsNullOrWhiteSpace(updateInfo.ReleaseUrl)
+                ? updateInfo.ReleaseUrl
+                : $"https://github.com/AGIBuild/AGI.Kapster/releases/tag/v{updateInfo.Version}";
+
+            var openDownload = new NotificationButton(
+                "open-download",
+                "Open Download Page",
+                _ => OpenUrlAsync(releaseUrl));
+
+            var instructions = "macOS builds require manual installation. Download the latest package, move it to Applications, then run 'xattr -dr com.apple.quarantine /Applications/AGI Kapster.app'.";
+
+            await _notificationService.ShowAsync(new NotificationRequest(
+                Title: "Update Available",
+                Message: instructions,
+                Buttons: new[] { openDownload },
+                IsAutoDismissEnabled: false));
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to show macOS manual update instructions");
+        }
+    }
+
+    private static bool IsMacOS() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+
+    private static Task OpenUrlAsync(string url)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to open URL: {Url}", url);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _updateService.UpdateAvailable -= OnUpdateAvailable;
+        _updateService.UpdateCompleted -= OnUpdateCompleted;
+        _updateService.StopBackgroundChecking();
     }
 
     private void CreateTrayIcon()
@@ -176,19 +347,17 @@ public class SystemTrayService : ISystemTrayService
     {
         try
         {
-            // Ensure UI operations run on the UI thread
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 try
                 {
-                    AboutDialog.ShowWindow();
+                    AboutDialog.ShowDialogWindow(null);
                     Log.Debug("About dialog opened from system tray");
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "Failed to show About dialog on UI thread");
 
-                    // Fallback to notification if dialog fails
                     try
                     {
                         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
@@ -213,24 +382,13 @@ public class SystemTrayService : ISystemTrayService
         {
             Log.Debug("Showing notification: {Title} - {Message}", title, message);
 
-            if (_trayIcon != null)
+            if (!_appSettings.General.ShowNotifications)
             {
-                // Update tooltip temporarily to show notification
-                var originalTooltip = _trayIcon.ToolTipText;
-                _trayIcon.ToolTipText = $"{title}: {message}";
-
-                // Reset tooltip after a delay
-                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ =>
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        if (_trayIcon != null)
-                        {
-                            _trayIcon.ToolTipText = originalTooltip;
-                        }
-                    });
-                });
+                Log.Debug("Notifications disabled by user settings");
+                return;
             }
+
+            _notificationService.ShowAsync(new NotificationRequest(title, message, IsAutoDismissEnabled: true)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -357,3 +515,4 @@ public class SystemTrayService : ISystemTrayService
         return false;
     }
 }
+

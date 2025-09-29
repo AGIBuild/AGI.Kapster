@@ -20,32 +20,45 @@ namespace AGI.Kapster.Desktop.Services.Update;
 /// </summary>
 public class UpdateService : IUpdateService, IDisposable
 {
+    private const int BackgroundCheckIntervalHours = 12;
+    private const string DefaultRepositoryOwner = "AGIBuild";
+    private const string DefaultRepositoryName = "AGI.Kapster";
+
     private readonly GitHubUpdateProvider _updateProvider;
     private readonly ISettingsService _settingsService;
     private readonly HttpClient _httpClient;
     private readonly Timer _updateTimer;
     private readonly ILogger _logger = Log.ForContext<UpdateService>();
+    private readonly SemaphoreSlim _downloadSemaphore = new(1, 1);
+    private readonly TimeSpan _retryInterval = TimeSpan.FromMinutes(15);
 
     private UpdateSettings _settings;
-    private bool _isCheckingForUpdates = false;
-    private bool _disposed = false;
+    private bool _isCheckingForUpdates;
+    private bool _disposed;
+    private string? _pendingInstallerPath;
+
+    public string? PendingInstallerPath => _pendingInstallerPath is not null && File.Exists(_pendingInstallerPath) ? _pendingInstallerPath : null;
+
+    public void ClearPendingInstaller() => _pendingInstallerPath = null;
 
     public UpdateService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
 
-        // Load current settings first
         _settings = LoadUpdateSettings();
 
-        // Initialize GitHub update provider with configurable repository
-        _updateProvider = new GitHubUpdateProvider(_settings.GitHubRepository);
+        var owner = string.IsNullOrWhiteSpace(_settings.RepositoryOwner) ? DefaultRepositoryOwner : _settings.RepositoryOwner;
+        var name = string.IsNullOrWhiteSpace(_settings.RepositoryName) ? DefaultRepositoryName : _settings.RepositoryName;
+
+        _updateProvider = new GitHubUpdateProvider($"{owner}/{name}");
         _httpClient = new HttpClient();
 
-        // Setup timer for periodic checks
-        _updateTimer = new Timer();
+        _updateTimer = new Timer
+        {
+            AutoReset = true,
+            Interval = TimeSpan.FromHours(BackgroundCheckIntervalHours).TotalMilliseconds
+        };
         _updateTimer.Elapsed += OnTimerElapsed;
-        _updateTimer.AutoReset = true;
-        UpdateTimerInterval();
 
         _logger.Information("Update service initialized. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
     }
@@ -144,11 +157,15 @@ public class UpdateService : IUpdateService, IDisposable
 
     public async Task<bool> DownloadUpdateAsync(UpdateInfo updateInfo, IProgress<DownloadProgress>? progress = null)
     {
+        await _downloadSemaphore.WaitAsync().ConfigureAwait(false);
+
         try
         {
             var filePath = GetInstallerPath(updateInfo.Version);
             var tempDir = Path.GetDirectoryName(filePath)!;
             Directory.CreateDirectory(tempDir);
+
+            filePath = await EnsureWritableInstallerPathAsync(filePath).ConfigureAwait(false);
 
             _logger.Information("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, filePath);
 
@@ -157,7 +174,7 @@ public class UpdateService : IUpdateService, IDisposable
 
             var totalBytes = response.Content.Headers.ContentLength ?? 0;
             using var contentStream = await response.Content.ReadAsStreamAsync();
-            using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read);
 
             var buffer = new byte[8192];
             var totalDownloaded = 0L;
@@ -171,7 +188,7 @@ public class UpdateService : IUpdateService, IDisposable
                 await fileStream.WriteAsync(buffer, 0, bytesRead);
                 totalDownloaded += bytesRead;
 
-                if (progress != null && stopwatch.ElapsedMilliseconds > 100) // Update every 100ms
+                if (progress != null && stopwatch.ElapsedMilliseconds > 100)
                 {
                     var downloadProgress = new DownloadProgress
                     {
@@ -194,7 +211,6 @@ public class UpdateService : IUpdateService, IDisposable
 
             _logger.Information("Download completed: {Path} ({Size:N0} bytes)", filePath, totalDownloaded);
 
-            // Verify file size
             var fileInfo = new FileInfo(filePath);
             if (updateInfo.FileSize > 0 && fileInfo.Length != updateInfo.FileSize)
             {
@@ -204,12 +220,67 @@ public class UpdateService : IUpdateService, IDisposable
                 return false;
             }
 
+            _pendingInstallerPath = filePath;
             return true;
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Error downloading update");
             return false;
+        }
+        finally
+        {
+            _downloadSemaphore.Release();
+        }
+    }
+
+    private static bool IsSharingViolation(IOException ex)
+        => ex.HResult == unchecked((int)0x80070020);
+
+    private async Task<string> EnsureWritableInstallerPathAsync(string initialPath)
+    {
+        var directory = Path.GetDirectoryName(initialPath)!;
+        var baseName = Path.GetFileNameWithoutExtension(initialPath);
+        var extension = Path.GetExtension(initialPath);
+        var candidate = initialPath;
+        var attempt = 0;
+
+        while (true)
+        {
+            try
+            {
+                if (File.Exists(candidate))
+                {
+                    using (File.Open(candidate, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+                    {
+                        File.Delete(candidate);
+                    }
+                }
+
+                using (File.Open(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+                {
+                }
+
+                File.Delete(candidate);
+                return candidate;
+            }
+            catch (IOException ioEx) when (IsSharingViolation(ioEx) || File.Exists(candidate))
+            {
+                attempt++;
+                var suffix = attempt switch
+                {
+                    0 => string.Empty,
+                    1 => DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"),
+                    _ => Guid.NewGuid().ToString("N")
+                };
+
+                if (!string.IsNullOrEmpty(suffix))
+                {
+                    candidate = Path.Combine(directory, $"{baseName}-{suffix}{extension}");
+                }
+
+                await Task.Delay(Math.Min(1500, attempt * 250)).ConfigureAwait(false);
+            }
         }
     }
 
@@ -223,92 +294,35 @@ public class UpdateService : IUpdateService, IDisposable
                 return false;
             }
 
-            _logger.Information("Starting silent installation: {Path}", installerPath);
-
-            ProcessStartInfo startInfo;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            var processInfo = new ProcessStartInfo
             {
-                // Windows MSI installation
-                startInfo = new ProcessStartInfo
-                {
-                    FileName = "msiexec",
-                    Arguments = $"/i \"{installerPath}\" /quiet /norestart LAUNCH_APP=0",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                // Use specialized macOS installer
-                var macInstaller = new MacOSUpdateInstaller();
-                var installResult = await macInstaller.InstallUpdateAsync(installerPath);
+                FileName = installerPath,
+                UseShellExecute = true
+            };
 
-                if (installResult)
-                {
-                    _logger.Information("macOS installation completed successfully");
+            _logger.Information("Launching installer: {Path}", installerPath);
 
-                    // Schedule application restart with proper error handling
-                    ScheduleApplicationRestart("macOS installation completed");
-
-                    return true;
-                }
-                else
-                {
-                    _logger.Error("macOS installation failed");
-                    return false;
-                }
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                // Linux DEB installation
-                startInfo = new ProcessStartInfo
-                {
-                    FileName = "sudo",
-                    Arguments = $"dpkg -i \"{installerPath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-            }
-            else
-            {
-                _logger.Error("Unsupported platform for installation: {Platform}", RuntimeInformation.OSDescription);
-                return false;
-            }
-
-            using var process = Process.Start(startInfo);
+            using var process = Process.Start(processInfo);
             if (process == null)
             {
-                _logger.Error("Failed to start installation process");
+                _logger.Error("Failed to launch installer process");
                 return false;
             }
 
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
-            {
-                _logger.Information("Installation completed successfully");
-
-                // Schedule application restart with proper error handling
-                ScheduleApplicationRestart("Installation completed successfully");
-
-                return true;
-            }
-            else
-            {
-                var error = await process.StandardError.ReadToEndAsync();
-                _logger.Error("Installation failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
-                return false;
-            }
+            _pendingInstallerPath = null;
+            return true;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Error installing update");
+            _logger.Error(ex, "Error launching installer");
             return false;
+        }
+        finally
+        {
+            if (_pendingInstallerPath != null && !File.Exists(_pendingInstallerPath))
+            {
+                _pendingInstallerPath = null;
+            }
         }
     }
 
@@ -339,7 +353,6 @@ public class UpdateService : IUpdateService, IDisposable
     {
         _settings = settings;
         await SaveUpdateSettingsAsync();
-        UpdateTimerInterval();
 
         _logger.Information("Update settings saved. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
     }
@@ -351,19 +364,7 @@ public class UpdateService : IUpdateService, IDisposable
             var update = await CheckForUpdatesAsync();
             if (update != null)
             {
-                UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
-
-                if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
-                {
-                    await PerformAutomaticUpdateAsync(update);
-                }
-                else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
-                {
-                    // For platforms that don't support silent install (like macOS), notify user
-                    _logger.Information("Automatic installation not supported on {Platform}, user notification required",
-                        PlatformUpdateHelper.GetPlatformDisplayName());
-                    UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
-                }
+                TriggerUpdateAvailable(update);
             }
         }
         catch (Exception ex)
@@ -372,99 +373,11 @@ public class UpdateService : IUpdateService, IDisposable
         }
     }
 
-    private async Task PerformAutomaticUpdateAsync(UpdateInfo updateInfo)
+    private void TriggerUpdateAvailable(UpdateInfo update)
     {
-        try
-        {
-            _logger.Information("Performing automatic update to version {Version}", updateInfo.Version);
-
-            var downloadSuccess = await DownloadUpdateAsync(updateInfo);
-            if (!downloadSuccess)
-            {
-                UpdateCompleted?.Invoke(this, new UpdateCompletedEventArgs(false, updateInfo, "Download failed"));
-                return;
-            }
-
-            var tempDir = Path.Combine(Path.GetTempPath(), "AGI.Kapster", "Updates");
-            var platformInfo = PlatformUpdateHelper.GetPlatformInfo();
-            var installerPath = Path.Combine(tempDir, $"AGI.Kapster-{updateInfo.Version}-{platformInfo.Identifier}.{platformInfo.Extension}");
-
-            var installSuccess = await InstallUpdateAsync(installerPath);
-            UpdateCompleted?.Invoke(this, new UpdateCompletedEventArgs(installSuccess, updateInfo,
-                installSuccess ? null : "Installation failed"));
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "Error during automatic update");
-            UpdateCompleted?.Invoke(this, new UpdateCompletedEventArgs(false, updateInfo, ex.Message));
-        }
+        UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
     }
 
-    private void RestartApplication()
-    {
-        try
-        {
-            var currentProcess = Process.GetCurrentProcess();
-            var executablePath = currentProcess.MainModule?.FileName ?? Assembly.GetEntryAssembly()?.Location;
-
-            if (!string.IsNullOrEmpty(executablePath))
-            {
-                _logger.Information("Restarting application: {Path}", executablePath);
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = executablePath,
-                    Arguments = "--updated",
-                    UseShellExecute = true
-                });
-            }
-
-            // Gracefully dispose resources before exiting
-            _logger.Information("Performing graceful shutdown before restart");
-            Dispose();
-
-            // Give a brief moment for cleanup to complete
-            Thread.Sleep(500);
-
-            Environment.Exit(0);
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "Error restarting application");
-            // If restart fails, at least try to dispose cleanly
-            try
-            {
-                Dispose();
-            }
-            catch (Exception disposeEx)
-            {
-                _logger.Error(disposeEx, "Error during cleanup after failed restart");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Schedule application restart with proper error handling
-    /// </summary>
-    private void ScheduleApplicationRestart(string reason)
-    {
-        Task.Run(async () =>
-        {
-            try
-            {
-                _logger.Information("Scheduling application restart in 2 seconds. Reason: {Reason}", reason);
-                await Task.Delay(2000);
-                RestartApplication();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error during scheduled application restart");
-            }
-        });
-    }
-
-    /// <summary>
-    /// Schedule delayed update check with proper error handling
-    /// </summary>
     private void ScheduleDelayedUpdateCheck(string reason)
     {
         Task.Run(async () =>
@@ -477,25 +390,23 @@ public class UpdateService : IUpdateService, IDisposable
                 var update = await CheckForUpdatesAsync();
                 if (update != null)
                 {
-                    UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, true));
-
-                    if (_settings.InstallAutomatically && !_settings.NotifyBeforeInstall && PlatformUpdateHelper.SupportsSilentInstall())
-                    {
-                        await PerformAutomaticUpdateAsync(update);
-                    }
-                    else if (_settings.InstallAutomatically && !PlatformUpdateHelper.SupportsSilentInstall())
-                    {
-                        // For platforms that don't support silent install (like macOS), notify user
-                        _logger.Information("Automatic installation not supported on {Platform}, user notification required",
-                            PlatformUpdateHelper.GetPlatformDisplayName());
-                        UpdateAvailable?.Invoke(this, new UpdateAvailableEventArgs(update, false));
-                    }
+                    TriggerUpdateAvailable(update);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error during scheduled update check");
             }
+        });
+    }
+
+    public void ScheduleRetryDownload(UpdateInfo updateInfo)
+    {
+        Task.Run(async () =>
+        {
+            _logger.Warning("Scheduling update download retry in {Delay} mins for version {Version}", _retryInterval.TotalMinutes, updateInfo.Version);
+            await Task.Delay(_retryInterval).ConfigureAwait(false);
+            TriggerUpdateAvailable(updateInfo);
         });
     }
 
@@ -507,29 +418,21 @@ public class UpdateService : IUpdateService, IDisposable
 
     private void UpdateTimerInterval()
     {
-        _updateTimer.Interval = TimeSpan.FromHours(_settings.CheckFrequencyHours).TotalMilliseconds;
+        _updateTimer.Interval = TimeSpan.FromHours(BackgroundCheckIntervalHours).TotalMilliseconds;
     }
 
     private UpdateSettings LoadUpdateSettings()
     {
-        try
+        var settings = _settingsService.Settings;
+        return new UpdateSettings
         {
-            var settings = _settingsService.Settings;
-            return new UpdateSettings
-            {
-                Enabled = settings.AutoUpdate?.Enabled ?? true,
-                CheckFrequencyHours = settings.AutoUpdate?.CheckFrequencyHours ?? 24,
-                InstallAutomatically = settings.AutoUpdate?.InstallAutomatically ?? true,
-                NotifyBeforeInstall = settings.AutoUpdate?.NotifyBeforeInstall ?? false,
-                UsePreReleases = settings.AutoUpdate?.UsePreReleases ?? false,
-                LastCheckTime = settings.AutoUpdate?.LastCheckTime ?? DateTime.MinValue
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(ex, "Error loading update settings, using defaults");
-            return new UpdateSettings();
-        }
+            Enabled = settings.AutoUpdate?.Enabled ?? true,
+            NotifyBeforeInstall = settings.AutoUpdate?.NotifyBeforeInstall ?? false,
+            UsePreReleases = settings.AutoUpdate?.UsePreReleases ?? false,
+            RepositoryOwner = settings.AutoUpdate?.RepositoryOwner,
+            RepositoryName = settings.AutoUpdate?.RepositoryName,
+            LastCheckTime = settings.AutoUpdate?.LastCheckTime ?? DateTime.MinValue
+        };
     }
 
     private async Task SaveUpdateSettingsAsync()
@@ -540,10 +443,10 @@ public class UpdateService : IUpdateService, IDisposable
             settings.AutoUpdate = new Models.AutoUpdateSettings
             {
                 Enabled = _settings.Enabled,
-                CheckFrequencyHours = _settings.CheckFrequencyHours,
-                InstallAutomatically = _settings.InstallAutomatically,
                 NotifyBeforeInstall = _settings.NotifyBeforeInstall,
                 UsePreReleases = _settings.UsePreReleases,
+                RepositoryOwner = _settings.RepositoryOwner ?? DefaultRepositoryOwner,
+                RepositoryName = _settings.RepositoryName ?? DefaultRepositoryName,
                 LastCheckTime = _settings.LastCheckTime
             };
 
@@ -563,6 +466,7 @@ public class UpdateService : IUpdateService, IDisposable
         _updateTimer?.Dispose();
         _updateProvider?.Dispose();
         _httpClient?.Dispose();
+        _downloadSemaphore.Dispose();
 
         _disposed = true;
         _logger.Debug("Update service disposed");

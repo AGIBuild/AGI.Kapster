@@ -53,8 +53,8 @@ public partial class AboutDialog : Window
             if (this.FindControl<TextBlock>("VersionText") is { } versionText)
             {
                 var versionString = version != null
-                    ? $"Version {version.Major}.{version.Minor}.{version.Build}"
-                    : "Version 1.0.0";
+                    ? $"Version {version}" 
+                    : "Version 1.0.0.0";
 
                 versionText.Text = versionString;
                 Log.Debug("About dialog loaded with version: {Version}", versionString);
@@ -80,7 +80,7 @@ public partial class AboutDialog : Window
     /// <summary>
     /// Show the About dialog as a modal dialog
     /// </summary>
-    public static void ShowAboutDialog(Window? owner = null)
+    public static void ShowDialogWindow(Window? owner = null)
     {
         try
         {
@@ -99,31 +99,6 @@ public partial class AboutDialog : Window
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show About dialog");
-        }
-    }
-
-    /// <summary>
-    /// Show the About dialog as a non-modal window
-    /// </summary>
-    public static void ShowWindow()
-    {
-        try
-        {
-            Log.Debug("Creating About dialog window");
-            var dialog = new AboutDialog();
-
-            Log.Debug("Showing About dialog window");
-            dialog.Show();
-
-            Log.Debug("Activating About dialog window");
-            dialog.Activate();
-
-            Log.Debug("About dialog window shown successfully");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to show About window");
-            throw; // Re-throw to let caller handle
         }
     }
 }

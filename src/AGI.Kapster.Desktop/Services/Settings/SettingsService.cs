@@ -136,11 +136,8 @@ public class SettingsService : ISettingsService
                 defaultSettings.AutoUpdate = new AutoUpdateSettings
                 {
                     Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
-                    CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
-                    InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
                     NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
-                    UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
-                    LastCheckTime = DateTime.MinValue
+                    UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false)
                 };
             }
         }
@@ -159,11 +156,8 @@ public class SettingsService : ISettingsService
             _settings.AutoUpdate = new AutoUpdateSettings
             {
                 Enabled = autoUpdateSection.GetValue<bool>("Enabled", true),
-                CheckFrequencyHours = autoUpdateSection.GetValue<int>("CheckFrequencyHours", 24),
-                InstallAutomatically = autoUpdateSection.GetValue<bool>("InstallAutomatically", true),
                 NotifyBeforeInstall = autoUpdateSection.GetValue<bool>("NotifyBeforeInstall", false),
-                UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false),
-                LastCheckTime = DateTime.MinValue
+                UsePreReleases = autoUpdateSection.GetValue<bool>("UsePreReleases", false)
             };
         }
 

@@ -131,11 +131,6 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsCheckedChanged += OnEnableAutoUpdateChanged;
         }
 
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
-        {
-            updateFrequency.SelectionChanged += OnUpdateFrequencyChanged;
-        }
-
         if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
         {
             notifyOnUpdates.IsCheckedChanged += OnNotifyOnUpdatesChanged;
@@ -354,22 +349,6 @@ public partial class SettingsWindow : Window
             enableAutoUpdate.IsChecked = _currentSettings.AutoUpdate.Enabled;
         }
 
-        // Update frequency
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency)
-        {
-            var hours = _currentSettings.AutoUpdate.CheckFrequencyHours;
-            foreach (ComboBoxItem item in updateFrequency.Items.OfType<ComboBoxItem>())
-            {
-                if (item.Tag is string tagValue &&
-                    int.TryParse(tagValue, out int itemHours) &&
-                    itemHours == hours)
-                {
-                    updateFrequency.SelectedItem = item;
-                    break;
-                }
-            }
-        }
-
         // Notify on updates
         if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
         {
@@ -515,19 +494,10 @@ public partial class SettingsWindow : Window
             _currentSettings.AutoUpdate.Enabled = enableAutoUpdate.IsChecked ?? true;
         }
 
-        // Update frequency
-        if (this.FindControl<ComboBox>("UpdateFrequencyComboBox") is { } updateFrequency &&
-            updateFrequency.SelectedItem is ComboBoxItem selectedItem &&
-            selectedItem.Tag is string tagValue &&
-            int.TryParse(tagValue, out int hours))
-        {
-            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
-        }
-
         // Notify on updates
         if (this.FindControl<CheckBox>("NotifyOnUpdatesCheckBox") is { } notifyOnUpdates)
         {
-            _currentSettings.AutoUpdate.NotifyBeforeInstall = notifyOnUpdates.IsChecked ?? false;
+            _currentSettings.AutoUpdate.NotifyBeforeInstall = notifyOnUpdates.IsChecked == true;
         }
     }
 
@@ -977,19 +947,6 @@ public partial class SettingsWindow : Window
         {
             _currentSettings.AutoUpdate.Enabled = checkBox.IsChecked == true;
             Log.Debug("Auto-update enabled changed: {Enabled}", _currentSettings.AutoUpdate.Enabled);
-        }
-    }
-
-    private void OnUpdateFrequencyChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
-    {
-        if (sender is ComboBox comboBox &&
-            comboBox.SelectedItem is ComboBoxItem selectedItem &&
-            selectedItem.Tag is string tagValue &&
-            int.TryParse(tagValue, out int hours) &&
-            _currentSettings.AutoUpdate != null)
-        {
-            _currentSettings.AutoUpdate.CheckFrequencyHours = hours;
-            Log.Debug("Update frequency changed: {Hours} hours", hours);
         }
     }
 

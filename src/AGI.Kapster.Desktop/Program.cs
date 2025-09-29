@@ -12,7 +12,6 @@ using AGI.Kapster.Desktop.Services.Hotkeys;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Platforms;
 using AGI.Kapster.Desktop.Services;
-using AGI.Kapster.Desktop.Services.Annotation;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.ElementDetection;
@@ -136,6 +135,7 @@ class Program
         builder.Services.AddSingleton<IApplicationController, ApplicationController>();
         builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
         builder.Services.AddTransient<SettingsWindow>();
+        builder.Services.AddSingleton<INotificationService, NotificationService>();
 
         // Auto-update service (only enabled in production)
         builder.Services.AddSingleton<AGI.Kapster.Desktop.Services.Update.IUpdateService, AGI.Kapster.Desktop.Services.Update.UpdateService>();
@@ -223,8 +223,6 @@ class Program
                 AutoUpdate = new
                 {
                     Enabled = true,
-                    CheckFrequencyHours = 24,
-                    InstallAutomatically = true,
                     NotifyBeforeInstall = false,
                     UsePreReleases = false,
                     RepositoryOwner = "AGIBuild",
