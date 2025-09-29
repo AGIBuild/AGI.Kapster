@@ -42,11 +42,11 @@ public static class TestDataFactory
             AutoUpdate = new AutoUpdateSettings
             {
                 Enabled = true,
-                CheckFrequencyHours = 24,
-                InstallAutomatically = true,
                 NotifyBeforeInstall = false,
                 UsePreReleases = false,
-                LastCheckTime = DateTime.MinValue
+                LastCheckTime = DateTime.MinValue,
+                RepositoryOwner = "AGIBuild",
+                RepositoryName = "AGI.Kapster"
             }
         };
     }

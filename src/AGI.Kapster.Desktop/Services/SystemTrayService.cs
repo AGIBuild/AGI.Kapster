@@ -53,7 +53,20 @@ public class SystemTrayService : ISystemTrayService, IDisposable
             CreateContextMenu();
             Log.Debug("System tray initialized");
 
-            _updateService.StartBackgroundChecking();
+            // Start background checking if enabled and not already running
+            if (_updateService.IsAutoUpdateEnabled && !_updateService.IsBackgroundCheckingActive)
+            {
+                _updateService.StartBackgroundChecking();
+                Log.Information("Background update checking started from SystemTrayService");
+            }
+            else if (_updateService.IsBackgroundCheckingActive)
+            {
+                Log.Debug("Background update checking already active, skipping start");
+            }
+            else
+            {
+                Log.Debug("Auto-update disabled, skipping background checking start");
+            }
 
             if (_updateService.PendingInstallerPath is { } pending && _appSettings.General.ShowNotifications)
             {
@@ -121,7 +134,6 @@ public class SystemTrayService : ISystemTrayService, IDisposable
             var downloadSuccess = await _updateService.DownloadUpdateAsync(e.UpdateInfo);
             if (!downloadSuccess)
             {
-                _updateService.ScheduleRetryDownload(e.UpdateInfo);
                 return;
             }
 

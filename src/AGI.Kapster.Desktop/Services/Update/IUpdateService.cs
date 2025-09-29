@@ -57,6 +57,11 @@ public interface IUpdateService
     bool IsAutoUpdateEnabled { get; }
 
     /// <summary>
+    /// Gets whether background checking is currently active
+    /// </summary>
+    bool IsBackgroundCheckingActive { get; }
+
+    /// <summary>
     /// Event fired when an update becomes available
     /// </summary>
     event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
@@ -74,6 +79,4 @@ public interface IUpdateService
     string? PendingInstallerPath { get; }
 
     void ClearPendingInstaller();
-
-    void ScheduleRetryDownload(UpdateInfo updateInfo);
 }

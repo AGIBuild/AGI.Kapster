@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading.Tasks;
 
 namespace AGI.Kapster.Desktop.Services.Settings;
@@ -36,4 +37,30 @@ public interface IFileSystemService
     /// Get application data directory path
     /// </summary>
     string GetApplicationDataPath();
+
+    // Update service specific methods
+    /// <summary>
+    /// Creates a directory if it doesn't exist
+    /// </summary>
+    void CreateDirectory(string path);
+
+    /// <summary>
+    /// Gets file information
+    /// </summary>
+    FileInfo GetFileInfo(string path);
+
+    /// <summary>
+    /// Deletes a file
+    /// </summary>
+    void DeleteFile(string path);
+
+    /// <summary>
+    /// Creates a file stream for writing
+    /// </summary>
+    Stream CreateFileStream(string path, FileMode mode, FileAccess access, FileShare share);
+
+    /// <summary>
+    /// Ensures a file path is writable by retrying with unique names if needed
+    /// </summary>
+    Task<string> EnsureWritablePathAsync(string initialPath);
 }

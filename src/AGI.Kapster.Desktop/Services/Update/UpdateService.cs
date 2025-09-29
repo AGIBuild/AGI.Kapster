@@ -12,6 +12,7 @@ using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update.Platforms;
 using Serilog;
 using Timer = System.Timers.Timer;
+using Polly;
 
 namespace AGI.Kapster.Desktop.Services.Update;
 
@@ -27,21 +28,25 @@ public class UpdateService : IUpdateService, IDisposable
     private readonly GitHubUpdateProvider _updateProvider;
     private readonly ISettingsService _settingsService;
     private readonly HttpClient _httpClient;
+    private readonly IFileSystemService _fileSystemService;
     private readonly Timer _updateTimer;
     private readonly ILogger _logger = Log.ForContext<UpdateService>();
     private readonly SemaphoreSlim _downloadSemaphore = new(1, 1);
-    private readonly TimeSpan _retryInterval = TimeSpan.FromMinutes(15);
-
+    private readonly TimeSpan _retryInterval;
+    private readonly AsyncPolicy<bool> _downloadRetryPolicy;
+    private readonly bool _ownsHttpClient;
+ 
     private UpdateSettings _settings;
     private bool _isCheckingForUpdates;
     private bool _disposed;
-    private string? _pendingInstallerPath;
+    private bool _backgroundCheckingStarted;
+    protected string? _pendingInstallerPath;
 
-    public string? PendingInstallerPath => _pendingInstallerPath is not null && File.Exists(_pendingInstallerPath) ? _pendingInstallerPath : null;
+    public string? PendingInstallerPath => _pendingInstallerPath is not null && _fileSystemService.FileExists(_pendingInstallerPath) ? _pendingInstallerPath : null;
 
     public void ClearPendingInstaller() => _pendingInstallerPath = null;
 
-    public UpdateService(ISettingsService settingsService)
+    public UpdateService(ISettingsService settingsService, TimeSpan? retryInterval = null, HttpClient? httpClient = null, IFileSystemService? fileSystemService = null)
     {
         _settingsService = settingsService;
 
@@ -51,7 +56,9 @@ public class UpdateService : IUpdateService, IDisposable
         var name = string.IsNullOrWhiteSpace(_settings.RepositoryName) ? DefaultRepositoryName : _settings.RepositoryName;
 
         _updateProvider = new GitHubUpdateProvider($"{owner}/{name}");
-        _httpClient = new HttpClient();
+        _httpClient = httpClient ?? new HttpClient();
+        _fileSystemService = fileSystemService ?? new FileSystemService();
+        _ownsHttpClient = httpClient is null;
 
         _updateTimer = new Timer
         {
@@ -60,11 +67,22 @@ public class UpdateService : IUpdateService, IDisposable
         };
         _updateTimer.Elapsed += OnTimerElapsed;
 
+        _retryInterval = retryInterval ?? TimeSpan.FromMinutes(15);
+
+        _downloadRetryPolicy = Policy
+            .HandleResult<bool>(success => !success)
+            .WaitAndRetryAsync(1,
+                _ => _retryInterval,
+                (outcome, delay, attempt, _) =>
+                    _logger.Warning("Retrying update download in {Delay} (attempt {Attempt})", delay, attempt + 1));
+
         _logger.Information("Update service initialized. Auto-update enabled: {Enabled}", IsAutoUpdateEnabled);
     }
 
     public bool IsAutoUpdateEnabled =>
         !IsDebugMode() && _settings.Enabled;
+
+    public bool IsBackgroundCheckingActive => _backgroundCheckingStarted;
 
     public event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
     public event EventHandler<UpdateCompletedEventArgs>? UpdateCompleted;
@@ -161,20 +179,36 @@ public class UpdateService : IUpdateService, IDisposable
 
         try
         {
+            return await _downloadRetryPolicy.ExecuteAsync(() => TryDownloadAsync(updateInfo, progress)).ConfigureAwait(false);
+        }
+        finally
+        {
+            _downloadSemaphore.Release();
+        }
+    }
+
+    protected virtual async Task<bool> TryDownloadAsync(UpdateInfo updateInfo, IProgress<DownloadProgress>? progress)
+    {
+        try
+        {
             var filePath = GetInstallerPath(updateInfo.Version);
             var tempDir = Path.GetDirectoryName(filePath)!;
-            Directory.CreateDirectory(tempDir);
+            _fileSystemService.CreateDirectory(tempDir);
 
-            filePath = await EnsureWritableInstallerPathAsync(filePath).ConfigureAwait(false);
+            filePath = await _fileSystemService.EnsureWritablePathAsync(filePath).ConfigureAwait(false);
 
             _logger.Information("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, filePath);
 
-            using var response = await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.Warning("Download failed with status {StatusCode}", response.StatusCode);
+                return false;
+            }
 
             var totalBytes = response.Content.Headers.ContentLength ?? 0;
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+            using var contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using var fileStream = _fileSystemService.CreateFileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read);
 
             var buffer = new byte[8192];
             var totalDownloaded = 0L;
@@ -182,10 +216,10 @@ public class UpdateService : IUpdateService, IDisposable
 
             while (true)
             {
-                var bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                var bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
                 if (bytesRead == 0) break;
 
-                await fileStream.WriteAsync(buffer, 0, bytesRead);
+                await fileStream.WriteAsync(buffer, 0, bytesRead).ConfigureAwait(false);
                 totalDownloaded += bytesRead;
 
                 if (progress != null && stopwatch.ElapsedMilliseconds > 100)
@@ -209,14 +243,17 @@ public class UpdateService : IUpdateService, IDisposable
                 }
             }
 
+            // Ensure all data is written to the file before checking its size
+            await fileStream.FlushAsync().ConfigureAwait(false);
+
             _logger.Information("Download completed: {Path} ({Size:N0} bytes)", filePath, totalDownloaded);
 
-            var fileInfo = new FileInfo(filePath);
+            var fileInfo = _fileSystemService.GetFileInfo(filePath);
             if (updateInfo.FileSize > 0 && fileInfo.Length != updateInfo.FileSize)
             {
                 _logger.Warning("Downloaded file size mismatch. Expected: {Expected}, Actual: {Actual}",
                     updateInfo.FileSize, fileInfo.Length);
-                File.Delete(filePath);
+                _fileSystemService.DeleteFile(filePath);
                 return false;
             }
 
@@ -230,65 +267,22 @@ public class UpdateService : IUpdateService, IDisposable
         }
         finally
         {
-            _downloadSemaphore.Release();
+            if (_pendingInstallerPath != null && !_fileSystemService.FileExists(_pendingInstallerPath))
+            {
+                _pendingInstallerPath = null;
+            }
         }
     }
+
 
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
-
-    private async Task<string> EnsureWritableInstallerPathAsync(string initialPath)
-    {
-        var directory = Path.GetDirectoryName(initialPath)!;
-        var baseName = Path.GetFileNameWithoutExtension(initialPath);
-        var extension = Path.GetExtension(initialPath);
-        var candidate = initialPath;
-        var attempt = 0;
-
-        while (true)
-        {
-            try
-            {
-                if (File.Exists(candidate))
-                {
-                    using (File.Open(candidate, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
-                    {
-                        File.Delete(candidate);
-                    }
-                }
-
-                using (File.Open(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
-                {
-                }
-
-                File.Delete(candidate);
-                return candidate;
-            }
-            catch (IOException ioEx) when (IsSharingViolation(ioEx) || File.Exists(candidate))
-            {
-                attempt++;
-                var suffix = attempt switch
-                {
-                    0 => string.Empty,
-                    1 => DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"),
-                    _ => Guid.NewGuid().ToString("N")
-                };
-
-                if (!string.IsNullOrEmpty(suffix))
-                {
-                    candidate = Path.Combine(directory, $"{baseName}-{suffix}{extension}");
-                }
-
-                await Task.Delay(Math.Min(1500, attempt * 250)).ConfigureAwait(false);
-            }
-        }
-    }
 
     public async Task<bool> InstallUpdateAsync(string installerPath)
     {
         try
         {
-            if (!File.Exists(installerPath))
+            if (!_fileSystemService.FileExists(installerPath))
             {
                 _logger.Error("Installer file not found: {Path}", installerPath);
                 return false;
@@ -319,7 +313,7 @@ public class UpdateService : IUpdateService, IDisposable
         }
         finally
         {
-            if (_pendingInstallerPath != null && !File.Exists(_pendingInstallerPath))
+            if (_pendingInstallerPath != null && !_fileSystemService.FileExists(_pendingInstallerPath))
             {
                 _pendingInstallerPath = null;
             }
@@ -328,6 +322,12 @@ public class UpdateService : IUpdateService, IDisposable
 
     public void StartBackgroundChecking()
     {
+        if (_backgroundCheckingStarted)
+        {
+            _logger.Debug("Background checking already started, skipping");
+            return;
+        }
+
         if (!IsAutoUpdateEnabled)
         {
             _logger.Debug("Background checking disabled in current environment");
@@ -335,6 +335,7 @@ public class UpdateService : IUpdateService, IDisposable
         }
 
         _logger.Information("Starting background update checking");
+        _backgroundCheckingStarted = true;
         _updateTimer.Start();
 
         // Perform initial check after 5 seconds with proper error handling
@@ -343,7 +344,14 @@ public class UpdateService : IUpdateService, IDisposable
 
     public void StopBackgroundChecking()
     {
+        if (!_backgroundCheckingStarted)
+        {
+            _logger.Debug("Background checking not started, skipping stop");
+            return;
+        }
+
         _logger.Information("Stopping background update checking");
+        _backgroundCheckingStarted = false;
         _updateTimer.Stop();
     }
 
@@ -397,16 +405,6 @@ public class UpdateService : IUpdateService, IDisposable
             {
                 _logger.Error(ex, "Error during scheduled update check");
             }
-        });
-    }
-
-    public void ScheduleRetryDownload(UpdateInfo updateInfo)
-    {
-        Task.Run(async () =>
-        {
-            _logger.Warning("Scheduling update download retry in {Delay} mins for version {Version}", _retryInterval.TotalMinutes, updateInfo.Version);
-            await Task.Delay(_retryInterval).ConfigureAwait(false);
-            TriggerUpdateAvailable(updateInfo);
         });
     }
 
@@ -465,7 +463,10 @@ public class UpdateService : IUpdateService, IDisposable
         _updateTimer?.Stop();
         _updateTimer?.Dispose();
         _updateProvider?.Dispose();
-        _httpClient?.Dispose();
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
         _downloadSemaphore.Dispose();
 
         _disposed = true;
