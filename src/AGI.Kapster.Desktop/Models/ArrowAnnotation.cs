@@ -2,6 +2,9 @@ using Avalonia;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Globalization;
+using Serilog;
 
 namespace AGI.Kapster.Desktop.Models;
 
@@ -12,6 +15,7 @@ public class ArrowAnnotation : AnnotationItemBase
 {
     private Point _startPoint;
     private Point _endPoint;
+    public List<Point> Trail { get; set; } = new();
 
     public override AnnotationType Type => AnnotationType.Arrow;
 
@@ -132,7 +136,8 @@ public class ArrowAnnotation : AnnotationItemBase
         {
             ZIndex = ZIndex,
             IsVisible = IsVisible,
-            IsLocked = IsLocked
+            IsLocked = IsLocked,
+            Trail = new List<Point>(Trail)
         };
     }
 
@@ -143,6 +148,7 @@ public class ArrowAnnotation : AnnotationItemBase
         data["StartPointY"] = _startPoint.Y;
         data["EndPointX"] = _endPoint.X;
         data["EndPointY"] = _endPoint.Y;
+        data["Trail"] = string.Join(";", Trail.Select(p => $"{p.X},{p.Y}"));
         return data;
     }
 
@@ -154,5 +160,85 @@ public class ArrowAnnotation : AnnotationItemBase
             _startPoint = new Point(Convert.ToDouble(startX), Convert.ToDouble(startY));
         if (data.TryGetValue("EndPointX", out var endX) && data.TryGetValue("EndPointY", out var endY))
             _endPoint = new Point(Convert.ToDouble(endX), Convert.ToDouble(endY));
+        if (data.TryGetValue("Trail", out var trailData) && trailData is string trailStr && !string.IsNullOrWhiteSpace(trailStr))
+        {
+            var parsedPoints = new List<Point>();
+            var segments = trailStr.Split(';');
+
+            foreach (var rawSegment in segments)
+            {
+                var segment = rawSegment.Trim();
+                if (string.IsNullOrEmpty(segment))
+                {
+                    continue;
+                }
+
+                var parts = segment.Split(',');
+                if (parts.Length < 2)
+                {
+                    Log.Warning("ArrowAnnotation.Deserialize: Invalid trail point format: '{Segment}'", segment);
+                    continue;
+                }
+
+                if (!TryParseDoubleFlexible(parts[0], out var x) || !TryParseDoubleFlexible(parts[1], out var y))
+                {
+                    Log.Warning("ArrowAnnotation.Deserialize: Non-numeric trail coordinates: '{X}', '{Y}'", parts[0], parts[1]);
+                    continue;
+                }
+
+                parsedPoints.Add(new Point(x, y));
+            }
+
+            Trail = parsedPoints;
+        }
+    }
+
+    public (Vector perpendicular, double maxDeviation) CalculateMaxDeviation()
+    {
+        if (Trail.Count < 3)
+        {
+            return (new Vector(0, 0), 0);
+        }
+
+        var start = _startPoint;
+        var end = _endPoint;
+        var dir = end - start;
+        var length = Math.Max(1.0, Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y));
+        var unitDir = dir / length;
+        var perp = new Vector(-unitDir.Y, unitDir.X);
+
+        double maxDistance = 0;
+        int directionSign = 1;
+
+        foreach (var point in Trail)
+        {
+            var toPoint = point - start;
+            var deviation = Vector.Dot(toPoint, perp);
+            if (Math.Abs(deviation) > Math.Abs(maxDistance))
+            {
+                maxDistance = deviation;
+                directionSign = Math.Sign(deviation) == 0 ? 1 : Math.Sign(deviation);
+            }
+        }
+
+        return (perp * directionSign, Math.Abs(maxDistance));
+    }
+
+    private static bool TryParseDoubleFlexible(string input, out double value)
+    {
+        // Try parse using invariant culture first for stable behavior
+        if (double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+
+        // Fallback to current culture to be permissive with user/system locale
+        if (double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out value))
+        {
+            return true;
+        }
+
+        value = default;
+        return false;
     }
 }

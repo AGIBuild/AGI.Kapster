@@ -85,7 +85,6 @@ public class UpdateService : IUpdateService, IDisposable
     public bool IsBackgroundCheckingActive => _backgroundCheckingStarted;
 
     public event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
-    public event EventHandler<UpdateCompletedEventArgs>? UpdateCompleted;
     public event EventHandler<DownloadProgress>? DownloadProgressChanged;
 
     /// <summary>
@@ -282,6 +281,9 @@ public class UpdateService : IUpdateService, IDisposable
     {
         try
         {
+            // Yield once to keep method truly asynchronous and avoid blocking UI thread
+            await Task.Yield();
+
             if (!_fileSystemService.FileExists(installerPath))
             {
                 _logger.Error("Installer file not found: {Path}", installerPath);

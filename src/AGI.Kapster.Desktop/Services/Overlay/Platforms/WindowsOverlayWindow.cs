@@ -189,14 +189,36 @@ public class WindowsOverlayWindow : IOverlayWindow
             }
         }
 
+        PixelRect screenRect;
+        if (_window != null)
+        {
+            var topLeft = _window.PointToScreen(e.Region.Position);
+            var bottomRight = _window.PointToScreen(new Point(e.Region.Right, e.Region.Bottom));
+
+            var x = (int)Math.Round((double)Math.Min(topLeft.X, bottomRight.X), MidpointRounding.AwayFromZero);
+            var y = (int)Math.Round((double)Math.Min(topLeft.Y, bottomRight.Y), MidpointRounding.AwayFromZero);
+            var width = (int)Math.Round((double)Math.Abs(bottomRight.X - topLeft.X), MidpointRounding.AwayFromZero);
+            var height = (int)Math.Round((double)Math.Abs(bottomRight.Y - topLeft.Y), MidpointRounding.AwayFromZero);
+
+            // Ensure width/height at least 1 to avoid invalid PixelRect
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            screenRect = new PixelRect(x, y, width, height);
+        }
+        else
+        {
+            screenRect = new PixelRect(
+                (int)Math.Round((double)e.Region.X, MidpointRounding.AwayFromZero),
+                (int)Math.Round((double)e.Region.Y, MidpointRounding.AwayFromZero),
+                Math.Max(1, (int)Math.Round((double)e.Region.Width, MidpointRounding.AwayFromZero)),
+                Math.Max(1, (int)Math.Round((double)e.Region.Height, MidpointRounding.AwayFromZero)));
+        }
+
         var args = new CaptureRegionEventArgs(
-            new PixelRect(
-                (int)e.Region.X,
-                (int)e.Region.Y,
-                (int)e.Region.Width,
-                (int)e.Region.Height),
+            screenRect,
             captureMode,
-            captureTarget);
+            captureTarget,
+            this);
 
         RegionSelected?.Invoke(this, args);
     }

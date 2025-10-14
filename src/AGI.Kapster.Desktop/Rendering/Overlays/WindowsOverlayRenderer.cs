@@ -121,16 +121,15 @@ public class WindowsOverlayRenderer : IOverlayRenderer
     {
         var text = $"{bounds.Width:0} × {bounds.Height:0}";
 
+        using var font = new SKFont(Theme.TextTypeface, Theme.TextSize);
         using var paint = new SKPaint
         {
             Color = Theme.TextColor,
-            TextSize = Theme.TextSize,
-            Typeface = Theme.TextTypeface,
             IsAntialias = true
         };
 
         var textBounds = new SKRect();
-        paint.MeasureText(text, ref textBounds);
+        font.MeasureText(text, out textBounds);
 
         var x = (float)(bounds.X + bounds.Width / 2 - textBounds.Width / 2);
         var y = (float)(bounds.Y - 10);
@@ -152,7 +151,7 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         canvas.DrawRoundRect(bgRect, 3, 3, bgPaint);
 
         // Draw text
-        canvas.DrawText(text, x, y, paint);
+        canvas.DrawText(text, x, y, font, paint);
     }
 
     public void RenderPixelInfo(SKCanvas canvas, Point position, SKColor pixelColor)
@@ -160,11 +159,10 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         var text = $"RGB({pixelColor.Red}, {pixelColor.Green}, {pixelColor.Blue})";
         var hexText = $"#{pixelColor.Red:X2}{pixelColor.Green:X2}{pixelColor.Blue:X2}";
 
+        using var font = new SKFont(Theme.TextTypeface, Theme.TextSize);
         using var paint = new SKPaint
         {
             Color = Theme.TextColor,
-            TextSize = Theme.TextSize,
-            Typeface = Theme.TextTypeface,
             IsAntialias = true
         };
 
@@ -174,8 +172,8 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         // Measure both texts
         var rgbBounds = new SKRect();
         var hexBounds = new SKRect();
-        paint.MeasureText(text, ref rgbBounds);
-        paint.MeasureText(hexText, ref hexBounds);
+        font.MeasureText(text, out rgbBounds);
+        font.MeasureText(hexText, out hexBounds);
 
         var maxWidth = Math.Max(rgbBounds.Width, hexBounds.Width);
         var totalHeight = rgbBounds.Height + hexBounds.Height + 5;
@@ -212,8 +210,8 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         canvas.DrawRect(swatchRect, swatchPaint);
 
         // Draw texts
-        canvas.DrawText(text, x, y - hexBounds.Height - 5, paint);
-        canvas.DrawText(hexText, x, y, paint);
+        canvas.DrawText(text, x, y - hexBounds.Height - 5, font, paint);
+        canvas.DrawText(hexText, x, y, font, paint);
     }
 
     public void RenderCaptureMode(SKCanvas canvas, CaptureMode mode, Rect canvasBounds)
@@ -227,16 +225,15 @@ public class WindowsOverlayRenderer : IOverlayRenderer
             _ => mode.ToString()
         };
 
+        using var font = new SKFont(Theme.TextTypeface, Theme.TextSize * 1.2f);
         using var paint = new SKPaint
         {
             Color = Theme.TextColor,
-            TextSize = Theme.TextSize * 1.2f,
-            Typeface = Theme.TextTypeface,
             IsAntialias = true
         };
 
         var textBounds = new SKRect();
-        paint.MeasureText(modeText, ref textBounds);
+        font.MeasureText(modeText, out textBounds);
 
         var x = (float)(canvasBounds.Width - textBounds.Width - 20);
         var y = 30f;
@@ -258,7 +255,7 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         canvas.DrawRoundRect(bgRect, 4, 4, bgPaint);
 
         // Draw text
-        canvas.DrawText(modeText, x, y, paint);
+        canvas.DrawText(modeText, x, y, font, paint);
     }
 
     private void RenderResizeHandles(SKCanvas canvas, Rect bounds)
@@ -332,16 +329,15 @@ public class WindowsOverlayRenderer : IOverlayRenderer
             label += $": {element.Name}";
         }
 
+        using var font = new SKFont(Theme.TextTypeface, Theme.TextSize);
         using var paint = new SKPaint
         {
             Color = Theme.TextColor,
-            TextSize = Theme.TextSize,
-            Typeface = Theme.TextTypeface,
             IsAntialias = true
         };
 
         var textBounds = new SKRect();
-        paint.MeasureText(label, ref textBounds);
+        font.MeasureText(label, out textBounds);
 
         var x = element.Bounds.X;
         var y = element.Bounds.Y - 5;
@@ -363,7 +359,7 @@ public class WindowsOverlayRenderer : IOverlayRenderer
         canvas.DrawRoundRect(bgRect, 3, 3, bgPaint);
 
         // Draw text
-        canvas.DrawText(label, x, y, paint);
+        canvas.DrawText(label, x, y, font, paint);
     }
 }
 
