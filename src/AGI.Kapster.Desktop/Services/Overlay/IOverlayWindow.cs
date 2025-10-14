@@ -82,14 +82,34 @@ public class CaptureRegionEventArgs : EventArgs
     /// <summary>
     /// Initializes a new instance of the <see cref="CaptureRegionEventArgs"/> class with the specified region, mode, and optional capture target.
     /// </summary>
+    public object? CaptureTarget { get; } // Could be Window handle, Element info, etc.
+
+    /// <summary>
+    /// Gets the overlay window instance that originated the capture event.
+    /// This is set when the capture was initiated from a specific overlay window,
+    /// and can be used to distinguish between multiple overlays.
+    /// Unlike <see cref="CaptureTarget"/>, which represents the logical target of the capture
+    /// (such as a window handle or element information), <c>SourceWindow</c> refers to the overlay
+    /// window that raised the event.
+    /// </summary>
+    public IOverlayWindow? SourceWindow { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CaptureRegionEventArgs"/> class.
+    /// </summary>
     /// <param name="region">The selected region.</param>
     /// <param name="mode">The capture mode.</param>
-    /// <param name="captureTarget">The object being captured (e.g., window handle, element info), or null.</param>
+    /// <param name="captureTarget">The logical target of the capture (e.g., window handle, element info).</param>
+    /// <param name="sourceWindow">
+    /// The overlay window instance that originated the capture event.
+    /// This is typically set when the capture was initiated from a specific overlay window.
+    /// </param>
     public CaptureRegionEventArgs(PixelRect region, CaptureMode mode, object? captureTarget = null)
         : this(region, mode, captureTarget, null)
     {
     }
 
+    /// <inheritdoc cref="CaptureRegionEventArgs(PixelRect, CaptureMode, object?, IOverlayWindow?)"/>
     /// <summary>
     /// Initializes a new instance of the <see cref="CaptureRegionEventArgs"/> class with the specified region, mode, capture target, and source window.
     /// </summary>
