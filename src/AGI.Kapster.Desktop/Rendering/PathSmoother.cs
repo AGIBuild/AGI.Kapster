@@ -60,21 +60,22 @@ internal static class PathSmoother
             }
         }
         
-        // Sample the curve
+        // Sample the curve (first pass to collect points and compute total arc length)
         const int samplesPerSegment = 8;
+        var rawPoints = new List<(Point pos, Vector tan)>();
         for (int i = 0; i < trail.Count - 1; i++)
         {
             var p0 = trail[Math.Max(0, i - 1)];
             var p1 = trail[i];
             var p2 = trail[i + 1];
             var p3 = trail[Math.Min(trail.Count - 1, i + 2)];
-            
+
             int numSamples = (i == trail.Count - 2) ? samplesPerSegment + 1 : samplesPerSegment;
             for (int s = 0; s < numSamples; s++)
             {
                 var t = s / (double)samplesPerSegment;
                 var pos = CatmullRom(p0, p1, p2, p3, t);
-                
+
                 // Estimate tangent
                 var epsilon = 0.01;
                 var tPrev = Math.Max(0, t - epsilon);
@@ -82,16 +83,25 @@ internal static class PathSmoother
                 var posPrev = CatmullRom(p0, p1, p2, p3, tPrev);
                 var posNext = CatmullRom(p0, p1, p2, p3, tNext);
                 var tangent = Normalize(new Vector(posNext.X - posPrev.X, posNext.Y - posPrev.Y));
-                
-                // Calculate arc length
-                if (result.Count > 0)
-                {
-                    totalLength += Distance(result[^1].Position, pos);
-                }
-                
-                var progress = result.Count / (double)(trail.Count * samplesPerSegment);
-                result.Add(new PathSample(pos, tangent, totalLength, progress));
+
+                rawPoints.Add((pos, tangent));
             }
+        }
+
+        // Compute cumulative arc length and normalized progress based on arc length (0..1)
+        double[] cumulative = new double[rawPoints.Count];
+        cumulative[0] = 0.0;
+        for (int i = 1; i < rawPoints.Count; i++)
+        {
+            cumulative[i] = cumulative[i - 1] + Distance(rawPoints[i - 1].pos, rawPoints[i].pos);
+        }
+        totalLength = cumulative[^1];
+        double invTotal = totalLength > 1e-9 ? 1.0 / totalLength : 0.0;
+
+        for (int i = 0; i < rawPoints.Count; i++)
+        {
+            var progress = (i == 0 || totalLength <= 1e-9) ? 0.0 : Math.Min(1.0, cumulative[i] * invTotal);
+            result.Add(new PathSample(rawPoints[i].pos, rawPoints[i].tan, cumulative[i], progress));
         }
         
         var signedBend = maxDeviation / Math.Max(straightLength, 1.0);
