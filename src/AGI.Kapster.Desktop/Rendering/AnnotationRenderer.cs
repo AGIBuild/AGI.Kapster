@@ -22,6 +22,8 @@ public class AnnotationRenderer : IAnnotationRenderer
     // Geometry cache to avoid rebuilding complex figures repeatedly
     private readonly Dictionary<Guid, (Geometry geometry, Rect bounds, long version)> _geometryCache = new();
     private readonly Dictionary<Guid, (PathGeometry geometry, Rect bounds, long version)> _freehandCache = new();
+    // Full arrow result cache (geometry + fill/shadow artifacts) to avoid redundant builds
+    private readonly Dictionary<Guid, (TacticalArrowBuilder.TacticalArrowResult result, Rect bounds, long version)> _arrowCache = new();
 
     // Path instance pool to reduce allocations
     private readonly Stack<Path> _pathPool = new();
@@ -198,6 +200,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         _renderCache.Clear();
         _geometryCache.Clear();
         _freehandCache.Clear();
+        _arrowCache.Clear();
     }
 
     public void RemoveRender(Canvas canvas, IAnnotationItem item)
@@ -223,6 +226,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         // Drop geometry cache for this item to force rebuild next time
         _geometryCache.Remove(item.Id);
         _freehandCache.Remove(item.Id);
+        _arrowCache.Remove(item.Id);
 
         // Additional safety check: remove any controls with matching name pattern
         // This helps prevent ghosting if the cache misses anything
@@ -265,22 +269,28 @@ public class AnnotationRenderer : IAnnotationRenderer
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
 
-        // Build or reuse geometry
+        // Build or reuse full arrow result (geometry + fill/shadow)
         var version = ComputeArrowVersion(arrow);
-        Geometry geom;
-        if (_geometryCache.TryGetValue(arrow.Id, out var cached) && cached.version == version && cached.geometry is not null)
+        TacticalArrowBuilder.TacticalArrowResult result;
+        if (_arrowCache.TryGetValue(arrow.Id, out var cachedArrow) && cachedArrow.version == version)
         {
-            geom = cached.geometry;
+            result = cachedArrow.result;
         }
         else
         {
-            geom = BuildArrowGeometry(arrow, out var bounds);
-            _geometryCache[arrow.Id] = (geom, bounds, version);
+            result = BuildFullArrow(arrow, out var bounds);
+            _arrowCache[arrow.Id] = (result, bounds, version);
+            // Keep geometry cache in sync for bounds intersection fast-paths
+            _geometryCache[arrow.Id] = (result.Geometry, bounds, version);
         }
-        
-        bodyPath.Data = geom;
-        shadowPath.Data = geom;
-        ApplyArrowFillAndShadow(bodyPath, shadowPath, arrow);
+
+        bodyPath.Data = result.Geometry;
+        shadowPath.Data = result.Geometry;
+        bodyPath.Fill = result.Fill;
+        bodyPath.Stroke = null;
+        shadowPath.Fill = result.ShadowFill;
+        shadowPath.Stroke = null;
+        shadowPath.RenderTransform = result.ShadowTransform;
 
         canvas.Children.Add(arrowCanvas);
         controls.Add(arrowCanvas);
@@ -732,19 +742,24 @@ public class AnnotationRenderer : IAnnotationRenderer
         shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
     }
 
-    // Build arrow geometry only (no fill/stroke assignment). Returns geometry and bounds.
-    private Geometry BuildArrowGeometry(ArrowAnnotation arrow, out Rect bounds)
+    // Build full arrow (geometry + fill/shadow artifacts) and return the result plus bounds
+    private TacticalArrowBuilder.TacticalArrowResult BuildFullArrow(ArrowAnnotation arrow, out Rect bounds)
     {
         var trail = arrow.Trail != null && arrow.Trail.Count > 1
             ? arrow.Trail
             : new List<Point> { arrow.StartPoint, arrow.EndPoint };
 
         var smoother = PathSmoother.Generate(trail);
-        var request = new TacticalArrowRequest(arrow.StartPoint, arrow.EndPoint, trail, arrow.Style.StrokeWidth, arrow.Style.StrokeColor, smoother.SignedBend);
+        var request = new TacticalArrowBuilder.TacticalArrowRequest(
+            arrow.StartPoint,
+            arrow.EndPoint,
+            trail,
+            arrow.Style.StrokeWidth,
+            arrow.Style.StrokeColor,
+            smoother.SignedBend);
         var result = TacticalArrowBuilder.Build(request);
-
         bounds = result.Geometry.Bounds;
-        return result.Geometry;
+        return result;
     }
 
     private static long ComputeArrowVersion(ArrowAnnotation arrow)
@@ -785,23 +800,7 @@ public class AnnotationRenderer : IAnnotationRenderer
 
     private void ApplyArrowFillAndShadow(Path bodyPath, Path shadowPath, ArrowAnnotation arrow)
     {
-        // The actual geometry is built and cached in BuildArrowGeometry.
-        // Here we just apply the fill/shadow, which might depend on live state not captured in the cache key.
-        
-        var trail = arrow.Trail != null && arrow.Trail.Count > 1
-            ? arrow.Trail
-            : new List<Point> { arrow.StartPoint, arrow.EndPoint };
-
-        // We need to re-run the builder to get the brushes and transforms, but we don't use the geometry from it.
-        var smoother = PathSmoother.Generate(trail);
-        var request = new TacticalArrowRequest(arrow.StartPoint, arrow.EndPoint, trail, arrow.Style.StrokeWidth, arrow.Style.StrokeColor, smoother.SignedBend);
-        var result = TacticalArrowBuilder.Build(request);
-        
-        bodyPath.Fill = result.Fill;
-        bodyPath.Stroke = null;
-        shadowPath.Fill = result.ShadowFill;
-        shadowPath.Stroke = null;
-        shadowPath.RenderTransform = result.ShadowTransform;
+        // No-op: handled in RenderArrow using cached TacticalArrowResult
     }
 
     /// <summary>

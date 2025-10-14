@@ -585,12 +585,14 @@ internal static class TacticalArrowBuilder
         Transform ShadowTransform, 
         double Bend, 
         double NeckRatio);
+    
+    // Expose type for renderer cache
+    internal readonly record struct TacticalArrowRequest(
+        Point Start,
+        Point End,
+        IReadOnlyList<Point>? Trail,
+        double StrokeThickness,
+        Color Color,
+        double? BendHint);
 }
 
-internal readonly record struct TacticalArrowRequest(
-    Point Start,
-    Point End,
-    IReadOnlyList<Point>? Trail,
-    double StrokeThickness,
-    Color Color,
-    double? BendHint);
