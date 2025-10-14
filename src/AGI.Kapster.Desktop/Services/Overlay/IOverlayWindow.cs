@@ -69,12 +69,19 @@ public class CaptureRegionEventArgs : EventArgs
     public PixelRect Region { get; }
     public CaptureMode Mode { get; }
     public object? CaptureTarget { get; } // Could be Window handle, Element info, etc.
+    public IOverlayWindow? SourceWindow { get; }
 
     public CaptureRegionEventArgs(PixelRect region, CaptureMode mode, object? captureTarget = null)
+        : this(region, mode, captureTarget, null)
+    {
+    }
+
+    public CaptureRegionEventArgs(PixelRect region, CaptureMode mode, object? captureTarget, IOverlayWindow? sourceWindow)
     {
         Region = region;
         Mode = mode;
         CaptureTarget = captureTarget;
+        SourceWindow = sourceWindow;
     }
 }
 

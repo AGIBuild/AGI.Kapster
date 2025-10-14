@@ -172,7 +172,7 @@ public class SimplifiedOverlayManager : IOverlayController
                     bitmapToClipboard = BitmapConverter.ConvertToSKBitmap(compositeImage);
                 }
 
-                // If no composite image, capture normally
+                // If no composite image, capture directly by screen pixel rect (already in screen coords)
                 if (bitmapToClipboard == null)
                 {
                     bitmapToClipboard = await _captureStrategy.CaptureRegionAsync(e.Region);

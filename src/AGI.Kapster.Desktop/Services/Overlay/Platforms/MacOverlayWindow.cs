@@ -168,14 +168,35 @@ public class MacOverlayWindow : IOverlayWindow
             captureTarget = ElementInfoAdapter.FromDetectedElement(e.DetectedElement);
         }
 
+        PixelRect screenRect;
+        if (_window != null)
+        {
+            var topLeft = _window.PointToScreen(new Point(e.Region.X, e.Region.Y));
+            var bottomRight = _window.PointToScreen(new Point(e.Region.Right, e.Region.Bottom));
+
+            var x = (int)Math.Round((double)Math.Min(topLeft.X, bottomRight.X), MidpointRounding.AwayFromZero);
+            var y = (int)Math.Round((double)Math.Min(topLeft.Y, bottomRight.Y), MidpointRounding.AwayFromZero);
+            var width = (int)Math.Round((double)Math.Abs(bottomRight.X - topLeft.X), MidpointRounding.AwayFromZero);
+            var height = (int)Math.Round((double)Math.Abs(bottomRight.Y - topLeft.Y), MidpointRounding.AwayFromZero);
+
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            screenRect = new PixelRect(x, y, width, height);
+        }
+        else
+        {
+            screenRect = new PixelRect(
+                (int)Math.Round((double)e.Region.X, MidpointRounding.AwayFromZero),
+                (int)Math.Round((double)e.Region.Y, MidpointRounding.AwayFromZero),
+                Math.Max(1, (int)Math.Round((double)e.Region.Width, MidpointRounding.AwayFromZero)),
+                Math.Max(1, (int)Math.Round((double)e.Region.Height, MidpointRounding.AwayFromZero)));
+        }
+
         RegionSelected?.Invoke(this, new CaptureRegionEventArgs(
-            new PixelRect(
-                (int)e.Region.X,
-                (int)e.Region.Y,
-                (int)e.Region.Width,
-                (int)e.Region.Height),
+            screenRect,
             e.IsFullScreen ? CaptureMode.FullScreen : CaptureMode.Region,
-            captureTarget));
+            captureTarget,
+            this));
     }
 
     private void OnCancelled(object? sender, OverlayCancelledEventArgs e)

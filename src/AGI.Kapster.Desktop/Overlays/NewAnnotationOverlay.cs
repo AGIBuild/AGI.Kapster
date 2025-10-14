@@ -314,6 +314,21 @@ public sealed class NewAnnotationOverlay : Canvas
                 // Handle double-click for various actions
                 if (e.ClickCount == 2)
                 {
+                    // Double-click should open text editing if hitting text annotation
+                    var hitItem = _annotationService.HitTest(point);
+                    if (hitItem is TextAnnotation textItem)
+                    {
+                        if (!_annotationService.Manager.SelectedItems.Contains(textItem))
+                        {
+                            _annotationService.Manager.ClearSelection();
+                            _annotationService.Manager.SelectItem(textItem);
+                        }
+
+                        StartTextEditing(textItem);
+                        e.Handled = true;
+                        return;
+                    }
+
                     // Clear annotation selection if any (anchor points)
                     if (_annotationService.Manager.HasSelection)
                     {
@@ -354,25 +369,6 @@ public sealed class NewAnnotationOverlay : Canvas
                 // Point is inside selection area - handle annotation logic
                 if (CurrentTool == AnnotationToolType.None)
                 {
-                    // Check for double-click on text annotation to enter editing mode
-                    if (e.ClickCount == 2)
-                    {
-                        var hitItem = _annotationService.HitTest(point);
-                        if (hitItem is TextAnnotation textItem)
-                        {
-                            // Ensure text is selected
-                            if (!_annotationService.Manager.SelectedItems.Contains(textItem))
-                            {
-                                _annotationService.Manager.ClearSelection();
-                                _annotationService.Manager.SelectItem(textItem);
-                            }
-
-                            StartTextEditing(textItem);
-                            e.Handled = true;
-                            return;
-                        }
-                    }
-
                     // Selection mode - for selecting/editing existing annotations
                     HandleSelectionPress(point, e.KeyModifiers.HasFlag(KeyModifiers.Control));
                 }

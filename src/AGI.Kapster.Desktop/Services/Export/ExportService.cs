@@ -210,9 +210,22 @@ public class ExportService : IExportService
             using var context = composite.CreateDrawingContext();
 
             // Draw screenshot portion
-            // Since the screenshot is already cropped to selection area, use full screenshot as source
-            var sourceRect = new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height);
+            // Ensure the screenshot bitmap matches the selectionRect size; if not, crop according to selectionRect
             var destRect = new Rect(0, 0, selectionRect.Width, selectionRect.Height);
+            Rect sourceRect;
+            if (screenshot.PixelSize.Width != (int)selectionRect.Width || screenshot.PixelSize.Height != (int)selectionRect.Height)
+            {
+                // When captured from a non-primary monitor or different DPI, sizes may mismatch.
+                // Crop the screenshot to the selection size from the top-left as a safe fallback.
+                var width = Math.Min(screenshot.PixelSize.Width, (int)selectionRect.Width);
+                var height = Math.Min(screenshot.PixelSize.Height, (int)selectionRect.Height);
+                sourceRect = new Rect(0, 0, width, height);
+                destRect = new Rect(0, 0, width, height);
+            }
+            else
+            {
+                sourceRect = new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height);
+            }
             context.DrawImage(screenshot, sourceRect, destRect);
 
             // Draw annotations on top
