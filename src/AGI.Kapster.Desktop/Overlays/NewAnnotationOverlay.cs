@@ -175,6 +175,32 @@ public sealed class NewAnnotationOverlay : Canvas
                     }
                     break;
 
+                // Size (Stroke Width) shortcuts: Ctrl + '-' decreases, Ctrl + '+' increases
+                case Key.OemMinus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                {
+                    var current = (int)Math.Round(CurrentStyle.StrokeWidth);
+                    var next = Math.Clamp(current - 1, 1, 20);
+                    if (next != current)
+                    {
+                        SetStrokeWidth(next);
+                        Log.Information("Stroke width decreased via Ctrl+-: {Old} -> {New}", current, next);
+                    }
+                    e.Handled = true;
+                    break;
+                }
+                case Key.OemPlus when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                {
+                    var current = (int)Math.Round(CurrentStyle.StrokeWidth);
+                    var next = Math.Clamp(current + 1, 1, 20);
+                    if (next != current)
+                    {
+                        SetStrokeWidth(next);
+                        Log.Information("Stroke width increased via Ctrl++: {Old} -> {New}", current, next);
+                    }
+                    e.Handled = true;
+                    break;
+                }
+
                 case Key.A when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                     // Select all annotations
                     _annotationService.Manager.SelectAll();
