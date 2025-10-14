@@ -277,14 +277,17 @@ public class UpdateService : IUpdateService, IDisposable
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
 
-    public Task<bool> InstallUpdateAsync(string installerPath)
+    public async Task<bool> InstallUpdateAsync(string installerPath)
     {
         try
         {
+            // Yield once to keep method truly asynchronous and avoid blocking UI thread
+            await Task.Yield();
+
             if (!_fileSystemService.FileExists(installerPath))
             {
                 _logger.Error("Installer file not found: {Path}", installerPath);
-                return Task.FromResult(false);
+                return false;
             }
 
             var processInfo = new ProcessStartInfo
@@ -299,16 +302,16 @@ public class UpdateService : IUpdateService, IDisposable
             if (process == null)
             {
                 _logger.Error("Failed to launch installer process");
-                return Task.FromResult(false);
+                return false;
             }
 
             _pendingInstallerPath = null;
-            return Task.FromResult(true);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Error launching installer");
-            return Task.FromResult(false);
+            return false;
         }
         finally
         {
