@@ -331,7 +331,6 @@ public class ExportService : IExportService
                     {
                         IsAntialias = true
                     };
-                    var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
 
                     // Use white background for formats that don't support transparency
                     canvas.Clear(SKColors.White);
