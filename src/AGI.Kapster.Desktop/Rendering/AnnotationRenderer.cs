@@ -943,34 +943,4 @@ public class AnnotationRenderer : IAnnotationRenderer
         return brush;
     }
 
-    private (double headLen, double headWidth, double tailWidth, double baseWidth) CalculateArrowDimensions(ArrowAnnotation arrow, double len)
-    {
-        var size = Math.Max(1.0, arrow.Style.StrokeWidth);
-        // Use Log for faster growth at larger sizes
-        var sizeFactor = Math.Log(size + 1);
- 
-        // --- Tail Width ---
-        var tailWidth = 6.0 + sizeFactor * 4.5;
-        if (size > 10)
-        {
-            // Double tail width for large sizes
-            tailWidth *= 1.5 + (size - 10) * 0.05; // Gently scale up from 1.5x to 2x
-        }
-        tailWidth = Math.Clamp(tailWidth, 5.0, Math.Max(5.0, len * 0.5));
- 
-        // --- Head Width ---
-        var headWidth = tailWidth * 0.6 + sizeFactor * 1.0;
-        var minHeadWidth = tailWidth * 0.4;
-        var maxHeadWidth = Math.Max(minHeadWidth + 0.01, len * 0.3);
-        headWidth = Math.Clamp(headWidth, minHeadWidth, maxHeadWidth);
-         
-        // --- Head Length ---
-        var headLen = tailWidth * 0.7 + sizeFactor * 1.5;
-        var minHeadLen = tailWidth * 0.45;
-        var maxHeadLen = Math.Max(minHeadLen + 0.01, len * 0.22);
-        headLen = Math.Clamp(headLen, minHeadLen, maxHeadLen);
-         var baseWidth = Math.Max(arrow.Style.StrokeWidth * 0.8, 2.5);
-
-        return (headLen, headWidth, tailWidth, baseWidth);
-    }
 }
