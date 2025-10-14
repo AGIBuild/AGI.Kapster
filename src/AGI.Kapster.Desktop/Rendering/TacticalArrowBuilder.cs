@@ -233,30 +233,13 @@ internal static class TacticalArrowBuilder
         var tailDepth = Math.Min(tailWidth * 0.5, totalLength * 0.08); // Limit tail depth to 8% of arrow length
         var geometry = BuildGeometry(leftEdge, rightEdge, headLeft, headRight, headTip, tailLeft, tailRight, start, tailTangent, tailDepth);
         
-        // Build gradient with alpha fade along the actual curve path
-        // Use all body points to create a smooth gradient that follows the curve
+        // Build gradient along the curve length for natural transparency transition
         var fill = BuildCurveAlphaGradient(bodyPoints, baseColor);
         
         var shadowBrush = new SolidColorBrush(Color.FromArgb(72, 0, 0, 0));
         var shadowTransform = new TranslateTransform(ShadowOffset, ShadowOffset);
 
-        // Convert body samples for external consumers (renderer)
-        var samples = new List<ArrowSample>(bodyPoints.Count);
-        foreach (var bp in bodyPoints)
-        {
-            samples.Add(new ArrowSample(bp.pos, bp.tangent, bp.t));
-        }
-
-        return new TacticalArrowResult(
-            geometry,
-            fill,
-            shadowBrush,
-            shadowTransform,
-            0,
-            sizeParams.NeckRatio,
-            samples,
-            sizeParams.NeckWidth,
-            sizeParams.NeckWidth * sizeParams.TailNeckRatio);
+        return new TacticalArrowResult(geometry, fill, shadowBrush, shadowTransform, 0, sizeParams.NeckRatio);
     }
 
     private static (Point cp1, Point cp2) CalculateCubicBezierControlPoints(Point start, Point end, Point through)
@@ -404,68 +387,74 @@ internal static class TacticalArrowBuilder
         return new PathGeometry { Figures = new PathFigures { figure } };
     }
 
+    // Build alpha gradient directly along the sampled curve length
     private static IBrush BuildCurveAlphaGradient(List<(Point pos, Vector tangent, double t)> bodyPoints, Color baseColor)
     {
-        if (bodyPoints.Count < 2)
+        if (bodyPoints == null || bodyPoints.Count < 2)
         {
             return new SolidColorBrush(baseColor);
         }
 
+        // Compute cumulative arc-length along samples to distribute gradient by real length
+        var cumulative = new double[bodyPoints.Count];
+        cumulative[0] = 0;
+        for (int i = 1; i < bodyPoints.Count; i++)
+        {
+            var a = bodyPoints[i - 1].pos;
+            var b = bodyPoints[i].pos;
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            cumulative[i] = cumulative[i - 1] + Math.Sqrt(dx * dx + dy * dy);
+        }
+        var totalLength = cumulative[^1];
+        if (totalLength <= 1e-6)
+        {
+            return new SolidColorBrush(baseColor);
+        }
+
+        // Build many stops to avoid banding; fade covers the entire curve length
         var stops = new GradientStops();
-        
-        // CRITICAL: Extend transparent fade to 70% of arrow length for longer, smoother gradient
-        const double fadeEndRatio = 0.70;
-        const int stopCount = 64; // Much more stops for ultra-smooth gradient without banding
-        
-        // Add initial fully transparent stop at 0%
+        const int stopCount = 64; // high resolution
+
+        // Tail fully transparent
         stops.Add(new GradientStop(Color.FromArgb(0, baseColor.R, baseColor.G, baseColor.B), 0.0));
 
         for (int i = 1; i < stopCount; i++)
         {
-            var ratio = i / (double)(stopCount - 1);
-            
-            if (ratio <= fadeEndRatio)
-            {
-                // Exponential fade formula: alpha(t) = 1 - exp(-m * t)
-                // Use m=1.5 for very gradual, natural fade
-                var normalizedT = ratio / fadeEndRatio; // Normalize to 0-1 within fade region
-                const double m = 1.5;
-                var alpha = 1.0 - Math.Exp(-m * normalizedT);
-                
-                // Apply perceptual gamma correction for smooth visual transition
-                alpha = Math.Pow(alpha, 1.0 / 2.2);
-                alpha = Math.Clamp(alpha, 0.0, 1.0);
-                
-                // Create color with calculated alpha
-                var color = Color.FromArgb(
-                    (byte)(alpha * baseColor.A),
-                    baseColor.R,
-                    baseColor.G,
-                    baseColor.B);
-                
-                stops.Add(new GradientStop(color, ratio));
-            }
-            else
-            {
-                // Fully opaque from fadeEndRatio to 100%
-                stops.Add(new GradientStop(baseColor, ratio));
-            }
-        }
-        
-        // Ensure fully opaque at the end
-        stops.Add(new GradientStop(baseColor, 1.0));
+            // Parameter by arc-length
+            var s = i / (double)(stopCount - 1);
+            var targetLen = s * totalLength;
 
-        // Use the curve path for gradient direction
+            // Find nearest segment index by linear search (stopCount is small)
+            int idx = 1;
+            while (idx < cumulative.Length && cumulative[idx] < targetLen) idx++;
+            var prevLen = cumulative[idx - 1];
+            var nextLen = cumulative[idx];
+            var segT = (targetLen - prevLen) / Math.Max(nextLen - prevLen, 1e-6);
+
+            // Exponential alpha profile mapped to s (0..1) over full length
+            // alpha(s) = 1 - exp(-m*s), choose m=2.2 for natural growth
+            const double m = 2.2;
+            var alpha = 1.0 - Math.Exp(-m * s);
+            alpha = Math.Clamp(alpha, 0.0, 1.0);
+
+            var color = Color.FromArgb(
+                (byte)(alpha * baseColor.A),
+                baseColor.R,
+                baseColor.G,
+                baseColor.B);
+
+            stops.Add(new GradientStop(color, s));
+        }
+
         var start = bodyPoints[0].pos;
         var end = bodyPoints[^1].pos;
-
         return new LinearGradientBrush
         {
             StartPoint = new RelativePoint(start, RelativeUnit.Absolute),
             EndPoint = new RelativePoint(end, RelativeUnit.Absolute),
             GradientStops = stops,
-            SpreadMethod = GradientSpreadMethod.Pad,
-            Opacity = 1.0
+            SpreadMethod = GradientSpreadMethod.Pad
         };
     }
 
@@ -589,18 +578,13 @@ internal static class TacticalArrowBuilder
         double FadeRatioMax,
         double StraightenStartRatio);
 
-internal readonly record struct TacticalArrowResult(
+    internal readonly record struct TacticalArrowResult(
         Geometry Geometry, 
         IBrush Fill, 
         IBrush ShadowFill, 
         Transform ShadowTransform, 
         double Bend, 
-        double NeckRatio,
-        IReadOnlyList<ArrowSample> Samples,
-        double NeckWidth,
-        double TailWidth);
-
-internal readonly record struct ArrowSample(Point Position, Vector Tangent, double T);
+        double NeckRatio);
 }
 
 internal readonly record struct TacticalArrowRequest(

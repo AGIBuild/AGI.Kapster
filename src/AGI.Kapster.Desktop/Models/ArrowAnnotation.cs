@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AGI.Kapster.Desktop.Models;
 
@@ -12,6 +13,7 @@ public class ArrowAnnotation : AnnotationItemBase
 {
     private Point _startPoint;
     private Point _endPoint;
+    public List<Point> Trail { get; set; } = new();
 
     public override AnnotationType Type => AnnotationType.Arrow;
 
@@ -132,7 +134,8 @@ public class ArrowAnnotation : AnnotationItemBase
         {
             ZIndex = ZIndex,
             IsVisible = IsVisible,
-            IsLocked = IsLocked
+            IsLocked = IsLocked,
+            Trail = new List<Point>(Trail)
         };
     }
 
@@ -143,6 +146,7 @@ public class ArrowAnnotation : AnnotationItemBase
         data["StartPointY"] = _startPoint.Y;
         data["EndPointX"] = _endPoint.X;
         data["EndPointY"] = _endPoint.Y;
+        data["Trail"] = string.Join(";", Trail.Select(p => $"{p.X},{p.Y}"));
         return data;
     }
 
@@ -154,5 +158,46 @@ public class ArrowAnnotation : AnnotationItemBase
             _startPoint = new Point(Convert.ToDouble(startX), Convert.ToDouble(startY));
         if (data.TryGetValue("EndPointX", out var endX) && data.TryGetValue("EndPointY", out var endY))
             _endPoint = new Point(Convert.ToDouble(endX), Convert.ToDouble(endY));
+        if (data.TryGetValue("Trail", out var trailData) && trailData is string trailStr && !string.IsNullOrEmpty(trailStr))
+        {
+            Trail = trailStr.Split(';')
+                .Select(s =>
+                {
+                    var parts = s.Split(',');
+                    return new Point(double.Parse(parts[0]), double.Parse(parts[1]));
+                })
+                .ToList();
+        }
+    }
+
+    public (Vector perpendicular, double maxDeviation) CalculateMaxDeviation()
+    {
+        if (Trail.Count < 3)
+        {
+            return (new Vector(0, 0), 0);
+        }
+
+        var start = _startPoint;
+        var end = _endPoint;
+        var dir = end - start;
+        var length = Math.Max(1.0, Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y));
+        var unitDir = dir / length;
+        var perp = new Vector(-unitDir.Y, unitDir.X);
+
+        double maxDistance = 0;
+        int directionSign = 1;
+
+        foreach (var point in Trail)
+        {
+            var toPoint = point - start;
+            var deviation = Vector.Dot(toPoint, perp);
+            if (Math.Abs(deviation) > Math.Abs(maxDistance))
+            {
+                maxDistance = deviation;
+                directionSign = Math.Sign(deviation) == 0 ? 1 : Math.Sign(deviation);
+            }
+        }
+
+        return (perp * directionSign, Math.Abs(maxDistance));
     }
 }

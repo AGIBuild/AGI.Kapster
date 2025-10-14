@@ -260,7 +260,9 @@ public class AnnotationService : IAnnotationService
             CurrentStyle.StrokeWidth
         );
 
-        return AnnotationFactory.CreateArrow(startPoint, startPoint, style);
+        var arrow = AnnotationFactory.CreateArrow(startPoint, startPoint, style);
+        arrow.Trail.Add(startPoint);
+        return arrow;
     }
 
     /// <summary>
@@ -269,6 +271,7 @@ public class AnnotationService : IAnnotationService
     private void UpdateArrow(ArrowAnnotation arrow, Point currentPoint)
     {
         arrow.EndPoint = currentPoint;
+        arrow.Trail.Add(currentPoint);
     }
 
     /// <summary>
