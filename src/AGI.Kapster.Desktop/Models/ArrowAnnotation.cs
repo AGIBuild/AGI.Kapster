@@ -3,6 +3,8 @@ using Avalonia.Media;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
+using Serilog;
 
 namespace AGI.Kapster.Desktop.Models;
 
@@ -158,15 +160,36 @@ public class ArrowAnnotation : AnnotationItemBase
             _startPoint = new Point(Convert.ToDouble(startX), Convert.ToDouble(startY));
         if (data.TryGetValue("EndPointX", out var endX) && data.TryGetValue("EndPointY", out var endY))
             _endPoint = new Point(Convert.ToDouble(endX), Convert.ToDouble(endY));
-        if (data.TryGetValue("Trail", out var trailData) && trailData is string trailStr && !string.IsNullOrEmpty(trailStr))
+        if (data.TryGetValue("Trail", out var trailData) && trailData is string trailStr && !string.IsNullOrWhiteSpace(trailStr))
         {
-            Trail = trailStr.Split(';')
-                .Select(s =>
+            var parsedPoints = new List<Point>();
+            var segments = trailStr.Split(';');
+
+            foreach (var rawSegment in segments)
+            {
+                var segment = rawSegment.Trim();
+                if (string.IsNullOrEmpty(segment))
                 {
-                    var parts = s.Split(',');
-                    return new Point(double.Parse(parts[0]), double.Parse(parts[1]));
-                })
-                .ToList();
+                    continue;
+                }
+
+                var parts = segment.Split(',');
+                if (parts.Length < 2)
+                {
+                    Log.Warning("ArrowAnnotation.Deserialize: Invalid trail point format: '{Segment}'", segment);
+                    continue;
+                }
+
+                if (!TryParseDoubleFlexible(parts[0], out var x) || !TryParseDoubleFlexible(parts[1], out var y))
+                {
+                    Log.Warning("ArrowAnnotation.Deserialize: Non-numeric trail coordinates: '{X}', '{Y}'", parts[0], parts[1]);
+                    continue;
+                }
+
+                parsedPoints.Add(new Point(x, y));
+            }
+
+            Trail = parsedPoints;
         }
     }
 
@@ -199,5 +222,23 @@ public class ArrowAnnotation : AnnotationItemBase
         }
 
         return (perp * directionSign, Math.Abs(maxDistance));
+    }
+
+    private static bool TryParseDoubleFlexible(string input, out double value)
+    {
+        // Try parse using invariant culture first for stable behavior
+        if (double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+
+        // Fallback to current culture to be permissive with user/system locale
+        if (double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out value))
+        {
+            return true;
+        }
+
+        value = default;
+        return false;
     }
 }
