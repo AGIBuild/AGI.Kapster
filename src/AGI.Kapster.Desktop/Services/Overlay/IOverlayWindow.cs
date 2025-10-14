@@ -69,13 +69,38 @@ public class CaptureRegionEventArgs : EventArgs
     public PixelRect Region { get; }
     public CaptureMode Mode { get; }
     public object? CaptureTarget { get; } // Could be Window handle, Element info, etc.
+
+    /// <summary>
+    /// Gets the overlay window instance that originated the capture event, if applicable.
+    /// This is set when the capture was initiated from a specific overlay window, and can be used to
+    /// distinguish between multiple overlays. Unlike <see cref="CaptureTarget"/>, which identifies the
+    /// object being captured (such as a window handle or element), <c>SourceWindow</c> refers to the overlay
+    /// window that triggered the capture event.
+    /// </summary>
     public IOverlayWindow? SourceWindow { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CaptureRegionEventArgs"/> class with the specified region, mode, and optional capture target.
+    /// </summary>
+    /// <param name="region">The selected region.</param>
+    /// <param name="mode">The capture mode.</param>
+    /// <param name="captureTarget">The object being captured (e.g., window handle, element info), or null.</param>
     public CaptureRegionEventArgs(PixelRect region, CaptureMode mode, object? captureTarget = null)
         : this(region, mode, captureTarget, null)
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CaptureRegionEventArgs"/> class with the specified region, mode, capture target, and source window.
+    /// </summary>
+    /// <param name="region">The selected region.</param>
+    /// <param name="mode">The capture mode.</param>
+    /// <param name="captureTarget">The object being captured (e.g., window handle, element info), or null.</param>
+    /// <param name="sourceWindow">
+    /// The overlay window instance that originated the capture event, or null if not applicable.
+    /// This is typically set when the capture is initiated from a specific overlay window, and is used to
+    /// distinguish the source of the event from the target being captured.
+    /// </param>
     public CaptureRegionEventArgs(PixelRect region, CaptureMode mode, object? captureTarget, IOverlayWindow? sourceWindow)
     {
         Region = region;
