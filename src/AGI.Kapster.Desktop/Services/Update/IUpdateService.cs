@@ -66,10 +66,6 @@ public interface IUpdateService
     /// </summary>
     event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
 
-    /// <summary>
-    /// Event fired when update process completes (success or failure)
-    /// </summary>
-    event EventHandler<UpdateCompletedEventArgs>? UpdateCompleted;
 
     /// <summary>
     /// Event fired when download progress changes

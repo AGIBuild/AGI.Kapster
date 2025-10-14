@@ -85,7 +85,6 @@ public class UpdateService : IUpdateService, IDisposable
     public bool IsBackgroundCheckingActive => _backgroundCheckingStarted;
 
     public event EventHandler<UpdateAvailableEventArgs>? UpdateAvailable;
-    public event EventHandler<UpdateCompletedEventArgs>? UpdateCompleted;
     public event EventHandler<DownloadProgress>? DownloadProgressChanged;
 
     /// <summary>
@@ -278,14 +277,14 @@ public class UpdateService : IUpdateService, IDisposable
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
 
-    public async Task<bool> InstallUpdateAsync(string installerPath)
+    public Task<bool> InstallUpdateAsync(string installerPath)
     {
         try
         {
             if (!_fileSystemService.FileExists(installerPath))
             {
                 _logger.Error("Installer file not found: {Path}", installerPath);
-                return false;
+                return Task.FromResult(false);
             }
 
             var processInfo = new ProcessStartInfo
@@ -300,16 +299,16 @@ public class UpdateService : IUpdateService, IDisposable
             if (process == null)
             {
                 _logger.Error("Failed to launch installer process");
-                return false;
+                return Task.FromResult(false);
             }
 
             _pendingInstallerPath = null;
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Error launching installer");
-            return false;
+            return Task.FromResult(false);
         }
         finally
         {

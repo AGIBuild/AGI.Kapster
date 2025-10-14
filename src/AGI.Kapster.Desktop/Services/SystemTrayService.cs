@@ -42,7 +42,6 @@ public class SystemTrayService : ISystemTrayService, IDisposable
         _appSettings = settingsService?.Settings ?? new AppSettings();
 
         _updateService.UpdateAvailable += OnUpdateAvailable;
-        _updateService.UpdateCompleted += OnUpdateCompleted;
     }
 
     public void Initialize()
@@ -153,10 +152,6 @@ public class SystemTrayService : ISystemTrayService, IDisposable
         }
     }
 
-    private void OnUpdateCompleted(object? sender, UpdateCompletedEventArgs e)
-    {
-        // Intentionally no user notification on failure; rely on logs
-    }
 
     private async Task ShowMacManualUpdatePromptAsync(UpdateInfo updateInfo)
     {
@@ -216,7 +211,6 @@ public class SystemTrayService : ISystemTrayService, IDisposable
     public void Dispose()
     {
         _updateService.UpdateAvailable -= OnUpdateAvailable;
-        _updateService.UpdateCompleted -= OnUpdateCompleted;
         _updateService.StopBackgroundChecking();
     }
 

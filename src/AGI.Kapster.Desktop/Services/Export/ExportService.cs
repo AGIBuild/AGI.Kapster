@@ -316,9 +316,9 @@ public class ExportService : IExportService
                     using var canvas = new SKCanvas(backgroundBitmap);
                     using var paint = new SKPaint
                     {
-                        IsAntialias = true,
-                        FilterQuality = SKFilterQuality.High
+                        IsAntialias = true
                     };
+                    var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
 
                     // Use white background for formats that don't support transparency
                     canvas.Clear(SKColors.White);
