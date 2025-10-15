@@ -245,7 +245,9 @@ public void OverlayManager_ShouldRaiseRegionSelectedEvent()
     var eventRaised = false;
     CaptureRegionEventArgs? eventArgs = null;
 
-    // Example only; current manager handles events internally and closes overlays
+    // Example only: This reflects the current API structure for illustration purposes.
+    // Note: The actual manager implementation has changed significantly from the example pattern shown,
+    // and now handles events internally and closes overlays.
 
     // Act
     overlayManager.TriggerRegionSelected(new PixelRect(0, 0, 100, 100));
