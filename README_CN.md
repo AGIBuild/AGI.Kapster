@@ -40,7 +40,7 @@
 |------|------|------|--------|
 | **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 9.0 Desktop |
 | **macOS** | macOS 10.15+ | x64, ARM64 | .NET 9.0 Runtime |
-| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime |
+| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime（X11/Wayland） |
 
 ### 安装
 
@@ -54,6 +54,8 @@
 **macOS:**
 - `AGI.Kapster-osx-x64.pkg` - Intel Mac
 - `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
+> 包未签名时，可能需要移除隔离属性：
+> `xattr -d com.apple.quarantine <your>.pkg`
 
 **Linux:**
 - `agi-kapster_*_amd64.deb` - Debian/Ubuntu
@@ -82,25 +84,38 @@ cd AGI.Kapster
 | 操作 | 快捷键 | 说明 |
 |------|--------|------|
 | **开始截图** | `Alt+A` | 启动屏幕截图 |
+| **打开设置** | `Alt+S` | 打开设置窗口 |
 | **保存到文件** | `Ctrl+S` | 保存当前截图 |
 | **复制到剪贴板** | `Enter` | 复制到剪贴板 |
 | **取消操作** | `Escape` | 取消当前操作 |
 
+### 编辑快捷键（覆盖层内）
+| 操作 | 快捷键 | 说明 |
+|------|--------|------|
+| **撤销** | `Ctrl+Z` | 撤销上一步 |
+| **重做** | `Ctrl+Y` 或 `Ctrl+Shift+Z` | 重做上一撤销 |
+| **全选** | `Ctrl+A` | 选择所有标注 |
+| **删除选择** | `Delete` | 删除所选项 |
+| **移动选择** | 方向键 | 1 像素微移 |
+| **调整线宽** | `Ctrl+-` / `Ctrl++` | 减小/增大线宽 |
+
 ### 标注工具
 | 工具 | 快捷键 | 说明 |
 |------|--------|------|
+| **选择** | `S` | 选择/编辑模式 |
 | **箭头** | `A` | 绘制箭头 |
 | **矩形** | `R` | 绘制矩形 |
 | **椭圆** | `E` | 绘制椭圆 |
 | **文字** | `T` | 添加文字 |
 | **手绘** | `F` | 自由绘图 |
 | **表情** | `M` | 插入表情符号 |
+| **取色器** | `C` | 触发取色（可用时） |
 
 ## 🛠️ 开发
 
 ### 开发要求
 - .NET 9.0 SDK
-- Visual Studio 2022 或 JetBrains Rider
+- Visual Studio 2022 / JetBrains Rider / VS Code
 
 ### 开发环境设置
 ```bash

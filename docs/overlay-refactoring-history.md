@@ -50,10 +50,10 @@ services.AddTransient<IElementDetector, WindowsElementDetector>();
 
 #### Issue 1: Editable Selection Closing Overlay
 **Problem**: Creating annotation selection closed all overlays immediately  
-**Solution**: Added `IsEditableSelection` flag to `RegionSelectedEventArgs`
+**Solution**: Added editable selection handling; event surface uses `CaptureRegionEventArgs` in windows
 
 ```csharp
-public class RegionSelectedEventArgs : EventArgs
+public class CaptureRegionEventArgs : EventArgs
 {
     public bool IsEditableSelection { get; }  // Added this flag
     // ... other properties
@@ -76,7 +76,7 @@ private void OnExportCompleted()
 // After (Solution)
 private void OnExportCompleted()
 {
-    _overlayController.CloseAllAsync();  // Closes all overlays
+    _overlayController.CloseAll();  // Closes all overlays
 }
 ```
 
@@ -148,7 +148,7 @@ public class SimplifiedOverlayManager : IOverlayController
         // Handle overlay lifecycle based on selection type
         if (!e.IsEditableSelection)
         {
-            _ = CloseAllAsync();
+            CloseAll();
         }
     }
 }
@@ -170,20 +170,14 @@ Different platforms handle multi-screen differently:
 Platform-specific implementations with shared interface:
 
 ```csharp
-public async Task ShowAllAsync()
+public void ShowAll()
 {
-    var screens = Screen.AllScreens;
-    var overlayTasks = screens.Select(async screen =>
+    foreach (var screen in Screen.AllScreens)
     {
         var overlay = _serviceProvider.GetRequiredService<IOverlayWindow>();
-        overlay.Screen = screen;
-        await overlay.ShowAsync();
-        
-        // Platform-specific positioning handled in implementation
-        return overlay;
-    });
-    
-    _activeOverlays = await Task.WhenAll(overlayTasks);
+        overlay.SetFullScreen(screen);
+        overlay.Show();
+    }
 }
 ```
 

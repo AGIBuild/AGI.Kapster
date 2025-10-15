@@ -144,5 +144,5 @@ AGI.Kapster is in active development with a focus on cross-platform screen captu
 
 ---
 
-*Last Updated: September 2024*
+*Last Updated: October 2025*
 *Status: Active Development*

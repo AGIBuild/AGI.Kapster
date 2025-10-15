@@ -10,7 +10,7 @@ Complete technical documentation for a cross-platform screen capture and overlay
 - **[Versioning Strategy](versioning-strategy.md)** - Version control and release strategy
 
 ### CI/CD Pipeline
-- **[GitHub Actions Workflows](../.github/README.md)** - Complete CI/CD automation
+- **[GitHub Actions Workflows](github-workflow.md)** - Complete CI/CD automation
 - **[Release Workflow](release-workflow.md)** - Automated release and packaging
 
 ### Testing & Quality
@@ -49,9 +49,7 @@ Complete technical documentation for a cross-platform screen capture and overlay
   - Mocking strategies with NSubstitute
   - Test coverage and best practices
 
-### Overlay System
-- **[System Architecture](overlay-system-architecture.md)** - Complete technical architecture of the overlay system
-- **[Quick Reference](overlay-system-quick-reference.md)** - API and component quick reference
+<!-- Duplicate section removed to avoid redundancy; see System Architecture above. -->
 
 ## 📋 Development Guide
 
@@ -64,19 +62,21 @@ Complete technical documentation for a cross-platform screen capture and overlay
 ### Directory Structure
 ```
 src/AGI.Kapster.Desktop/
-├── Services/           # Services grouped by functionality
-│   ├── Clipboard/     # Clipboard operations
-│   ├── Capture/       # Screen capture
-│   ├── Export/        # Export functionality
-│   └── Settings/      # Settings management
-├── Rendering/         # Rendering components
-└── Platforms/         # Platform-specific implementations
+├── Services/                 # Services grouped by functionality
+│   ├── Overlay/             # Overlay controller and windows
+│   ├── Capture/             # Screen capture strategies
+│   ├── Clipboard/           # Clipboard operations
+│   ├── Settings/            # Settings management
+│   └── Update/              # Auto-update services
+├── Overlays/                # Avalonia overlay UI and events
+├── Rendering/               # Rendering components
+└── Views/                   # Settings and dialogs
 ```
 
 ### Recent Updates
 - ✅ Removed main window, pure background architecture
 - ✅ Service organization refactoring, grouped by functionality
-- ✅ Enhanced test coverage, 95 unit tests
+- ✅ Enhanced test coverage, 95+ unit tests
 - ✅ File system abstraction for isolated testing
 
 ## 📚 Reference Documentation
@@ -85,4 +85,6 @@ src/AGI.Kapster.Desktop/
 - **[Project Status](project-status.md)** - Current development status and milestones
 - **[Refactoring History](overlay-refactoring-history.md)** - Important design decision records
 
-*Note: Some historical documents may contain outdated information. Current architecture documents take precedence.*
+*Last Updated: October 2025*
+
+*Note: Historical documents are archived for context; current architecture docs take precedence.*

@@ -45,7 +45,7 @@ The build system integrates with GitHub Actions through:
 ### Composite Actions
 - **setup-environment**: Complete environment setup with checkout and .NET 9.0
 - **setup-dotnet-only**: Lightweight .NET setup without checkout
-- **setup-dotnet-env**: .NET setup with Git configuration
+- **setup-dotnet-env**: Legacy .NET setup (kept for historical compatibility)
 - **build-and-test**: Standardized build and test execution
 - **publish-package**: Multi-platform publishing and packaging
 

@@ -107,8 +107,7 @@ artifacts/
 ## Configuration
 
 ### .NET Configuration
-- **Version**: 9.0.x (preview channel)
-- **Quality**: Preview releases enabled
+- **Version**: 9.0.x
 - **Runtime**: Multi-platform targeting
 
 ### Cache Configuration

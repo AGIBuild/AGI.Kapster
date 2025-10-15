@@ -13,8 +13,8 @@ Thank you for your interest in AGI.Kapster! We welcome all forms of contribution
    ```
 
 2. **Install Dependencies**
-   - .NET 9.0 SDK
-   - Visual Studio 2022 or JetBrains Rider
+- .NET 9.0 SDK
+- Visual Studio 2022 / JetBrains Rider / VS Code
 
 3. **Build and Test**
    ```bash
@@ -84,7 +84,8 @@ AGI.Kapster/
 - Follow C# naming conventions
 - Use meaningful variable and method names
 - Add XML documentation for public APIs
-- Use async/await for asynchronous operations
+- Prefer synchronous APIs when the codebase uses sync for overlay control
+  and use async/await where naturally asynchronous (I/O, network)
 - Handle exceptions appropriately
 
 #### Commit Message Format
