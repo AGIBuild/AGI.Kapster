@@ -40,7 +40,7 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 |----------|---------|--------------|---------|
 | **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 9.0 Desktop |
 | **macOS** | macOS 10.15+ | x64, ARM64 | .NET 9.0 Runtime |
-| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime |
+| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime (X11/Wayland) |
 
 ### Installation
 
@@ -54,9 +54,8 @@ Download from [GitHub Releases](../../releases/latest):
 **macOS:**
 - `AGI.Kapster-osx-x64.pkg` - Intel Mac
 - `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
-> Since the installation package is not signed, you need to run the following command in the command line to lift the system restriction by removing the quarantine attribute from the installation file. You must perform this operation each time you install a new version.
-
-`xattr -d com.apple.quarantine AGI.Kapster-2025.9.26.48676-osx-arm64.pkg`
+> Unsigned packages may require removing the quarantine attribute:
+> `xattr -d com.apple.quarantine <your>.pkg`
 
 **Linux:**
 - `agi-kapster_*_amd64.deb` - Debian/Ubuntu
@@ -103,7 +102,7 @@ cd AGI.Kapster
 
 ### Requirements
 - .NET 9.0 SDK
-- Visual Studio 2022 or JetBrains Rider
+- Visual Studio 2022 / JetBrains Rider / VS Code
 
 ### Development Setup
 ```bash

@@ -14,11 +14,9 @@ Primary interface for overlay lifecycle management:
 ```csharp
 public interface IOverlayController
 {
-    Task ShowAllAsync();
-    Task CloseAllAsync();
+    void ShowAll();
+    void CloseAll();
     bool IsActive { get; }
-    event EventHandler<RegionSelectedEventArgs> RegionSelected;
-    event EventHandler Cancelled;
 }
 ```
 
@@ -31,14 +29,18 @@ public interface IOverlayController
 Platform-specific overlay window interface:
 
 ```csharp
-public interface IOverlayWindow
+public interface IOverlayWindow : IDisposable
 {
-    Task ShowAsync();
-    Task CloseAsync();
-    Screen Screen { get; }
+    void Show();
+    void Close();
+    void SetFullScreen(Screen screen);
+    void SetRegion(PixelRect region);
     bool IsVisible { get; }
-    event EventHandler<RegionSelectedEventArgs> RegionSelected;
-    event EventHandler Cancelled;
+    bool ElementDetectionEnabled { get; set; }
+    Screen? Screen { get; }
+    event EventHandler<CaptureRegionEventArgs>? RegionSelected;
+    event EventHandler? Cancelled;
+    event EventHandler? Closed;
 }
 ```
 
@@ -52,10 +54,14 @@ Platform-specific screen capture implementation:
 ```csharp
 public interface IScreenCaptureStrategy
 {
-    Task<SKBitmap> CaptureRegionAsync(PixelRect region);
-    Task<SKBitmap> CaptureFullScreenAsync(Screen screen);
-    Task<SKBitmap> CaptureWindowAsync(IntPtr windowHandle);
-    Task<SKBitmap> CaptureElementAsync(IElementInfo element);
+    Task<SKBitmap?> CaptureFullScreenAsync(Screen screen);
+    Task<SKBitmap?> CaptureWindowAsync(nint windowHandle);
+    Task<SKBitmap?> CaptureRegionAsync(PixelRect region);
+    Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window);
+    Task<SKBitmap?> CaptureElementAsync(IElementInfo element);
+    bool SupportsWindowCapture { get; }
+    bool SupportsElementCapture { get; }
+    bool IsHardwareAccelerated { get; }
 }
 ```
 
@@ -75,7 +81,7 @@ sequenceDiagram
     
     App->>DI: Register Services
     DI->>OM: Create OverlayManager
-    App->>OM: ShowAllAsync()
+    App->>OM: ShowAll()
     OM->>OW: Create per screen
     OW->>OW: Initialize overlay UI
 ```
@@ -94,16 +100,16 @@ sequenceDiagram
     OM->>CS: CaptureRegionAsync()
     CS->>OM: Return bitmap
     OM->>App: Forward event
-    App->>OM: CloseAllAsync()
+    App->>OM: CloseAll()
 ```
 
 ### 3. Event Propagation
 ```mermaid
 graph TD
     A[User Action] --> B[OverlayWindow]
-    B --> C[RegionSelectedEventArgs]
+    B --> C[CaptureRegionEventArgs]
     C --> D[OverlayManager]
-    D --> E[Application Handler]
+    D --> E[Copy to Clipboard]
     E --> F[Close All Overlays]
 ```
 
@@ -115,25 +121,11 @@ graph TD
 ```csharp
 public class WindowsOverlayWindow : IOverlayWindow
 {
-    private readonly IScreenCaptureStrategy _captureStrategy;
-    private readonly IElementDetector _elementDetector;
-    private OverlayWindow _avaloniaWindow;
-
-    public async Task ShowAsync()
-    {
-        _avaloniaWindow = new OverlayWindow
-        {
-            DataContext = new OverlayViewModel(_captureStrategy, _elementDetector)
-        };
-        
-        // Configure for Windows-specific behavior
-        _avaloniaWindow.WindowState = WindowState.Maximized;
-        _avaloniaWindow.Topmost = true;
-        _avaloniaWindow.ShowInTaskbar = false;
-        
-        _avaloniaWindow.Show();
-        await _avaloniaWindow.WaitForLoadedAsync();
-    }
+    public void Show() { /* ... */ }
+    public void Close() { /* ... */ }
+    public void SetFullScreen(Screen screen) { /* ... */ }
+    public void SetRegion(PixelRect region) { /* ... */ }
+    public event EventHandler<CaptureRegionEventArgs>? RegionSelected;
 }
 ```
 
@@ -141,17 +133,7 @@ public class WindowsOverlayWindow : IOverlayWindow
 ```csharp
 public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
 {
-    public async Task<SKBitmap> CaptureRegionAsync(PixelRect region)
-    {
-        var hdc = GetDC(IntPtr.Zero);
-        var memDc = CreateCompatibleDC(hdc);
-        var bitmap = CreateCompatibleBitmap(hdc, region.Width, region.Height);
-        
-        SelectObject(memDc, bitmap);
-        BitBlt(memDc, 0, 0, region.Width, region.Height, hdc, region.X, region.Y, SRCCOPY);
-        
-        return ConvertToSKBitmap(bitmap);
-    }
+    public Task<SKBitmap?> CaptureRegionAsync(PixelRect region) { /* ... */ }
 }
 ```
 
@@ -161,28 +143,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
 ```csharp
 public class MacOverlayWindow : IOverlayWindow
 {
-    public async Task ShowAsync()
-    {
-        _avaloniaWindow = new OverlayWindow();
-        
-        // macOS-specific configuration
-        _avaloniaWindow.SystemDecorations = SystemDecorations.None;
-        _avaloniaWindow.Background = Brushes.Transparent;
-        _avaloniaWindow.WindowState = WindowState.FullScreen;
-        
-        _avaloniaWindow.Show();
-        await EnsureProperScreenCoverage();
-    }
-    
-    private async Task EnsureProperScreenCoverage()
-    {
-        // Handle macOS multi-screen black screen issue
-        var screens = Screen.AllScreens;
-        foreach (var screen in screens)
-        {
-            await ValidateScreenCoverage(screen);
-        }
-    }
+    public void Show() { /* ... */ }
 }
 ```
 
@@ -190,25 +151,7 @@ public class MacOverlayWindow : IOverlayWindow
 ```csharp
 public class MacScreenCaptureStrategy : IScreenCaptureStrategy
 {
-    public async Task<SKBitmap> CaptureRegionAsync(PixelRect region)
-    {
-        var tempFile = Path.GetTempFileName() + ".png";
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "screencapture",
-                Arguments = $"-R {region.X},{region.Y},{region.Width},{region.Height} {tempFile}",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-        
-        process.Start();
-        await process.WaitForExitAsync();
-        
-        return SKBitmap.Decode(tempFile);
-    }
+    public Task<SKBitmap?> CaptureRegionAsync(PixelRect region) { /* ... */ }
 }
 ```
 
@@ -233,7 +176,7 @@ public static void ConfigureServices(IServiceCollection services)
     {
         services.AddTransient<IOverlayWindow, MacOverlayWindow>();
         services.AddTransient<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
-        services.AddTransient<IElementDetector, MacElementDetector>();
+        services.AddTransient<IElementDetector, NullElementDetector>();
     }
     
     // Shared services
@@ -263,12 +206,12 @@ services.AddTransient<IElementDetector, WindowsElementDetector>();
 
 ### Event Flow Architecture
 ```csharp
-public class RegionSelectedEventArgs : EventArgs
+public class CaptureRegionEventArgs : EventArgs
 {
     public PixelRect Region { get; }
-    public SKBitmap? CapturedImage { get; }
-    public bool IsEditableSelection { get; }
-    public DateTime Timestamp { get; }
+    public CaptureMode Mode { get; }
+    public object? CaptureTarget { get; }
+    public IOverlayWindow? SourceWindow { get; }
 }
 ```
 
@@ -276,18 +219,10 @@ public class RegionSelectedEventArgs : EventArgs
 ```csharp
 public class SimplifiedOverlayManager : IOverlayController
 {
-    public event EventHandler<RegionSelectedEventArgs> RegionSelected;
-    
-    private void OnOverlayRegionSelected(object sender, RegionSelectedEventArgs e)
+    private void OnOverlayRegionSelected(object? sender, CaptureRegionEventArgs e)
     {
-        // Forward event to application level
-        RegionSelected?.Invoke(this, e);
-        
-        // Auto-close unless editable selection
-        if (!e.IsEditableSelection)
-        {
-            _ = CloseAllAsync();
-        }
+        // Handle capture pipeline and clipboard copy, then close overlays
+        CloseAll();
     }
 }
 ```
@@ -296,23 +231,18 @@ public class SimplifiedOverlayManager : IOverlayController
 
 ### Screen Enumeration
 ```csharp
-public async Task ShowAllAsync()
+public void ShowAll()
 {
-    var screens = Screen.AllScreens;
-    var overlayTasks = screens.Select(async screen =>
+    var screens = GetAvailableScreens();
+    foreach (var screen in screens)
     {
         var overlay = _serviceProvider.GetRequiredService<IOverlayWindow>();
-        overlay.Screen = screen;
-        await overlay.ShowAsync();
-        
-        // Subscribe to events
+        overlay.SetFullScreen(screen);
+        overlay.Show();
         overlay.RegionSelected += OnOverlayRegionSelected;
         overlay.Cancelled += OnOverlayCancelled;
-        
-        return overlay;
-    });
-    
-    _activeOverlays = await Task.WhenAll(overlayTasks);
+        // track overlay instance...
+    }
 }
 ```
 
@@ -387,7 +317,7 @@ public async Task<IEnumerable<IElementInfo>> DetectElementsAsync()
 ### Interface Mocking
 ```csharp
 [Test]
-public async Task ShowAllAsync_ShouldCreateOverlayForEachScreen()
+public void ShowAll_ShouldCreateOverlayForEachScreen()
 {
     // Arrange
     var mockOverlay = Substitute.For<IOverlayWindow>();
@@ -397,7 +327,7 @@ public async Task ShowAllAsync_ShouldCreateOverlayForEachScreen()
     var manager = new SimplifiedOverlayManager(mockServiceProvider);
     
     // Act
-    await manager.ShowAllAsync();
+    manager.ShowAll();
     
     // Assert
     mockServiceProvider.Received(Screen.AllScreens.Length).GetRequiredService<IOverlayWindow>();
@@ -417,7 +347,7 @@ public async Task EndToEndCaptureWorkflow()
     var overlayManager = provider.GetRequiredService<IOverlayController>();
     
     // Act
-    await overlayManager.ShowAllAsync();
+    overlayManager.ShowAll();
     
     // Simulate user selection
     var testRegion = new PixelRect(100, 100, 200, 200);

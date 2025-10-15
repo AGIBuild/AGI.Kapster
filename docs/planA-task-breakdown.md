@@ -1,10 +1,10 @@
-# Project Planning Archive
+# Project Planning Archive (Archived)
 
 ## Historical Task Breakdown (Plan A)
 
 This document contains historical project planning information from the initial development phase using .NET 9 + Avalonia 11 + CommunityToolkit.Mvvm architecture.
 
-**Note**: This is archived content for historical reference. Current project status and active tasks should be found in [Project Status](project-status.md).
+> Archived: Historical planning only. See [Project Status](project-status.md) for current state.
 
 ## Completed Milestones
 

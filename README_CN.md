@@ -40,7 +40,7 @@
 |------|------|------|--------|
 | **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 9.0 Desktop |
 | **macOS** | macOS 10.15+ | x64, ARM64 | .NET 9.0 Runtime |
-| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime |
+| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime（X11/Wayland） |
 
 ### 安装
 
@@ -54,6 +54,8 @@
 **macOS:**
 - `AGI.Kapster-osx-x64.pkg` - Intel Mac
 - `AGI.Kapster-osx-arm64.pkg` - Apple Silicon
+> 包未签名时，可能需要移除隔离属性：
+> `xattr -d com.apple.quarantine <your>.pkg`
 
 **Linux:**
 - `agi-kapster_*_amd64.deb` - Debian/Ubuntu
@@ -100,7 +102,7 @@ cd AGI.Kapster
 
 ### 开发要求
 - .NET 9.0 SDK
-- Visual Studio 2022 或 JetBrains Rider
+- Visual Studio 2022 / JetBrains Rider / VS Code
 
 ### 开发环境设置
 ```bash

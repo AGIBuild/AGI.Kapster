@@ -237,12 +237,9 @@ public void OverlayManager_ShouldRaiseRegionSelectedEvent()
     // Arrange
     var overlayManager = new SimplifiedOverlayManager();
     var eventRaised = false;
-    RegionSelectedEventArgs? eventArgs = null;
+    CaptureRegionEventArgs? eventArgs = null;
 
-    overlayManager.RegionSelected += (sender, args) => {
-        eventRaised = true;
-        eventArgs = args;
-    };
+    // Example only; current manager handles events internally and closes overlays
 
     // Act
     overlayManager.TriggerRegionSelected(new PixelRect(0, 0, 100, 100));

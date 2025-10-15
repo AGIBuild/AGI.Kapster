@@ -7,9 +7,9 @@
 **Implementation**: `SimplifiedOverlayManager`  
 
 ```csharp
-Task ShowAllAsync();        // Show overlays on all screens
-Task CloseAllAsync();       // Close all active overlays
-bool IsActive { get; }      // Check if any overlays are active
+void ShowAll();        // Show overlays on all screens
+void CloseAll();       // Close all active overlays
+bool IsActive { get; } // Check if any overlays are active
 ```
 
 ### IOverlayWindow
@@ -17,9 +17,12 @@ bool IsActive { get; }      // Check if any overlays are active
 **Implementations**: `WindowsOverlayWindow`, `MacOverlayWindow`
 
 ```csharp
-Task ShowAsync();           // Display overlay window
-Task CloseAsync();          // Close overlay window
-Screen Screen { get; }      // Associated screen
+void Show();                // Display overlay window
+void Close();               // Close overlay window
+void SetFullScreen(Screen screen);
+void SetRegion(PixelRect region);
+bool ElementDetectionEnabled { get; set; }
+Screen? Screen { get; }     // Associated screen
 ```
 
 ### IScreenCaptureStrategy
@@ -35,16 +38,16 @@ Task<SKBitmap> CaptureFullScreenAsync(Screen screen);    // Capture entire scree
 
 ### RegionSelected
 ```csharp
-public class RegionSelectedEventArgs : EventArgs
+public class CaptureRegionEventArgs : EventArgs
 {
-    public PixelRect Region { get; }           // Selected screen region
-    public SKBitmap? CapturedImage { get; }    // Captured bitmap (optional)
-    public bool IsEditableSelection { get; }   // Whether to keep overlay open
-    public DateTime Timestamp { get; }         // Selection timestamp
+  public PixelRect Region { get; }           // Selected screen region
+  public CaptureMode Mode { get; }           // FullScreen/Window/Region/Element
+  public object? CaptureTarget { get; }      // Window handle or element info
+  public IOverlayWindow? SourceWindow { get; } // Origin overlay window
 }
 ```
 
-**Event Flow**: `OverlayWindow` → `OverlayManager` → `Application`
+**Event Flow**: `OverlayWindow` → `OverlayManager` → `Clipboard` → `CloseAll`
 
 ### Cancelled
 Triggered when user cancels selection (ESC key or click outside)
@@ -68,6 +71,7 @@ else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
 {
     services.AddTransient<IOverlayWindow, MacOverlayWindow>();
     services.AddTransient<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
+    services.AddTransient<IElementDetector, NullElementDetector>();
 }
 ```
 
@@ -78,7 +82,7 @@ else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
 var overlayController = serviceProvider.GetRequiredService<IOverlayController>();
 
 // Show overlays on all screens
-await overlayController.ShowAllAsync();
+overlayController.ShowAll();
 
 // Handle region selection
 overlayController.RegionSelected += async (sender, args) =>
@@ -86,11 +90,8 @@ overlayController.RegionSelected += async (sender, args) =>
     // Process captured region
     await ProcessCapturedRegion(args.Region, args.CapturedImage);
     
-    // Close overlays if not editable
-    if (!args.IsEditableSelection)
-    {
-        await overlayController.CloseAllAsync();
-    }
+    // Close overlays explicitly if needed
+    overlayController.CloseAll();
 };
 ```
 
@@ -199,10 +200,7 @@ src/AGI.Kapster.Desktop/
 tests/AGI.Kapster.Tests/
 ├── Services/
 │   └── Overlay/
-│       ├── OverlayManagerTests.cs          # Manager unit tests
-│       └── OverlayWindowTests.cs           # Window unit tests
-└── Integration/
-    └── OverlayIntegrationTests.cs          # End-to-end tests
+│       └── OverlayManagerTests.cs          # Manager unit tests
 ```
 
 ## Performance Tips
@@ -239,15 +237,15 @@ private static readonly Screen[] CachedScreens = Screen.AllScreens.ToArray();
 ```csharp
 var mockController = Substitute.For<IOverlayController>();
 mockController.IsActive.Returns(false);
-mockController.ShowAllAsync().Returns(Task.CompletedTask);
 ```
 
 ### Test Event Triggering
 ```csharp
-var eventArgs = new RegionSelectedEventArgs(
+var eventArgs = new CaptureRegionEventArgs(
     new PixelRect(0, 0, 100, 100),
-    capturedImage: null,
-    isEditableSelection: false
+    CaptureMode.Region,
+    captureTarget: null,
+    sourceWindow: null
 );
 
 // Trigger event for testing
@@ -266,12 +264,12 @@ var provider = services.BuildServiceProvider();
 
 ### Show Overlays
 ```csharp
-await overlayController.ShowAllAsync();
+overlayController.ShowAll();
 ```
 
 ### Close All Overlays
 ```csharp
-await overlayController.CloseAllAsync();
+overlayController.CloseAll();
 ```
 
 ### Capture Region
