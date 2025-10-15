@@ -8,23 +8,29 @@ AGI.Kapster implements a comprehensive testing strategy using dependency injecti
 
 ### Directory Structure
 ```
-tests/AGI.Kapster.Tests/
-├── TestHelpers/
-│   ├── TestBase.cs                    # Base class for all tests
-│   ├── MemoryFileSystemService.cs     # In-memory file system for testing
-│   └── AvaloniaTestHelper.cs          # Avalonia initialization for tests
-├── Services/
-│   ├── SettingsServiceTests.cs        # Settings service with file system mocking
-│   ├── AnnotationServiceTests.cs      # Annotation service tests
-│   ├── HotkeyManagerTests.cs          # Hotkey management tests
-│   └── Clipboard/
-│       └── ClipboardServiceTests.cs   # Clipboard service tests
-├── Models/
-│   └── AnnotationTests.cs             # Annotation model tests
-├── Commands/
-│   └── CommandTests.cs                # Command pattern tests
-└── Integration/
-    └── OverlayIntegrationTests.cs     # End-to-end overlay tests
+tests/
+├── AGI.Kapster.Tests/
+│   ├── Commands/
+│   │   └── CommandTests.cs                # Command pattern tests
+│   ├── Models/
+│   │   ├── AnnotationTests.cs             # Annotation model tests
+│   │   └── SettingsTests.cs               # Settings model tests
+│   ├── Services/
+│   │   ├── AnnotationServiceTests.cs      # Annotation service tests
+│   │   ├── AnnotationToolHotkeysTests.cs  # Annotation tool hotkeys tests
+│   │   ├── HotkeyManagerTests.cs          # Hotkey management tests
+│   │   ├── SettingsServiceTests.cs        # Settings service tests
+│   │   ├── Hotkeys/
+│   │   │   └── HotkeyProviderTests.cs     # Hotkey provider tests
+│   │   └── Overlay/
+│   │       └── OverlayManagerTests.cs     # Overlay manager tests
+│   ├── TestHelpers/
+│   │   ├── TestBase.cs                    # Base class for tests
+│   │   ├── UIThreadHelper.cs              # UI thread helper
+│   │   └── (other helpers)
+│   └── xunit.runner.json                  # xUnit configuration
+└── AGI.Kapster.Integration.Tests/
+    └── Support/                           # Integration test support utilities
 ```
 
 ## Testing Patterns
