@@ -386,3 +386,36 @@ git tag -d v2024.9.23.1
 git push origin --delete v2024.9.23.1
 gh release delete v2024.9.23.1
 ```
+
+## Hotkeys Quick Reference
+
+### Global / Capture
+| Action | Hotkey | Description |
+|--------|--------|-------------|
+| Capture Screen | Alt+A | Start screen capture |
+| Open Settings | Alt+S | Open settings window |
+| Save to File | Ctrl+S | Save current capture |
+| Copy to Clipboard | Enter | Copy current selection to clipboard |
+| Cancel | Escape | Cancel current operation |
+
+### Editing (Overlay)
+| Action | Hotkey | Description |
+|--------|--------|-------------|
+| Undo | Ctrl+Z | Undo last action |
+| Redo | Ctrl+Y / Ctrl+Shift+Z | Redo last undone action |
+| Select All | Ctrl+A | Select all annotations |
+| Delete Selection | Delete | Remove selected items |
+| Move Selection | Arrow keys | Nudge by 1 px |
+| Adjust Stroke Width | Ctrl+- / Ctrl++ | Decrease/Increase stroke width |
+
+### Annotation Tools
+| Tool | Hotkey | Description |
+|------|--------|-------------|
+| Select | S | Selection/edit mode |
+| Arrow | A | Draw arrows |
+| Rectangle | R | Draw rectangles |
+| Ellipse | E | Draw ellipses |
+| Text | T | Add text |
+| Freehand | F | Free drawing |
+| Emoji | M | Insert emoji |
+| Color Picker | C | Pick color (when available) |
