@@ -276,6 +276,19 @@ public PixelRect TranslateToGlobalCoordinates(PixelRect localRect, Screen screen
 - **macOS**: Metal rendering integration
 - **Cross-platform**: Skia GPU acceleration
 
+## Platform Capability Matrix
+
+| Capability | Windows | macOS | Notes |
+|------------|---------|-------|-------|
+| Screen capture (full) | ✅ | ⚠️ Planned | macOS full capture via CoreGraphics (TBD) |
+| Screen capture (region) | ✅ | ✅ | macOS uses `screencapture -R` |
+| Window capture | ✅ | ❌ | Not implemented on macOS |
+| Element capture | ✅ | ❌ | Not supported on macOS |
+| Element detection | ✅ UI Automation | ❌ | `NullElementDetector` registered |
+| Multi-screen overlays | ✅ | ✅ | Positioning differs by platform |
+| Required permissions | None | Screen Recording | Prompted by system |
+| Typical performance | High | Medium | Depends on API path |
+
 ## Error Handling
 
 ### Platform Capability Detection

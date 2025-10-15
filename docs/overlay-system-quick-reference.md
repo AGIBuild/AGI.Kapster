@@ -110,13 +110,15 @@ var fullScreenBitmap = await captureStrategy.CaptureFullScreenAsync(screen);
 
 ## Platform Differences
 
-| Feature | Windows | macOS | Notes |
-|---------|---------|-------|-------|
-| **Screen Capture** | BitBlt API | screencapture command | Windows faster, macOS more compatible |
-| **Element Detection** | UI Automation | Limited | Windows has full element detection |
-| **Multi-Screen** | Full support | Full support | Both handle multiple monitors |
-| **Permissions** | None required | Screen Recording permission | macOS requires user approval |
-| **Performance** | High | Medium | Windows uses native APIs |
+| Capability | Windows | macOS | Notes |
+|------------|---------|-------|-------|
+| Screen capture (full/region) | ✅ | ✅ (region via screencapture) | macOS full/window planned via CoreGraphics |
+| Window capture | ✅ | ⚠️ Not implemented | `CaptureWindowAsync` returns null on macOS |
+| Element capture | ✅ | ❌ | macOS not supported yet |
+| Element detection | ✅ UI Automation | ❌ | `NullElementDetector` on macOS |
+| Multi-screen overlays | ✅ | ✅ | Different positioning strategies |
+| Permissions | None | Screen Recording required | User must grant once |
+| Performance | High (native BitBlt) | Medium (shell command + IO) | Future CG optimizations |
 
 ## Debugging
 
