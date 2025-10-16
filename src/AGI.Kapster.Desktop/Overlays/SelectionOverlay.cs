@@ -160,6 +160,44 @@ public sealed class SelectionOverlay : Canvas
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        var p = e.GetPosition(this);
+
+        // Check if this was a click (not a drag) for fullscreen selection
+        // If _pendingCreate is true but _isDraggingCreate is false, it means the pointer
+        // never moved enough to trigger drag creation - this is a click
+        var hasExistingSelection = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
+        if (_pendingCreate && !_isDraggingCreate && !hasExistingSelection)
+        {
+            Log.Information("SelectionOverlay: Click detected, creating fullscreen selection");
+            
+            // Set selection to entire canvas (fullscreen)
+            SelectionRect = new Rect(0, 0, Bounds.Width, Bounds.Height);
+            UpdateVisuals();
+
+            // Set global selection state
+            var parentWindow = this.FindAncestorOfType<OverlayWindow>();
+            if (parentWindow != null)
+            {
+                GlobalSelectionState.SetSelection(parentWindow);
+            }
+
+            // Show info overlay
+            _infoOverlay.Show();
+            UpdateInfoOverlay(p);
+
+            // Reset state
+            _isDraggingCreate = false;
+            _isDraggingMove = false;
+            _activeHandle = HandleKind.None;
+            _pendingCreate = false;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+
+            // Fire selection finished event
+            SelectionFinished?.Invoke(SelectionRect);
+            return; // Early return to avoid duplicate processing
+        }
+
         _isDraggingCreate = false;
         _isDraggingMove = false;
         _activeHandle = HandleKind.None;

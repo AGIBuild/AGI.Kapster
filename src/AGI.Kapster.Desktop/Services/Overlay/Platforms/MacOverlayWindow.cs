@@ -19,7 +19,6 @@ public class MacOverlayWindow : IOverlayWindow
 {
     private readonly IServiceProvider _serviceProvider;
     private OverlayWindow? _window;
-    private Screen? _screen;
     private bool _disposed;
     private static OverlayWindow? _primaryWindow; // Used for screen enumeration
 
@@ -35,8 +34,6 @@ public class MacOverlayWindow : IOverlayWindow
         get => false; // Element detection not supported on macOS yet
         set { /* No-op */ }
     }
-
-    public Screen? Screen => _screen;
 
     public event EventHandler<CaptureRegionEventArgs>? RegionSelected;
     public event EventHandler? Cancelled;
@@ -76,26 +73,6 @@ public class MacOverlayWindow : IOverlayWindow
             _window = null;
             Log.Debug("macOS overlay window closed");
         }
-    }
-
-    public void SetFullScreen(Screen screen)
-    {
-        _screen = screen;
-
-        if (_window == null)
-        {
-            CreateWindow();
-        }
-
-        // Position window directly on the target screen using screen bounds
-        _window!.Position = new PixelPoint(screen.Bounds.Position.X, screen.Bounds.Position.Y);
-        _window.WindowStartupLocation = WindowStartupLocation.Manual;
-        _window.Width = screen.Bounds.Width;
-        _window.Height = screen.Bounds.Height;
-        _window.WindowState = WindowState.Normal; // Use Normal state instead of FullScreen for better multi-screen support
-
-        Log.Debug("macOS overlay window set to fullscreen on screen at {X},{Y}",
-            screen.Bounds.Position.X, screen.Bounds.Position.Y);
     }
 
     public void SetRegion(PixelRect region)
@@ -156,46 +133,21 @@ public class MacOverlayWindow : IOverlayWindow
             return;
         }
 
-        // Pass composite image (if available) through CaptureTarget
-        // This is used for macOS to include annotations in the screenshot
-        object? captureTarget = null;
-        if (e.CompositeImage != null)
+        // OverlayWindow always provides the final image (from frozen background)
+        // No need to convert coordinates or re-capture
+        if (e.CompositeImage == null)
         {
-            captureTarget = e.CompositeImage;
-        }
-        else if (e.DetectedElement != null)
-        {
-            captureTarget = ElementInfoAdapter.FromDetectedElement(e.DetectedElement);
+            Log.Warning("No final image provided from OverlayWindow - this should not happen");
+            return;
         }
 
-        PixelRect screenRect;
-        if (_window != null)
-        {
-            var topLeft = _window.PointToScreen(new Point(e.Region.X, e.Region.Y));
-            var bottomRight = _window.PointToScreen(new Point(e.Region.Right, e.Region.Bottom));
-
-            var x = (int)Math.Round((double)Math.Min(topLeft.X, bottomRight.X), MidpointRounding.AwayFromZero);
-            var y = (int)Math.Round((double)Math.Min(topLeft.Y, bottomRight.Y), MidpointRounding.AwayFromZero);
-            var width = (int)Math.Round((double)Math.Abs(bottomRight.X - topLeft.X), MidpointRounding.AwayFromZero);
-            var height = (int)Math.Round((double)Math.Abs(bottomRight.Y - topLeft.Y), MidpointRounding.AwayFromZero);
-
-            width = Math.Max(1, width);
-            height = Math.Max(1, height);
-            screenRect = new PixelRect(x, y, width, height);
-        }
-        else
-        {
-            screenRect = new PixelRect(
-                (int)Math.Round((double)e.Region.X, MidpointRounding.AwayFromZero),
-                (int)Math.Round((double)e.Region.Y, MidpointRounding.AwayFromZero),
-                Math.Max(1, (int)Math.Round((double)e.Region.Width, MidpointRounding.AwayFromZero)),
-                Math.Max(1, (int)Math.Round((double)e.Region.Height, MidpointRounding.AwayFromZero)));
-        }
+        Log.Debug("Received final image from overlay: {W}x{H}", 
+            e.CompositeImage.PixelSize.Width, e.CompositeImage.PixelSize.Height);
 
         RegionSelected?.Invoke(this, new CaptureRegionEventArgs(
-            screenRect,
-            e.IsFullScreen ? CaptureMode.FullScreen : CaptureMode.Region,
-            captureTarget,
+            new PixelRect(0, 0, e.CompositeImage.PixelSize.Width, e.CompositeImage.PixelSize.Height),
+            CaptureMode.Region,
+            e.CompositeImage, // Pass final image directly
             this));
     }
 

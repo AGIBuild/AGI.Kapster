@@ -86,16 +86,39 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                 // Convert window coordinates to screen coordinates
                 if (window is Window w)
                 {
-                    var p1 = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
-                    var p2 = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
+                    // Get the screen this window is on to determine DPI scaling
+                    var screen = w.Screens.ScreenFromWindow(w);
+                    if (screen == null)
+                    {
+                        Log.Warning("Could not determine screen for window");
+                        return null;
+                    }
+
+                    // Get DPI scaling factor
+                    var scaling = screen.Scaling;
+
+                    // PointToScreen in Avalonia should return physical pixel coordinates
+                    // But we need to ensure we're working with the correct coordinate system
+                    var topLeft = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
+                    var bottomRight = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
 
                     var screenRect = new PixelRect(
-                        Math.Min(p1.X, p2.X),
-                        Math.Min(p1.Y, p2.Y),
-                        Math.Max(1, Math.Abs(p2.X - p1.X)),
-                        Math.Max(1, Math.Abs(p2.Y - p1.Y)));
+                        Math.Min(topLeft.X, bottomRight.X),
+                        Math.Min(topLeft.Y, bottomRight.Y),
+                        Math.Max(1, Math.Abs(bottomRight.X - topLeft.X)),
+                        Math.Max(1, Math.Abs(bottomRight.Y - topLeft.Y)));
 
-                    return CaptureRegion(screenRect);
+                    Log.Debug("CaptureWindowRegion: DIP rect {WindowRect}, Screen scaling {Scaling}, Physical rect {ScreenRect}", 
+                        windowRect, scaling, screenRect);
+
+                    var bitmap = CaptureRegion(screenRect);
+                    
+                    if (bitmap != null)
+                    {
+                        Log.Debug("Captured bitmap: {W}x{H} pixels", bitmap.Width, bitmap.Height);
+                    }
+                    
+                    return bitmap;
                 }
                 else
                 {

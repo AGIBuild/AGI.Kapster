@@ -233,10 +233,11 @@ internal static class TacticalArrowBuilder
         var tailDepth = Math.Min(tailWidth * 0.5, totalLength * 0.08); // Limit tail depth to 8% of arrow length
         var geometry = BuildGeometry(leftEdge, rightEdge, headLeft, headRight, headTip, tailLeft, tailRight, start, tailTangent, tailDepth);
         
-        // Build gradient along the curve length for natural transparency transition
-        var fill = BuildCurveAlphaGradient(bodyPoints, baseColor);
+        // Build gradient along the curve length: linear opacity growth 0-80%, then maintain
+        var fill = BuildCurveAlphaGradientWithEarlySaturation(bodyPoints, baseColor);
         
-        var shadowBrush = new SolidColorBrush(Color.FromArgb(72, 0, 0, 0));
+        // Build shadow gradient: starts from 50% position and gradually increases
+        var shadowBrush = BuildCurveShadowGradient(bodyPoints);
         var shadowTransform = new TranslateTransform(ShadowOffset, ShadowOffset);
 
         return new TacticalArrowResult(geometry, fill, shadowBrush, shadowTransform, 0, sizeParams.NeckRatio);
@@ -388,14 +389,17 @@ internal static class TacticalArrowBuilder
     }
 
     // Build alpha gradient directly along the sampled curve length
-    private static IBrush BuildCurveAlphaGradient(List<(Point pos, Vector tangent, double t)> bodyPoints, Color baseColor)
+    /// <summary>
+    /// Build gradient that reaches full opacity at 80% of arrow length (linear growth)
+    /// </summary>
+    private static IBrush BuildCurveAlphaGradientWithEarlySaturation(List<(Point pos, Vector tangent, double t)> bodyPoints, Color baseColor)
     {
         if (bodyPoints == null || bodyPoints.Count < 2)
         {
             return new SolidColorBrush(baseColor);
         }
 
-        // Compute cumulative arc-length along samples to distribute gradient by real length
+        // Compute cumulative arc-length along samples
         var cumulative = new double[bodyPoints.Count];
         cumulative[0] = 0;
         for (int i = 1; i < bodyPoints.Count; i++)
@@ -412,30 +416,29 @@ internal static class TacticalArrowBuilder
             return new SolidColorBrush(baseColor);
         }
 
-        // Build many stops to avoid banding; fade covers the entire curve length
         var stops = new GradientStops();
-        const int stopCount = 64; // high resolution
+        const int stopCount = 64;
 
         // Tail fully transparent
         stops.Add(new GradientStop(Color.FromArgb(0, baseColor.R, baseColor.G, baseColor.B), 0.0));
 
         for (int i = 1; i < stopCount; i++)
         {
-            // Parameter by arc-length
             var s = i / (double)(stopCount - 1);
-            var targetLen = s * totalLength;
-
-            // Find nearest segment index by linear search (stopCount is small)
-            int idx = 1;
-            while (idx < cumulative.Length && cumulative[idx] < targetLen) idx++;
-            var prevLen = cumulative[idx - 1];
-            var nextLen = cumulative[idx];
-            var segT = (targetLen - prevLen) / Math.Max(nextLen - prevLen, 1e-6);
-
-            // Exponential alpha profile mapped to s (0..1) over full length
-            // alpha(s) = 1 - exp(-m*s), choose m=2.2 for natural growth
-            const double m = 2.2;
-            var alpha = 1.0 - Math.Exp(-m * s);
+            
+            double alpha;
+            if (s <= 0.8)
+            {
+                // From 0% to 80%: linear growth to full opacity
+                // Map s from [0, 0.8] to [0, 1]
+                alpha = s / 0.8;
+            }
+            else
+            {
+                // From 80% to 100%: maintain full opacity
+                alpha = 1.0;
+            }
+            
             alpha = Math.Clamp(alpha, 0.0, 1.0);
 
             var color = Color.FromArgb(
@@ -443,6 +446,60 @@ internal static class TacticalArrowBuilder
                 baseColor.R,
                 baseColor.G,
                 baseColor.B);
+
+            stops.Add(new GradientStop(color, s));
+        }
+
+        var start = bodyPoints[0].pos;
+        var end = bodyPoints[^1].pos;
+        return new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(start, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(end, RelativeUnit.Absolute),
+            GradientStops = stops,
+            SpreadMethod = GradientSpreadMethod.Pad
+        };
+    }
+
+    /// <summary>
+    /// Build shadow gradient that starts at 50% position and gradually increases
+    /// </summary>
+    private static IBrush BuildCurveShadowGradient(List<(Point pos, Vector tangent, double t)> bodyPoints)
+    {
+        if (bodyPoints == null || bodyPoints.Count < 2)
+        {
+            return new SolidColorBrush(Colors.Transparent);
+        }
+
+        var stops = new GradientStops();
+        const int stopCount = 64;
+
+        // Maximum shadow opacity (12% black)
+        const byte maxShadowAlpha = 30; // ~12% opacity
+
+        for (int i = 0; i < stopCount; i++)
+        {
+            var s = i / (double)(stopCount - 1);
+            
+            double shadowAlpha;
+            if (s < 0.5)
+            {
+                // From 0% to 50%: completely transparent (no shadow)
+                shadowAlpha = 0.0;
+            }
+            else
+            {
+                // From 50% to 100%: gradually increase shadow
+                // Map s from [0.5, 1.0] to [0, 1]
+                var normalizedS = (s - 0.5) * 2.0;
+                // Smooth curve for shadow intensity
+                shadowAlpha = Math.Pow(normalizedS, 1.5); // Power curve for smooth transition
+            }
+            
+            shadowAlpha = Math.Clamp(shadowAlpha, 0.0, 1.0);
+            var alpha = (byte)(shadowAlpha * maxShadowAlpha);
+
+            var color = Color.FromArgb(alpha, 0, 0, 0); // Black shadow
 
             stops.Add(new GradientStop(color, s));
         }
@@ -469,44 +526,59 @@ internal static class TacticalArrowBuilder
     
     private static ArrowSizeParameters ComputeSizeParameters(double baseLength, double userSize, ArrowLengthClass lengthClass)
     {
-        // New saturation function with better distribution: y(x) = min + (max - min) * (1 - e^(-k*x))
-        // This provides better differentiation across size 1-20 range
+        // Piecewise function: linear growth then saturation
+        // size 1-12: linear growth for clear differentiation
+        // size 12-20: smooth saturation to prevent excessive size
         var x = Math.Clamp(userSize, 1.0, 20.0);
         
-        // Improved saturation function with explicit min/max range
-        double SaturationFunc(double input, double min, double max, double k)
+        // Linear-then-saturate function with smooth transition
+        double LinearThenSaturate(double input, double min, double max, double linearThreshold = 12.0)
         {
-            var range = max - min;
-            return Math.Round(min + range * (1.0 - Math.Exp(-k * input)));
+            var normalized = (input - 1.0) / (20.0 - 1.0); // Map to [0, 1]
+            var thresholdT = (linearThreshold - 1.0) / (20.0 - 1.0);
+            
+            if (input <= linearThreshold)
+            {
+                // Linear phase: size 1-12 maps linearly to min to ~75% of range
+                var linearRatio = (input - 1.0) / (linearThreshold - 1.0);
+                return min + (max - min) * 0.75 * linearRatio;
+            }
+            else
+            {
+                // Saturation phase: size 12-20 maps smoothly from 75% to 100%
+                var saturationInput = (input - linearThreshold) / (20.0 - linearThreshold);
+                var saturationValue = 1.0 - Math.Exp(-3.0 * saturationInput); // Smooth approach to 1.0
+                return min + (max - min) * (0.75 + 0.25 * saturationValue);
+            }
         }
         
-        // Neck width: range 1-16px, k=0.18 for good spread with smaller minimum
-        // size=1: ~1.16px, size=7: ~8.7px, size=20: ~14.5px
-        var neckWidth = SaturationFunc(x, 1.0, 16.0, 0.18);
+        // Neck width: range 2-18px
+        // size=1: 2px, size=6: ~8.8px, size=12: 14.5px, size=20: ~17.7px
+        var neckWidth = LinearThenSaturate(x, 2.0, 18.0, 12.0);
         
-        // Ensure minimum width based on length class (reduced minimum values)
+        // Ensure minimum width based on length class
         double minNeckWidth = lengthClass switch
         {
-            ArrowLengthClass.Micro => 1.0,
-            ArrowLengthClass.Short => 1.5,
-            ArrowLengthClass.Medium => 2.0,
+            ArrowLengthClass.Micro => 2.5,
+            ArrowLengthClass.Short => 2.5,
+            ArrowLengthClass.Medium => 2.5,
             ArrowLengthClass.Long => 2.5,
             ArrowLengthClass.XLong => 3.0,
-            _ => 2.0
+            _ => 2.5
         };
         neckWidth = Math.Max(neckWidth, minNeckWidth);
         
         // Cap maximum neck width to prevent extreme sizes
         neckWidth = Math.Min(neckWidth, 28.0);
         
-        // Tail width: range 3-40px, k=0.14 for wider range with smaller minimum
-        // size=1: ~3.4px, size=7: ~19.8px, size=20: ~35.3px
-        var tailWidth = SaturationFunc(x, 3.0, 40.0, 0.14);
+        // Tail width: range 4-42px
+        // size=1: 4px, size=6: ~17.8px, size=12: 32.5px, size=20: ~41.3px
+        var tailWidth = LinearThenSaturate(x, 4.0, 42.0, 12.0);
         var tailNeckRatio = tailWidth / Math.Max(neckWidth, 1.0);
         
-        // Head base width: range 4-32px, k=0.15 for moderate growth with smaller minimum
-        // size=1: ~4.57px, size=7: ~20.5px, size=20: ~29.8px
-        var headBaseWidth = SaturationFunc(x, 4.0, 32.0, 0.15);
+        // Head base width: range 6-34px
+        // size=1: 6px, size=6: ~18.5px, size=12: 28px, size=20: ~33.5px
+        var headBaseWidth = LinearThenSaturate(x, 6.0, 34.0, 12.0);
         var headBaseMultiplier = headBaseWidth / Math.Max(neckWidth, 1.0);
         
         // Head length: proportional to head base width

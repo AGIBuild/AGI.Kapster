@@ -21,11 +21,6 @@ public interface IOverlayWindow : IDisposable
     void Close();
 
     /// <summary>
-    /// Sets the window to full screen mode on the specified screen
-    /// </summary>
-    void SetFullScreen(Screen screen);
-
-    /// <summary>
     /// Sets the window to cover a specific region
     /// </summary>
     void SetRegion(PixelRect region);
@@ -39,11 +34,6 @@ public interface IOverlayWindow : IDisposable
     /// Gets or sets whether element detection is enabled
     /// </summary>
     bool ElementDetectionEnabled { get; set; }
-
-    /// <summary>
-    /// Gets the screen this overlay is displayed on
-    /// </summary>
-    Screen? Screen { get; }
 
     /// <summary>
     /// Raised when a capture region is selected

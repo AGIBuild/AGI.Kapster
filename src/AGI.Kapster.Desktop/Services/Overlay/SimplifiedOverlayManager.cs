@@ -34,32 +34,33 @@ public class SimplifiedOverlayManager : IOverlayController
     {
         try
         {
-            Log.Information("Showing overlay windows");
+            Log.Information("Showing overlay window (single window covering all screens)");
 
             CloseAll(); // Clean up any existing windows
 
             var screens = GetAvailableScreens();
             if (screens == null || screens.Count == 0)
             {
-                Log.Warning("No screens available, creating default window");
-                var window = CreateWindow();
-                window.SetFullScreen(CreateDefaultScreen());
-                window.Show();
-                _windows.Add(window);
+                Log.Warning("No screens available, creating default window with fallback dimensions");
+                var defaultWindow = CreateWindow();
+                var defaultBounds = new PixelRect(0, 0, 1920, 1080);
+                defaultWindow.SetRegion(defaultBounds);
+                defaultWindow.Show();
+                _windows.Add(defaultWindow);
                 return;
             }
 
-            // Create an overlay window for each screen
-            foreach (var screen in screens)
-            {
-                Log.Debug("Creating overlay for screen: {Screen}", screen.DisplayName);
-                var window = CreateWindow();
-                window.SetFullScreen(screen);
-                window.Show();
-                _windows.Add(window);
-            }
+            // Calculate bounding box covering all screens (including negative coordinates)
+            var virtualDesktopBounds = CalculateVirtualDesktopBounds(screens);
+            Log.Information("Virtual desktop bounds: {Bounds}", virtualDesktopBounds);
 
-            Log.Information("Created {Count} overlay windows", _windows.Count);
+            // Create a single overlay window covering the entire virtual desktop
+            var overlayWindow = CreateWindow();
+            overlayWindow.SetRegion(virtualDesktopBounds);
+            overlayWindow.Show();
+            _windows.Add(overlayWindow);
+
+            Log.Information("Created single overlay window covering all screens");
         }
         catch (Exception ex)
         {
@@ -145,6 +146,20 @@ public class SimplifiedOverlayManager : IOverlayController
             var screens = tempWindow.Screens?.All?.ToList();
             tempWindow.Close();
 
+            if (screens != null)
+            {
+                Log.Information("Detected {Count} screen(s):", screens.Count);
+                foreach (var screen in screens)
+                {
+                    Log.Information("  Screen: {Name}, Primary={Primary}, Bounds={Bounds}, WorkingArea={WorkingArea}, Scaling={Scaling}", 
+                        screen.DisplayName ?? "(unnamed)", 
+                        screen.IsPrimary,
+                        screen.Bounds,
+                        screen.WorkingArea,
+                        screen.Scaling);
+                }
+            }
+
             return screens;
         }
         catch (Exception ex)
@@ -154,40 +169,58 @@ public class SimplifiedOverlayManager : IOverlayController
         }
     }
 
+    private PixelRect CalculateVirtualDesktopBounds(List<Screen> screens)
+    {
+        int minX = int.MaxValue;
+        int minY = int.MaxValue;
+        int maxX = int.MinValue;
+        int maxY = int.MinValue;
+
+        foreach (var screen in screens)
+        {
+            var bounds = screen.Bounds;
+            minX = Math.Min(minX, bounds.X);
+            minY = Math.Min(minY, bounds.Y);
+            maxX = Math.Max(maxX, bounds.X + bounds.Width);
+            maxY = Math.Max(maxY, bounds.Y + bounds.Height);
+        }
+
+        return new PixelRect(minX, minY, maxX - minX, maxY - minY);
+    }
+
     private async void OnRegionSelected(object? sender, CaptureRegionEventArgs e)
     {
         try
         {
-            Log.Information("Region selected: {Region}", e.Region);
+            Log.Information("Region selected: {W}x{H}", e.Region.Width, e.Region.Height);
 
-            if (_captureStrategy != null && _clipboardStrategy != null)
+            if (_clipboardStrategy == null)
             {
-                SkiaSharp.SKBitmap? bitmapToClipboard = null;
+                Log.Warning("Clipboard strategy not available");
+                return;
+            }
 
-                // Check if we have a composite image from OverlayWindow (macOS with annotations)
-                // The composite image is passed through CaptureTarget property
-                if (e.CaptureTarget is Avalonia.Media.Imaging.Bitmap compositeImage)
-                {
-                    Log.Debug("Using composite image with annotations from OverlayWindow");
-                    bitmapToClipboard = BitmapConverter.ConvertToSKBitmap(compositeImage);
-                }
+            // OverlayWindow always provides the final image through CaptureTarget
+            if (e.CaptureTarget is not Avalonia.Media.Imaging.Bitmap finalImage)
+            {
+                Log.Warning("No final image provided from OverlayWindow");
+                CloseAll();
+                return;
+            }
 
-                // If no composite image, capture directly by screen pixel rect (already in screen coords)
-                if (bitmapToClipboard == null)
-                {
-                    bitmapToClipboard = await _captureStrategy.CaptureRegionAsync(e.Region);
-                }
+            Log.Debug("Using final image from OverlayWindow: {W}x{H}", 
+                finalImage.PixelSize.Width, finalImage.PixelSize.Height);
 
-                if (bitmapToClipboard != null)
-                {
-                    // Copy to clipboard
-                    var success = await _clipboardStrategy.SetImageAsync(bitmapToClipboard);
-                    Log.Information("Screenshot copied to clipboard: {Success}", success);
-                }
-                else
-                {
-                    Log.Warning("Failed to capture region");
-                }
+            var skBitmap = BitmapConverter.ConvertToSKBitmap(finalImage);
+            if (skBitmap != null)
+            {
+                // Copy to clipboard
+                var success = await _clipboardStrategy.SetImageAsync(skBitmap);
+                Log.Information("Screenshot copied to clipboard: {Success}", success);
+            }
+            else
+            {
+                Log.Warning("Failed to convert final image to SKBitmap");
             }
 
             CloseAll();
@@ -218,13 +251,4 @@ public class SimplifiedOverlayManager : IOverlayController
         }
     }
 
-    private Screen CreateDefaultScreen()
-    {
-        return new Screen(
-            1.0,
-            new PixelRect(0, 0, 1920, 1080),
-            new PixelRect(0, 0, 1920, 1080),
-            true
-        );
-    }
 }

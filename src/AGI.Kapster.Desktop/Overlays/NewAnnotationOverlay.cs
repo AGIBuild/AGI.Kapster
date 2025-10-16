@@ -451,7 +451,6 @@ public sealed class NewAnnotationOverlay : Canvas
         {
             // Drawing tool selected and inside selection - FORCE cross cursor
             Cursor = new Cursor(StandardCursorType.Cross);
-            Log.Information("OnPointerMoved: FORCING Cross cursor - CurrentTool={CurrentTool}, InSelection={InSelection}", CurrentTool, pointInSelection);
         }
         else
         {

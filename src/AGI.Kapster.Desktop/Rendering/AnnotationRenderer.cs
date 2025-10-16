@@ -27,7 +27,6 @@ public class AnnotationRenderer : IAnnotationRenderer
 
     // Path instance pool to reduce allocations
     private readonly Stack<Path> _pathPool = new();
-    private readonly SolidColorBrush _arrowShadowBrush = new SolidColorBrush(Colors.Black, 0.08);
 
     // Geometry pools for shapes with reusable local coordinates
     private readonly Dictionary<(int w, int h), RectangleGeometry> _rectGeomPool = new();
@@ -259,17 +258,18 @@ public class AnnotationRenderer : IAnnotationRenderer
         var arrowCanvas = new Canvas();
 
         // Create shadow and body paths
+        // Shadow uses gradient that only applies to the rear 50% of the arrow
         var shadowPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
-        shadowPath.Fill = _arrowShadowBrush;
         shadowPath.Stroke = null;
-        shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
+
         var bodyPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
         bodyPath.Stroke = null;
 
+        // Add shadow first (bottom layer), then body (top layer)
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
 
-        // Build or reuse full arrow result (geometry + fill/shadow)
+        // Build or reuse full arrow result (geometry + fill + shadow gradient)
         var version = ComputeArrowVersion(arrow);
         TacticalArrowBuilder.TacticalArrowResult result;
         if (_arrowCache.TryGetValue(arrow.Id, out var cachedArrow) && cachedArrow.version == version)
@@ -284,10 +284,12 @@ public class AnnotationRenderer : IAnnotationRenderer
             _geometryCache[arrow.Id] = (result.Geometry, bounds, version);
         }
 
+        // Apply geometry and styling to both layers
         bodyPath.Data = result.Geometry;
-        shadowPath.Data = result.Geometry;
         bodyPath.Fill = result.Fill;
         bodyPath.Stroke = null;
+
+        shadowPath.Data = result.Geometry;
         shadowPath.Fill = result.ShadowFill;
         shadowPath.Stroke = null;
         shadowPath.RenderTransform = result.ShadowTransform;
@@ -335,10 +337,15 @@ public class AnnotationRenderer : IAnnotationRenderer
         var version = ComputeEllipseVersion(ellipse);
         if (!_geometryCache.TryGetValue(ellipse.Id, out var cached) || cached.version != version)
         {
-            var key = ((int)Math.Round(ellipse.BoundingRect.Width), (int)Math.Round(ellipse.BoundingRect.Height));
+            // Use center point and radii instead of Rect to avoid coordinate offset issues
+            var radiusX = ellipse.BoundingRect.Width / 2.0;
+            var radiusY = ellipse.BoundingRect.Height / 2.0;
+            var key = ((int)Math.Round(radiusX * 2), (int)Math.Round(radiusY * 2));
+            
             if (!_ellipseGeomPool.TryGetValue(key, out var eg))
             {
-                eg = new EllipseGeometry(new Rect(0, 0, key.Item1, key.Item2));
+                // Create ellipse at origin with center at (radiusX, radiusY)
+                eg = new EllipseGeometry(new Rect(0, 0, radiusX * 2, radiusY * 2));
                 _ellipseGeomPool[key] = eg;
             }
             _geometryCache[ellipse.Id] = (eg, ellipse.Bounds, version);
@@ -351,8 +358,14 @@ public class AnnotationRenderer : IAnnotationRenderer
         path.StrokeThickness = ellipse.Style.StrokeWidth;
         path.Fill = ellipse.Style.FillMode != FillMode.None ? CreateBrush(ellipse.Style.FillColor) : Brushes.Transparent;
         path.Opacity = ellipse.Style.Opacity;
-        Canvas.SetLeft(path, ellipse.BoundingRect.X);
-        Canvas.SetTop(path, ellipse.BoundingRect.Y);
+        
+        // Position the ellipse: BoundingRect is top-left corner, but EllipseGeometry's Rect is centered
+        // So we need to position at BoundingRect top-left directly
+        var left = ellipse.BoundingRect.X;
+        var top = ellipse.BoundingRect.Y;
+        
+        Canvas.SetLeft(path, left);
+        Canvas.SetTop(path, top);
         canvas.Children.Add(path);
         controls.Add(path);
     }
@@ -399,8 +412,6 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         if (string.IsNullOrEmpty(text.Text)) return;
 
-        // Ensure we don't have duplicate text renders for the same annotation
-        // by using the annotation ID as a unique identifier
         var textBlock = new TextBlock
         {
             Text = text.Text,
@@ -409,10 +420,14 @@ public class AnnotationRenderer : IAnnotationRenderer
             FontWeight = text.Style.FontWeight,
             FontStyle = text.Style.FontStyle,
             Foreground = CreateBrush(text.Style.StrokeColor),
+            Background = Brushes.Transparent,
             Opacity = text.Style.Opacity,
-            // Add unique name to help identify and prevent duplicates
+            UseLayoutRounding = false,
             Name = $"TextAnnotation_{text.Id}"
         };
+
+        // Use grayscale antialiasing instead of subpixel to prevent color fringes on transparent background
+        RenderOptions.SetTextRenderingMode(textBlock, TextRenderingMode.Antialias);
 
         Canvas.SetLeft(textBlock, text.Position.X);
         Canvas.SetTop(textBlock, text.Position.Y);
