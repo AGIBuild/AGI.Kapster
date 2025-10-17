@@ -38,6 +38,8 @@ public partial class OverlayWindow : Window
 
 	// Frozen background (snapshot at overlay activation)
 	private Bitmap? _frozenBackground;
+	// Pre-captured Avalonia bitmap set before Show() for instant display
+	private Bitmap? _precapturedBackground;
 
     // Public events for external consumers
     public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
@@ -54,8 +56,59 @@ public partial class OverlayWindow : Window
     {
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
+        
+        // Fast initialization: only XAML parsing
         InitializeComponent();
 
+        // Minimal setup for immediate display
+        this.Cursor = new Cursor(StandardCursorType.Cross);
+        _isElementPickerMode = false;
+        _hasEditableSelection = false;
+
+        // Set up mouse event handlers for element selection
+        this.PointerPressed += OnOverlayPointerPressed;
+        this.PointerMoved += OnOverlayPointerMoved;
+
+		// Opened event: display background immediately, then initialize heavy components
+		this.Opened += async (_, __) =>
+		{
+		    // Display pre-captured background immediately if available
+		    if (_precapturedBackground != null)
+		    {
+		        if (this.FindControl<Image>("BackgroundImage") is { } img)
+		        {
+		            img.Source = _precapturedBackground;
+		            _frozenBackground = _precapturedBackground;
+		        }
+		    }
+		    else
+		    {
+		        // Fallback: async capture if no pre-captured background
+		        await InitializeFrozenBackgroundAsync();
+		    }
+		    
+		    UpdateMaskForSelection(default);
+		    
+		    // Initialize heavy components asynchronously after background is visible
+		    _ = Task.Run(async () =>
+		    {
+		        await Task.Delay(10);
+		        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+		        {
+		            InitializeHeavyComponents();
+		        });
+		    });
+		};
+
+		// Set focus to annotator when window is loaded
+		this.Loaded += OnOverlayWindowLoaded;
+    }
+
+    /// <summary>
+    /// Initialize heavy UI components (Annotator, Toolbar, ElementHighlight) after background is visible
+    /// </summary>
+    private void InitializeHeavyComponents()
+    {
         // Create settings service instance for this overlay session
         var settingsService = new SettingsService();
 
@@ -88,10 +141,6 @@ public partial class OverlayWindow : Window
 
         SetupElementHighlight();
 
-        // Start in free selection mode by default
-        _isElementPickerMode = false;
-        _hasEditableSelection = false;
-
         if (_elementDetector != null && _elementHighlight != null)
         {
             _elementHighlight.IsActive = false; // Initially disabled
@@ -104,29 +153,6 @@ public partial class OverlayWindow : Window
             selectorOverlay.IsVisible = true;
             selectorOverlay.IsHitTestVisible = true;
         }
-
-        // Set initial cursor for free selection mode
-        this.Cursor = new Cursor(StandardCursorType.Cross);
-
-        Log.Information("OverlayWindow created with default free selection mode");
-
-        Log.Information("OverlayWindow created {W}x{H}", Width, Height);
-
-        // Set up mouse event handlers for element selection
-        this.PointerPressed += OnOverlayPointerPressed;
-        this.PointerMoved += OnOverlayPointerMoved;
-
-		// Set focus to annotator when window is loaded
-		this.Loaded += OnOverlayWindowLoaded;
-		// Initialize frozen background on open
-		this.Opened += async (_, __) =>
-		{
-		    await InitializeFrozenBackgroundAsync();
-		    // Initialize mask after window is fully opened
-		    UpdateMaskForSelection(default);
-		    Log.Information("OverlayWindow opened: Position={Pos}, Size={W}x{H}, Bounds={Bounds}", 
-		        Position, Width, Height, Bounds);
-		};
 
         // Setup selection overlay
         SetupSelectionOverlay();
@@ -144,6 +170,14 @@ public partial class OverlayWindow : Window
             this.Focus();
             Log.Debug("Focus also set to overlay window");
         }
+    }
+
+    /// <summary>
+    /// Set pre-captured Avalonia bitmap for instant display (called before Show())
+    /// </summary>
+    public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
+    {
+        _precapturedBackground = bitmap;
     }
 
     private async Task InitializeFrozenBackgroundAsync()

@@ -20,9 +20,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
     public bool SupportsElementCapture => true;
     public bool IsHardwareAccelerated => false; // Can be enhanced with DXGI later
 
-    public async Task<SKBitmap?> CaptureFullScreenAsync(Screen screen)
+    public Task<SKBitmap?> CaptureFullScreenAsync(Screen screen)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -41,13 +41,12 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         });
     }
 
-    public async Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
+    public Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
-                // Get window bounds
                 if (!GetWindowRect(windowHandle, out RECT rect))
                 {
                     Log.Warning("Failed to get window rect for handle {Handle}", windowHandle);
@@ -65,9 +64,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         });
     }
 
-    public async Task<SKBitmap?> CaptureRegionAsync(PixelRect region)
+    public Task<SKBitmap?> CaptureRegionAsync(PixelRect region)
     {
-        return await Task.Run(() => CaptureRegion(region));
+        return Task.Run(() => CaptureRegion(region));
     }
 
     public async Task<SKBitmap?> CaptureElementAsync(IElementInfo element)
@@ -77,9 +76,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         return await CaptureRegionAsync(element.Bounds);
     }
 
-    public async Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
+    public Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using AGI.Kapster.Desktop.Overlays;
 using Microsoft.Extensions.DependencyInjection;
@@ -88,6 +89,16 @@ public class MacOverlayWindow : IOverlayWindow
         _window.WindowState = WindowState.Normal;
 
         Log.Debug("macOS overlay window set to region {Region}", region);
+    }
+
+    public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
+    {
+        if (_window == null)
+        {
+            CreateWindow();
+        }
+
+        _window!.SetPrecapturedAvaloniaBitmap(bitmap);
     }
 
     private void CreateWindow()

@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using SkiaSharp;
 
@@ -24,6 +25,11 @@ public interface IOverlayWindow : IDisposable
     /// Sets the window to cover a specific region
     /// </summary>
     void SetRegion(PixelRect region);
+
+    /// <summary>
+    /// Sets pre-captured Avalonia bitmap for instant display (called before Show())
+    /// </summary>
+    void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap);
 
     /// <summary>
     /// Gets whether the window is currently visible

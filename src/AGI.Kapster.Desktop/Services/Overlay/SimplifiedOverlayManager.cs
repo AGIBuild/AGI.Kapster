@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
@@ -30,18 +31,17 @@ public class SimplifiedOverlayManager : IOverlayController
 
     public bool IsActive => _windows.Count > 0;
 
-    public void ShowAll()
+    public async void ShowAll()
     {
         try
         {
             Log.Information("Showing overlay window (single window covering all screens)");
-
-            CloseAll(); // Clean up any existing windows
+            CloseAll();
 
             var screens = GetAvailableScreens();
             if (screens == null || screens.Count == 0)
             {
-                Log.Warning("No screens available, creating default window with fallback dimensions");
+                Log.Warning("No screens available, using default fallback bounds");
                 var defaultWindow = CreateWindow();
                 var defaultBounds = new PixelRect(0, 0, 1920, 1080);
                 defaultWindow.SetRegion(defaultBounds);
@@ -50,22 +50,50 @@ public class SimplifiedOverlayManager : IOverlayController
                 return;
             }
 
-            // Calculate bounding box covering all screens (including negative coordinates)
             var virtualDesktopBounds = CalculateVirtualDesktopBounds(screens);
-            Log.Information("Virtual desktop bounds: {Bounds}", virtualDesktopBounds);
+            
+            // Pre-capture background for instant display
+            var skBitmap = await PrecaptureBackgroundAsync(virtualDesktopBounds);
+            var avaloniaBitmap = skBitmap != null ? BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap) : null;
+            
+            if (avaloniaBitmap == null && skBitmap != null)
+            {
+                // Fallback to slow path if fast conversion failed
+                avaloniaBitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+            }
 
-            // Create a single overlay window covering the entire virtual desktop
+            // Create window and set pre-captured background before Show()
             var overlayWindow = CreateWindow();
             overlayWindow.SetRegion(virtualDesktopBounds);
+            
+            if (avaloniaBitmap != null)
+            {
+                overlayWindow.SetPrecapturedAvaloniaBitmap(avaloniaBitmap);
+            }
+
             overlayWindow.Show();
             _windows.Add(overlayWindow);
-
-            Log.Information("Created single overlay window covering all screens");
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show overlay windows");
             CloseAll();
+        }
+    }
+
+    private async Task<SkiaSharp.SKBitmap?> PrecaptureBackgroundAsync(PixelRect bounds)
+    {
+        if (_captureStrategy == null)
+            return null;
+
+        try
+        {
+            return await _captureStrategy.CaptureRegionAsync(bounds);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to pre-capture background");
+            return null;
         }
     }
 
@@ -148,16 +176,7 @@ public class SimplifiedOverlayManager : IOverlayController
 
             if (screens != null)
             {
-                Log.Information("Detected {Count} screen(s):", screens.Count);
-                foreach (var screen in screens)
-                {
-                    Log.Information("  Screen: {Name}, Primary={Primary}, Bounds={Bounds}, WorkingArea={WorkingArea}, Scaling={Scaling}", 
-                        screen.DisplayName ?? "(unnamed)", 
-                        screen.IsPrimary,
-                        screen.Bounds,
-                        screen.WorkingArea,
-                        screen.Scaling);
-                }
+                Log.Debug("Detected {Count} screen(s)", screens.Count);
             }
 
             return screens;

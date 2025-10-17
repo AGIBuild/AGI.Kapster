@@ -481,9 +481,9 @@ public class ExportService : IExportService
     /// <summary>
     /// Convert Avalonia bitmap to SkiaSharp bitmap with optimal quality preservation
     /// </summary>
-    private async Task<SKBitmap> ConvertToSkiaBitmapAsync(Bitmap avaloniabitmap, ExportSettings settings)
+    private Task<SKBitmap> ConvertToSkiaBitmapAsync(Bitmap avaloniabitmap, ExportSettings settings)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -539,9 +539,9 @@ public class ExportService : IExportService
     /// <summary>
     /// Save SkiaSharp bitmap with specific format and quality settings
     /// </summary>
-    private async Task SaveSkiaBitmapAsync(SKBitmap bitmap, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
+    private Task SaveSkiaBitmapAsync(SKBitmap bitmap, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
     {
-        await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {

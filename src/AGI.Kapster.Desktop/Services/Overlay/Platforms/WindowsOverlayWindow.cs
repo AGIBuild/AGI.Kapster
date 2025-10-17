@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using AGI.Kapster.Desktop.Overlays;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,6 +92,16 @@ public class WindowsOverlayWindow : IOverlayWindow
 
         Log.Information("Windows overlay window set to region {Region}, DIPs: {W}x{H}, Scale: {SX}x{SY}", 
             region, widthDip, heightDip, scaleX, scaleY);
+    }
+
+    public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
+    {
+        if (_window == null)
+        {
+            CreateWindow();
+        }
+
+        _window!.SetPrecapturedAvaloniaBitmap(bitmap);
     }
 
     private void CreateWindow()
