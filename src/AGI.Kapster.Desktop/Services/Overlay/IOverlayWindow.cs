@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using SkiaSharp;
 
@@ -21,14 +22,14 @@ public interface IOverlayWindow : IDisposable
     void Close();
 
     /// <summary>
-    /// Sets the window to full screen mode on the specified screen
-    /// </summary>
-    void SetFullScreen(Screen screen);
-
-    /// <summary>
     /// Sets the window to cover a specific region
     /// </summary>
     void SetRegion(PixelRect region);
+
+    /// <summary>
+    /// Sets pre-captured Avalonia bitmap for instant display (called before Show())
+    /// </summary>
+    void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap);
 
     /// <summary>
     /// Gets whether the window is currently visible
@@ -39,11 +40,6 @@ public interface IOverlayWindow : IDisposable
     /// Gets or sets whether element detection is enabled
     /// </summary>
     bool ElementDetectionEnabled { get; set; }
-
-    /// <summary>
-    /// Gets the screen this overlay is displayed on
-    /// </summary>
-    Screen? Screen { get; }
 
     /// <summary>
     /// Raised when a capture region is selected

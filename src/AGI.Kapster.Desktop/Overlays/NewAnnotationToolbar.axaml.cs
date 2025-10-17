@@ -51,6 +51,7 @@ public partial class NewAnnotationToolbar : UserControl
         var ellipseButton = this.FindControl<ToggleButton>("EllipseToolButton")!;
         var textButton = this.FindControl<ToggleButton>("TextToolButton")!;
         var freehandButton = this.FindControl<ToggleButton>("FreehandToolButton")!;
+        var mosaicButton = this.FindControl<ToggleButton>("MosaicToolButton")!;
 
         // Set tooltips with hotkeys
         ToolTip.SetTip(selectButton, $"Select Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.None)})");
@@ -59,6 +60,7 @@ public partial class NewAnnotationToolbar : UserControl
         ToolTip.SetTip(ellipseButton, $"Ellipse Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Ellipse)})");
         ToolTip.SetTip(textButton, $"Text Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Text)})");
         ToolTip.SetTip(freehandButton, $"Freehand Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Freehand)})");
+        ToolTip.SetTip(mosaicButton, $"Mosaic Tool ({AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Mosaic)})");
 
         _toolButtons.Add(selectButton);
         _toolButtons.Add(arrowButton);
@@ -66,6 +68,7 @@ public partial class NewAnnotationToolbar : UserControl
         _toolButtons.Add(ellipseButton);
         _toolButtons.Add(textButton);
         _toolButtons.Add(freehandButton);
+        _toolButtons.Add(mosaicButton);
 
         // Setup event handlers for tool buttons
         foreach (var button in _toolButtons)
@@ -617,6 +620,7 @@ public partial class NewAnnotationToolbar : UserControl
             AnnotationToolType.Ellipse => this.FindControl<ToggleButton>("EllipseToolButton"),
             AnnotationToolType.Text => this.FindControl<ToggleButton>("TextToolButton"),
             AnnotationToolType.Freehand => this.FindControl<ToggleButton>("FreehandToolButton"),
+            AnnotationToolType.Mosaic => this.FindControl<ToggleButton>("MosaicToolButton"),
             AnnotationToolType.Emoji => this.FindControl<ToggleButton>("EmojiToolButton"),
             _ => this.FindControl<ToggleButton>("SelectToolButton")
         };

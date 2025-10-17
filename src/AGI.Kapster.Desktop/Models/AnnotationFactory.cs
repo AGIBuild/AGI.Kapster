@@ -79,6 +79,14 @@ public static class AnnotationFactory
     }
 
     /// <summary>
+    /// Create brush-style mosaic annotation
+    /// </summary>
+    public static MosaicAnnotation CreateMosaic(IAnnotationStyle? style = null, int brushSize = 20, int pixelSize = 8)
+    {
+        return new MosaicAnnotation(style, brushSize, pixelSize);
+    }
+
+    /// <summary>
     /// 从序列化数据创建标注项
     /// </summary>
     public static IAnnotationItem? CreateFromData(Dictionary<string, object> data)
@@ -97,6 +105,7 @@ public static class AnnotationFactory
             AnnotationType.Text => new TextAnnotation(new Point(0, 0)),
             AnnotationType.Freehand => new FreehandAnnotation(),
             AnnotationType.Emoji => new EmojiAnnotation(new Point(0, 0)),
+            AnnotationType.Mosaic => new MosaicAnnotation(),
             _ => null
         };
 
@@ -117,6 +126,7 @@ public static class AnnotationFactory
             AnnotationType.Text => AnnotationStyle.CreateTextStyle(Color.FromRgb(255, 0, 0), 16),
             AnnotationType.Freehand => AnnotationStyle.CreateShapeStyle(Color.FromRgb(255, 0, 0), 3.0),
             AnnotationType.Emoji => AnnotationStyle.CreateTextStyle(Color.FromRgb(255, 255, 255), 32),
+            AnnotationType.Mosaic => AnnotationStyle.CreateShapeStyle(Color.FromRgb(128, 128, 128), 10),
             _ => new AnnotationStyle()
         };
     }

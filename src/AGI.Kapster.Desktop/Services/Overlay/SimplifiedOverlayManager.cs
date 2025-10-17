@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
@@ -30,41 +31,69 @@ public class SimplifiedOverlayManager : IOverlayController
 
     public bool IsActive => _windows.Count > 0;
 
-    public void ShowAll()
+    public async Task ShowAll()
     {
         try
         {
-            Log.Information("Showing overlay windows");
-
-            CloseAll(); // Clean up any existing windows
+            Log.Information("Showing overlay window (single window covering all screens)");
+            CloseAll();
 
             var screens = GetAvailableScreens();
             if (screens == null || screens.Count == 0)
             {
-                Log.Warning("No screens available, creating default window");
-                var window = CreateWindow();
-                window.SetFullScreen(CreateDefaultScreen());
-                window.Show();
-                _windows.Add(window);
+                Log.Warning("No screens available, using default fallback bounds");
+                var defaultWindow = CreateWindow();
+                var defaultBounds = new PixelRect(0, 0, 1920, 1080);
+                defaultWindow.SetRegion(defaultBounds);
+                defaultWindow.Show();
+                _windows.Add(defaultWindow);
                 return;
             }
 
-            // Create an overlay window for each screen
-            foreach (var screen in screens)
+            var virtualDesktopBounds = CalculateVirtualDesktopBounds(screens);
+            
+            // Pre-capture background for instant display
+            var skBitmap = await PrecaptureBackgroundAsync(virtualDesktopBounds);
+            var avaloniaBitmap = skBitmap != null ? BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap) : null;
+            
+            if (avaloniaBitmap == null && skBitmap != null)
             {
-                Log.Debug("Creating overlay for screen: {Screen}", screen.DisplayName);
-                var window = CreateWindow();
-                window.SetFullScreen(screen);
-                window.Show();
-                _windows.Add(window);
+                // Fallback to slow path if fast conversion failed
+                avaloniaBitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
             }
 
-            Log.Information("Created {Count} overlay windows", _windows.Count);
+            // Create window and set pre-captured background before Show()
+            var overlayWindow = CreateWindow();
+            overlayWindow.SetRegion(virtualDesktopBounds);
+            
+            if (avaloniaBitmap != null)
+            {
+                overlayWindow.SetPrecapturedAvaloniaBitmap(avaloniaBitmap);
+            }
+
+            overlayWindow.Show();
+            _windows.Add(overlayWindow);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to show overlay windows");
             CloseAll();
+        }
+    }
+
+    private async Task<SkiaSharp.SKBitmap?> PrecaptureBackgroundAsync(PixelRect bounds)
+    {
+        if (_captureStrategy == null)
+            return null;
+
+        try
+        {
+            return await _captureStrategy.CaptureRegionAsync(bounds);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to pre-capture background");
+            return null;
         }
     }
 
@@ -145,6 +174,11 @@ public class SimplifiedOverlayManager : IOverlayController
             var screens = tempWindow.Screens?.All?.ToList();
             tempWindow.Close();
 
+            if (screens != null)
+            {
+                Log.Debug("Detected {Count} screen(s)", screens.Count);
+            }
+
             return screens;
         }
         catch (Exception ex)
@@ -154,40 +188,58 @@ public class SimplifiedOverlayManager : IOverlayController
         }
     }
 
+    private PixelRect CalculateVirtualDesktopBounds(List<Screen> screens)
+    {
+        int minX = int.MaxValue;
+        int minY = int.MaxValue;
+        int maxX = int.MinValue;
+        int maxY = int.MinValue;
+
+        foreach (var screen in screens)
+        {
+            var bounds = screen.Bounds;
+            minX = Math.Min(minX, bounds.X);
+            minY = Math.Min(minY, bounds.Y);
+            maxX = Math.Max(maxX, bounds.X + bounds.Width);
+            maxY = Math.Max(maxY, bounds.Y + bounds.Height);
+        }
+
+        return new PixelRect(minX, minY, maxX - minX, maxY - minY);
+    }
+
     private async void OnRegionSelected(object? sender, CaptureRegionEventArgs e)
     {
         try
         {
-            Log.Information("Region selected: {Region}", e.Region);
+            Log.Information("Region selected: {W}x{H}", e.Region.Width, e.Region.Height);
 
-            if (_captureStrategy != null && _clipboardStrategy != null)
+            if (_clipboardStrategy == null)
             {
-                SkiaSharp.SKBitmap? bitmapToClipboard = null;
+                Log.Warning("Clipboard strategy not available");
+                return;
+            }
 
-                // Check if we have a composite image from OverlayWindow (macOS with annotations)
-                // The composite image is passed through CaptureTarget property
-                if (e.CaptureTarget is Avalonia.Media.Imaging.Bitmap compositeImage)
-                {
-                    Log.Debug("Using composite image with annotations from OverlayWindow");
-                    bitmapToClipboard = BitmapConverter.ConvertToSKBitmap(compositeImage);
-                }
+            // OverlayWindow always provides the final image through CaptureTarget
+            if (e.CaptureTarget is not Avalonia.Media.Imaging.Bitmap finalImage)
+            {
+                Log.Warning("No final image provided from OverlayWindow");
+                CloseAll();
+                return;
+            }
 
-                // If no composite image, capture directly by screen pixel rect (already in screen coords)
-                if (bitmapToClipboard == null)
-                {
-                    bitmapToClipboard = await _captureStrategy.CaptureRegionAsync(e.Region);
-                }
+            Log.Debug("Using final image from OverlayWindow: {W}x{H}", 
+                finalImage.PixelSize.Width, finalImage.PixelSize.Height);
 
-                if (bitmapToClipboard != null)
-                {
-                    // Copy to clipboard
-                    var success = await _clipboardStrategy.SetImageAsync(bitmapToClipboard);
-                    Log.Information("Screenshot copied to clipboard: {Success}", success);
-                }
-                else
-                {
-                    Log.Warning("Failed to capture region");
-                }
+            var skBitmap = BitmapConverter.ConvertToSKBitmap(finalImage);
+            if (skBitmap != null)
+            {
+                // Copy to clipboard
+                var success = await _clipboardStrategy.SetImageAsync(skBitmap);
+                Log.Information("Screenshot copied to clipboard: {Success}", success);
+            }
+            else
+            {
+                Log.Warning("Failed to convert final image to SKBitmap");
             }
 
             CloseAll();
@@ -218,13 +270,4 @@ public class SimplifiedOverlayManager : IOverlayController
         }
     }
 
-    private Screen CreateDefaultScreen()
-    {
-        return new Screen(
-            1.0,
-            new PixelRect(0, 0, 1920, 1080),
-            new PixelRect(0, 0, 1920, 1080),
-            true
-        );
-    }
 }

@@ -27,7 +27,6 @@ public class AnnotationRenderer : IAnnotationRenderer
 
     // Path instance pool to reduce allocations
     private readonly Stack<Path> _pathPool = new();
-    private readonly SolidColorBrush _arrowShadowBrush = new SolidColorBrush(Colors.Black, 0.08);
 
     // Geometry pools for shapes with reusable local coordinates
     private readonly Dictionary<(int w, int h), RectangleGeometry> _rectGeomPool = new();
@@ -67,6 +66,9 @@ public class AnnotationRenderer : IAnnotationRenderer
                 break;
             case EmojiAnnotation emoji:
                 RenderEmoji(canvas, emoji, controls);
+                break;
+            case MosaicAnnotation mosaic:
+                RenderMosaic(canvas, mosaic, controls);
                 break;
         }
 
@@ -259,17 +261,18 @@ public class AnnotationRenderer : IAnnotationRenderer
         var arrowCanvas = new Canvas();
 
         // Create shadow and body paths
+        // Shadow uses gradient that only applies to the rear 50% of the arrow
         var shadowPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
-        shadowPath.Fill = _arrowShadowBrush;
         shadowPath.Stroke = null;
-        shadowPath.RenderTransform = new TranslateTransform(1.0, 1.0);
+
         var bodyPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
         bodyPath.Stroke = null;
 
+        // Add shadow first (bottom layer), then body (top layer)
         arrowCanvas.Children.Add(shadowPath);
         arrowCanvas.Children.Add(bodyPath);
 
-        // Build or reuse full arrow result (geometry + fill/shadow)
+        // Build or reuse full arrow result (geometry + fill + shadow gradient)
         var version = ComputeArrowVersion(arrow);
         TacticalArrowBuilder.TacticalArrowResult result;
         if (_arrowCache.TryGetValue(arrow.Id, out var cachedArrow) && cachedArrow.version == version)
@@ -284,10 +287,12 @@ public class AnnotationRenderer : IAnnotationRenderer
             _geometryCache[arrow.Id] = (result.Geometry, bounds, version);
         }
 
+        // Apply geometry and styling to both layers
         bodyPath.Data = result.Geometry;
-        shadowPath.Data = result.Geometry;
         bodyPath.Fill = result.Fill;
         bodyPath.Stroke = null;
+
+        shadowPath.Data = result.Geometry;
         shadowPath.Fill = result.ShadowFill;
         shadowPath.Stroke = null;
         shadowPath.RenderTransform = result.ShadowTransform;
@@ -335,10 +340,15 @@ public class AnnotationRenderer : IAnnotationRenderer
         var version = ComputeEllipseVersion(ellipse);
         if (!_geometryCache.TryGetValue(ellipse.Id, out var cached) || cached.version != version)
         {
-            var key = ((int)Math.Round(ellipse.BoundingRect.Width), (int)Math.Round(ellipse.BoundingRect.Height));
+            // Use center point and radii instead of Rect to avoid coordinate offset issues
+            var radiusX = ellipse.BoundingRect.Width / 2.0;
+            var radiusY = ellipse.BoundingRect.Height / 2.0;
+            var key = ((int)Math.Round(radiusX * 2), (int)Math.Round(radiusY * 2));
+            
             if (!_ellipseGeomPool.TryGetValue(key, out var eg))
             {
-                eg = new EllipseGeometry(new Rect(0, 0, key.Item1, key.Item2));
+                // Create ellipse at origin with center at (radiusX, radiusY)
+                eg = new EllipseGeometry(new Rect(0, 0, radiusX * 2, radiusY * 2));
                 _ellipseGeomPool[key] = eg;
             }
             _geometryCache[ellipse.Id] = (eg, ellipse.Bounds, version);
@@ -351,8 +361,14 @@ public class AnnotationRenderer : IAnnotationRenderer
         path.StrokeThickness = ellipse.Style.StrokeWidth;
         path.Fill = ellipse.Style.FillMode != FillMode.None ? CreateBrush(ellipse.Style.FillColor) : Brushes.Transparent;
         path.Opacity = ellipse.Style.Opacity;
-        Canvas.SetLeft(path, ellipse.BoundingRect.X);
-        Canvas.SetTop(path, ellipse.BoundingRect.Y);
+        
+        // Position the ellipse: BoundingRect is top-left corner, but EllipseGeometry's Rect is centered
+        // So we need to position at BoundingRect top-left directly
+        var left = ellipse.BoundingRect.X;
+        var top = ellipse.BoundingRect.Y;
+        
+        Canvas.SetLeft(path, left);
+        Canvas.SetTop(path, top);
         canvas.Children.Add(path);
         controls.Add(path);
     }
@@ -399,8 +415,6 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         if (string.IsNullOrEmpty(text.Text)) return;
 
-        // Ensure we don't have duplicate text renders for the same annotation
-        // by using the annotation ID as a unique identifier
         var textBlock = new TextBlock
         {
             Text = text.Text,
@@ -409,10 +423,14 @@ public class AnnotationRenderer : IAnnotationRenderer
             FontWeight = text.Style.FontWeight,
             FontStyle = text.Style.FontStyle,
             Foreground = CreateBrush(text.Style.StrokeColor),
+            Background = Brushes.Transparent,
             Opacity = text.Style.Opacity,
-            // Add unique name to help identify and prevent duplicates
+            UseLayoutRounding = false,
             Name = $"TextAnnotation_{text.Id}"
         };
+
+        // Use grayscale antialiasing instead of subpixel to prevent color fringes on transparent background
+        RenderOptions.SetTextRenderingMode(textBlock, TextRenderingMode.Antialias);
 
         Canvas.SetLeft(textBlock, text.Position.X);
         Canvas.SetTop(textBlock, text.Position.Y);
@@ -926,6 +944,126 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         canvas.Children.Add(textBlock);
         controls.Add(textBlock);
+    }
+
+    /// <summary>
+    /// Render brush-style mosaic annotation along trail points
+    /// </summary>
+    private void RenderMosaic(Canvas canvas, MosaicAnnotation mosaic, List<Control> controls)
+    {
+        if (!mosaic.IsVisible || mosaic.Points.Count == 0) return;
+
+        var pixelSize = mosaic.PixelSize;
+        var brushRadius = mosaic.BrushSize / 2.0;
+        var brushRadiusSquared = brushRadius * brushRadius;
+        
+        // Use the persistent rendered cells set from the annotation
+        var allCells = mosaic.RenderedCells;
+
+        // Process ALL points to update the complete cell coverage
+        for (int i = 0; i < mosaic.Points.Count; i++)
+        {
+            var point = mosaic.Points[i];
+            
+            // Calculate the bounding box of the circular brush area
+            var left = (int)Math.Floor((point.X - brushRadius) / pixelSize);
+            var top = (int)Math.Floor((point.Y - brushRadius) / pixelSize);
+            var right = (int)Math.Ceiling((point.X + brushRadius) / pixelSize);
+            var bottom = (int)Math.Ceiling((point.Y + brushRadius) / pixelSize);
+
+            // Check cells within the circular brush area
+            for (int row = top; row <= bottom; row++)
+            {
+                for (int col = left; col <= right; col++)
+                {
+                    // Skip if already in set
+                    if (allCells.Contains((row, col)))
+                        continue;
+
+                    // Check if tile (rectangle) intersects with circular brush
+                    // Use closest point on rectangle to circle center
+                    var tileLeft = col * pixelSize;
+                    var tileTop = row * pixelSize;
+                    var tileRight = tileLeft + pixelSize;
+                    var tileBottom = tileTop + pixelSize;
+                    
+                    // Find closest point on rectangle to circle center
+                    var closestX = Math.Clamp(point.X, tileLeft, tileRight);
+                    var closestY = Math.Clamp(point.Y, tileTop, tileBottom);
+                    
+                    // Check distance from circle center to closest point
+                    var dx = closestX - point.X;
+                    var dy = closestY - point.Y;
+
+                    if (dx * dx + dy * dy <= brushRadiusSquared)
+                    {
+                        allCells.Add((row, col)); // Add to persistent set
+                    }
+                }
+            }
+        }
+        
+        // Render ALL cells in the set (complete re-render each time)
+        var cellsToDraw = allCells;
+
+        // Batch render all cells with mosaic pattern effect
+        if (cellsToDraw.Count > 0)
+        {
+            // Group cells by alternating colors for checkerboard pattern
+            var darkCells = new List<(int, int)>();
+            var lightCells = new List<(int, int)>();
+            
+            foreach (var (row, col) in cellsToDraw)
+            {
+                // Checkerboard pattern
+                if ((row + col) % 2 == 0)
+                    darkCells.Add((row, col));
+                else
+                    lightCells.Add((row, col));
+            }
+            
+            // Render dark cells
+            if (darkCells.Count > 0)
+            {
+                var darkPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+                var darkGeometry = new GeometryGroup();
+                
+                foreach (var (row, col) in darkCells)
+                {
+                    darkGeometry.Children.Add(new RectangleGeometry(
+                        new Rect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)));
+                }
+                
+                darkPath.Data = darkGeometry;
+                darkPath.Fill = new SolidColorBrush(Color.FromArgb(255, 100, 100, 100));
+                darkPath.Stroke = null;
+                darkPath.Opacity = mosaic.Style.Opacity;
+                
+                canvas.Children.Add(darkPath);
+                controls.Add(darkPath);
+            }
+            
+            // Render light cells
+            if (lightCells.Count > 0)
+            {
+                var lightPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+                var lightGeometry = new GeometryGroup();
+                
+                foreach (var (row, col) in lightCells)
+                {
+                    lightGeometry.Children.Add(new RectangleGeometry(
+                        new Rect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)));
+                }
+                
+                lightPath.Data = lightGeometry;
+                lightPath.Fill = new SolidColorBrush(Color.FromArgb(255, 150, 150, 150));
+                lightPath.Stroke = null;
+                lightPath.Opacity = mosaic.Style.Opacity;
+                
+                canvas.Children.Add(lightPath);
+                controls.Add(lightPath);
+            }
+        }
     }
 
     /// <summary>

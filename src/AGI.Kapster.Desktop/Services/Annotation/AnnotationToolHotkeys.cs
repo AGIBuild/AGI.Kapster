@@ -21,7 +21,8 @@ public static class AnnotationToolHotkeys
         { AnnotationToolType.Ellipse, "E" },
         { AnnotationToolType.Text, "T" },
         { AnnotationToolType.Freehand, "F" },
-        { AnnotationToolType.Emoji, "M" }
+        { AnnotationToolType.Mosaic, "M" },
+        { AnnotationToolType.Emoji, "J" }
     };
 
     /// <summary>
@@ -80,6 +81,7 @@ public static class AnnotationToolHotkeys
             { AnnotationToolType.Ellipse, "Draw ellipses" },
             { AnnotationToolType.Text, "Add text annotations" },
             { AnnotationToolType.Freehand, "Free drawing" },
+            { AnnotationToolType.Mosaic, "Pixelate and blur regions" },
             { AnnotationToolType.Emoji, "Insert emoji symbols" }
         };
     }

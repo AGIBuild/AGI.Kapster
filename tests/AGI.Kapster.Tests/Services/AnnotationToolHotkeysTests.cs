@@ -26,7 +26,8 @@ public class AnnotationToolHotkeysTests : TestBase
         AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Ellipse).Should().Be("E");
         AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Text).Should().Be("T");
         AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Freehand).Should().Be("F");
-        AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Emoji).Should().Be("M");
+        AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Mosaic).Should().Be("M");
+        AnnotationToolHotkeys.GetHotkey(AnnotationToolType.Emoji).Should().Be("J");
     }
 
     [Fact]
@@ -49,7 +50,8 @@ public class AnnotationToolHotkeysTests : TestBase
         AnnotationToolHotkeys.GetToolFromHotkey("E").Should().Be(AnnotationToolType.Ellipse);
         AnnotationToolHotkeys.GetToolFromHotkey("T").Should().Be(AnnotationToolType.Text);
         AnnotationToolHotkeys.GetToolFromHotkey("F").Should().Be(AnnotationToolType.Freehand);
-        AnnotationToolHotkeys.GetToolFromHotkey("M").Should().Be(AnnotationToolType.Emoji);
+        AnnotationToolHotkeys.GetToolFromHotkey("M").Should().Be(AnnotationToolType.Mosaic);
+        AnnotationToolHotkeys.GetToolFromHotkey("J").Should().Be(AnnotationToolType.Emoji);
     }
 
     [Fact]
@@ -103,6 +105,7 @@ public class AnnotationToolHotkeysTests : TestBase
         AnnotationToolHotkeys.IsToolHotkey("T").Should().BeTrue();
         AnnotationToolHotkeys.IsToolHotkey("F").Should().BeTrue();
         AnnotationToolHotkeys.IsToolHotkey("M").Should().BeTrue();
+        AnnotationToolHotkeys.IsToolHotkey("J").Should().BeTrue();
     }
 
     [Fact]
@@ -122,13 +125,14 @@ public class AnnotationToolHotkeysTests : TestBase
         var descriptions = AnnotationToolHotkeys.GetToolDescriptions();
 
         // Assert
-        descriptions.Should().HaveCount(7);
+        descriptions.Should().HaveCount(8);
         descriptions[AnnotationToolType.None].Should().Be("Select and edit annotation elements");
         descriptions[AnnotationToolType.Arrow].Should().Be("Draw pointing arrows");
         descriptions[AnnotationToolType.Rectangle].Should().Be("Draw rectangle frames");
         descriptions[AnnotationToolType.Ellipse].Should().Be("Draw ellipses");
         descriptions[AnnotationToolType.Text].Should().Be("Add text annotations");
         descriptions[AnnotationToolType.Freehand].Should().Be("Free drawing");
+        descriptions[AnnotationToolType.Mosaic].Should().Be("Pixelate and blur regions");
         descriptions[AnnotationToolType.Emoji].Should().Be("Insert emoji symbols");
     }
 
@@ -136,13 +140,14 @@ public class AnnotationToolHotkeysTests : TestBase
     public void ToolHotkeys_ShouldContainAllExpectedMappings()
     {
         // Act & Assert
-        AnnotationToolHotkeys.ToolHotkeys.Should().HaveCount(7);
+        AnnotationToolHotkeys.ToolHotkeys.Should().HaveCount(8);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.None); // None is used for selection tool
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Arrow);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Rectangle);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Ellipse);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Text);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Freehand);
+        AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Mosaic);
         AnnotationToolHotkeys.ToolHotkeys.Should().ContainKey(AnnotationToolType.Emoji);
     }
 }

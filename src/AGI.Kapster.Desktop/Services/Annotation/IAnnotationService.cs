@@ -15,7 +15,8 @@ public enum AnnotationToolType
     Arrow,       // 箭头工具
     Text,        // 文本工具
     Freehand,    // 自由画笔
-    Emoji        // Emoji工具
+    Emoji,       // Emoji工具
+    Mosaic       // 马赛克工具
 }
 
 /// <summary>

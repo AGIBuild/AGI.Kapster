@@ -20,9 +20,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
     public bool SupportsElementCapture => true;
     public bool IsHardwareAccelerated => false; // Can be enhanced with DXGI later
 
-    public async Task<SKBitmap?> CaptureFullScreenAsync(Screen screen)
+    public Task<SKBitmap?> CaptureFullScreenAsync(Screen screen)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -41,13 +41,12 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         });
     }
 
-    public async Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
+    public Task<SKBitmap?> CaptureWindowAsync(nint windowHandle)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
-                // Get window bounds
                 if (!GetWindowRect(windowHandle, out RECT rect))
                 {
                     Log.Warning("Failed to get window rect for handle {Handle}", windowHandle);
@@ -65,9 +64,9 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         });
     }
 
-    public async Task<SKBitmap?> CaptureRegionAsync(PixelRect region)
+    public Task<SKBitmap?> CaptureRegionAsync(PixelRect region)
     {
-        return await Task.Run(() => CaptureRegion(region));
+        return Task.Run(() => CaptureRegion(region));
     }
 
     public async Task<SKBitmap?> CaptureElementAsync(IElementInfo element)
@@ -77,25 +76,48 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
         return await CaptureRegionAsync(element.Bounds);
     }
 
-    public async Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
+    public Task<SKBitmap?> CaptureWindowRegionAsync(Rect windowRect, Visual window)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
                 // Convert window coordinates to screen coordinates
                 if (window is Window w)
                 {
-                    var p1 = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
-                    var p2 = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
+                    // Get the screen this window is on to determine DPI scaling
+                    var screen = w.Screens.ScreenFromWindow(w);
+                    if (screen == null)
+                    {
+                        Log.Warning("Could not determine screen for window");
+                        return null;
+                    }
+
+                    // Get DPI scaling factor
+                    var scaling = screen.Scaling;
+
+                    // PointToScreen in Avalonia should return physical pixel coordinates
+                    // But we need to ensure we're working with the correct coordinate system
+                    var topLeft = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
+                    var bottomRight = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
 
                     var screenRect = new PixelRect(
-                        Math.Min(p1.X, p2.X),
-                        Math.Min(p1.Y, p2.Y),
-                        Math.Max(1, Math.Abs(p2.X - p1.X)),
-                        Math.Max(1, Math.Abs(p2.Y - p1.Y)));
+                        Math.Min(topLeft.X, bottomRight.X),
+                        Math.Min(topLeft.Y, bottomRight.Y),
+                        Math.Max(1, Math.Abs(bottomRight.X - topLeft.X)),
+                        Math.Max(1, Math.Abs(bottomRight.Y - topLeft.Y)));
 
-                    return CaptureRegion(screenRect);
+                    Log.Debug("CaptureWindowRegion: DIP rect {WindowRect}, Screen scaling {Scaling}, Physical rect {ScreenRect}", 
+                        windowRect, scaling, screenRect);
+
+                    var bitmap = CaptureRegion(screenRect);
+                    
+                    if (bitmap != null)
+                    {
+                        Log.Debug("Captured bitmap: {W}x{H} pixels", bitmap.Width, bitmap.Height);
+                    }
+                    
+                    return bitmap;
                 }
                 else
                 {

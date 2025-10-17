@@ -97,6 +97,19 @@
                      VerticalContentAlignment="Center"
                      HorizontalContentAlignment="Center"
                      ToolTip.Tip="Freehand Tool"/>
+        <ToggleButton x:Name="MosaicToolButton" 
+                     Content="⊞"
+                     Tag="Mosaic"
+                     Width="32" Height="32"
+                     Background="Transparent"
+                     BorderBrush="#60FFFFFF"
+                     BorderThickness="1"
+                     Foreground="White"
+                     CornerRadius="3"
+                     FontSize="14"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     ToolTip.Tip="Mosaic Tool (M)"/>
       </StackPanel>
       
       <!-- Separator -->
@@ -145,7 +158,7 @@
                HorizontalContentAlignment="Center" 
                VerticalContentAlignment="Center"
                Margin="1"
-               ToolTip.Tip="Emoji Tool">
+               ToolTip.Tip="Emoji Tool (J)">
           <TextBlock x:Name="CurrentEmojiText"
                     Text="😀"
                     FontSize="18"

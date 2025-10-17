@@ -104,6 +104,10 @@ public class AnnotationService : IAnnotationService
         {
             item = CreateEmoji(startPoint);
         }
+        else if (CurrentTool == AnnotationToolType.Mosaic)
+        {
+            item = CreateMosaic(startPoint);
+        }
 
         if (item != null)
         {
@@ -128,6 +132,9 @@ public class AnnotationService : IAnnotationService
                 break;
             case ArrowAnnotation arrow:
                 UpdateArrow(arrow, currentPoint);
+                break;
+            case MosaicAnnotation mosaic:
+                UpdateMosaic(mosaic, currentPoint);
                 break;
             case FreehandAnnotation freehand:
                 UpdateFreehand(freehand, currentPoint);
@@ -162,6 +169,15 @@ public class AnnotationService : IAnnotationService
             // Validate minimum number of points
             if (freehand.Points.Count < 2)
                 return false;
+        }
+        else if (item is MosaicAnnotation mosaic)
+        {
+            // Validate minimum number of points for mosaic trail
+            if (mosaic.Points.Count < 1)
+                return false;
+            
+            // Clear rendered cells set for next edit
+            mosaic.RenderedCells.Clear();
         }
 
         // Add to manager
@@ -398,6 +414,65 @@ public class AnnotationService : IAnnotationService
     private Color GetCurrentColor()
     {
         return CurrentStyle.StrokeColor;
+    }
+
+    /// <summary>
+    /// Create brush-style mosaic annotation
+    /// </summary>
+    private MosaicAnnotation CreateMosaic(Point startPoint)
+    {
+        var style = AnnotationFactory.CreateStyleVariant(
+            AnnotationFactory.GetDefaultStyle(AnnotationType.Mosaic),
+            GetCurrentColor(),
+            CurrentStyle.StrokeWidth // Use current size setting for brush size control
+        );
+
+        var mosaic = AnnotationFactory.CreateMosaic(style);
+        mosaic.AddPoint(startPoint); // Add initial point
+        return mosaic;
+    }
+
+    /// <summary>
+    /// Update mosaic annotation by adding points along the trail
+    /// </summary>
+    private void UpdateMosaic(MosaicAnnotation mosaic, Point currentPoint)
+    {
+        // Get the last point to interpolate from
+        if (mosaic.Points.Count > 0)
+        {
+            var lastPoint = mosaic.Points[mosaic.Points.Count - 1];
+            var dx = currentPoint.X - lastPoint.X;
+            var dy = currentPoint.Y - lastPoint.Y;
+            var distance = Math.Sqrt(dx * dx + dy * dy);
+            
+            // Dynamic step size based on brush size to ensure continuous coverage
+            // Use 25% of brush size for dense sampling with good overlap
+            var stepSize = Math.Max(1.0, mosaic.BrushSize * 0.25);
+            
+            if (distance > stepSize)
+            {
+                // Add interpolated points for continuous stroke
+                var steps = (int)Math.Ceiling(distance / stepSize);
+                for (int i = 1; i <= steps; i++)
+                {
+                    var t = (double)i / steps;
+                    var interpolatedPoint = new Point(
+                        lastPoint.X + dx * t,
+                        lastPoint.Y + dy * t
+                    );
+                    mosaic.AddPoint(interpolatedPoint);
+                }
+            }
+            else if (distance > 0.5) // Minimum distance threshold to avoid excessive duplicate points
+            {
+                mosaic.AddPoint(currentPoint);
+            }
+            // If distance <= 0.5, skip to avoid creating too many overlapping points
+        }
+        else
+        {
+            mosaic.AddPoint(currentPoint);
+        }
     }
 
 }

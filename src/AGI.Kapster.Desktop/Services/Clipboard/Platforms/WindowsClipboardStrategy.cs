@@ -16,9 +16,9 @@ public class WindowsClipboardStrategy : IClipboardStrategy
     public bool SupportsMultipleFormats => true;
     public bool SupportsImages => true;
 
-    public async Task<bool> SetImageAsync(SKBitmap bitmap)
+    public Task<bool> SetImageAsync(SKBitmap bitmap)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -49,9 +49,9 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         });
     }
 
-    public async Task<bool> SetTextAsync(string text)
+    public Task<bool> SetTextAsync(string text)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -104,9 +104,9 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         });
     }
 
-    public async Task<SKBitmap?> GetImageAsync()
+    public Task<SKBitmap?> GetImageAsync()
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -134,9 +134,9 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         });
     }
 
-    public async Task<string?> GetTextAsync()
+    public Task<string?> GetTextAsync()
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -164,9 +164,9 @@ public class WindowsClipboardStrategy : IClipboardStrategy
         });
     }
 
-    public async Task<bool> ClearAsync()
+    public Task<bool> ClearAsync()
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {

@@ -36,6 +36,11 @@ public partial class OverlayWindow : Window
     private const double MinMovementThreshold = 8.0; // pixels
     private static readonly TimeSpan MinDetectionInterval = TimeSpan.FromMilliseconds(30); // ~33 FPS max
 
+	// Frozen background (snapshot at overlay activation)
+	private Bitmap? _frozenBackground;
+	// Pre-captured Avalonia bitmap set before Show() for instant display
+	private Bitmap? _precapturedBackground;
+
     // Public events for external consumers
     public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
     public event EventHandler<OverlayCancelledEventArgs>? Cancelled;
@@ -51,8 +56,59 @@ public partial class OverlayWindow : Window
     {
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
+        
+        // Fast initialization: only XAML parsing
         InitializeComponent();
 
+        // Minimal setup for immediate display
+        this.Cursor = new Cursor(StandardCursorType.Cross);
+        _isElementPickerMode = false;
+        _hasEditableSelection = false;
+
+        // Set up mouse event handlers for element selection
+        this.PointerPressed += OnOverlayPointerPressed;
+        this.PointerMoved += OnOverlayPointerMoved;
+
+		// Opened event: display background immediately, then initialize heavy components
+		this.Opened += async (_, __) =>
+		{
+		    // Display pre-captured background immediately if available
+		    if (_precapturedBackground != null)
+		    {
+		        if (this.FindControl<Image>("BackgroundImage") is { } img)
+		        {
+		            img.Source = _precapturedBackground;
+		            _frozenBackground = _precapturedBackground;
+		        }
+		    }
+		    else
+		    {
+		        // Fallback: async capture if no pre-captured background
+		        await InitializeFrozenBackgroundAsync();
+		    }
+		    
+		    UpdateMaskForSelection(default);
+		    
+		    // Initialize heavy components asynchronously after background is visible
+		    _ = Task.Run(async () =>
+		    {
+		        await Task.Delay(10);
+		        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+		        {
+		            InitializeHeavyComponents();
+		        });
+		    });
+		};
+
+		// Set focus to annotator when window is loaded
+		this.Loaded += OnOverlayWindowLoaded;
+    }
+
+    /// <summary>
+    /// Initialize heavy UI components (Annotator, Toolbar, ElementHighlight) after background is visible
+    /// </summary>
+    private void InitializeHeavyComponents()
+    {
         // Create settings service instance for this overlay session
         var settingsService = new SettingsService();
 
@@ -85,10 +141,6 @@ public partial class OverlayWindow : Window
 
         SetupElementHighlight();
 
-        // Start in free selection mode by default
-        _isElementPickerMode = false;
-        _hasEditableSelection = false;
-
         if (_elementDetector != null && _elementHighlight != null)
         {
             _elementHighlight.IsActive = false; // Initially disabled
@@ -101,20 +153,6 @@ public partial class OverlayWindow : Window
             selectorOverlay.IsVisible = true;
             selectorOverlay.IsHitTestVisible = true;
         }
-
-        // Set initial cursor for free selection mode
-        this.Cursor = new Cursor(StandardCursorType.Cross);
-
-        Log.Information("OverlayWindow created with default free selection mode");
-
-        Log.Information("OverlayWindow created {W}x{H}", Width, Height);
-
-        // Set up mouse event handlers for element selection
-        this.PointerPressed += OnOverlayPointerPressed;
-        this.PointerMoved += OnOverlayPointerMoved;
-
-        // Set focus to annotator when window is loaded
-        this.Loaded += OnOverlayWindowLoaded;
 
         // Setup selection overlay
         SetupSelectionOverlay();
@@ -131,6 +169,54 @@ public partial class OverlayWindow : Window
             // Also set focus to the window itself to ensure keyboard events are captured
             this.Focus();
             Log.Debug("Focus also set to overlay window");
+        }
+    }
+
+    /// <summary>
+    /// Set pre-captured Avalonia bitmap for instant display (called before Show())
+    /// </summary>
+    public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
+    {
+        _precapturedBackground = bitmap;
+    }
+
+    private async Task InitializeFrozenBackgroundAsync()
+    {
+        if (_screenCaptureStrategy == null)
+            return;
+
+        try
+        {
+            // Temporarily make window transparent to avoid capturing the overlay itself
+            var originalOpacity = this.Opacity;
+            this.Opacity = 0;
+            await Task.Delay(16);
+
+            var rect = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
+            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
+
+            this.Opacity = originalOpacity;
+
+            var bitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+            if (bitmap != null)
+            {
+                _frozenBackground = bitmap;
+                if (this.FindControl<Image>("BackgroundImage") is { } img)
+                {
+                    img.Source = _frozenBackground;
+                }
+                Log.Information("Frozen background initialized: {W}x{H} pixels for window bounds {Bounds}", 
+                    bitmap.PixelSize.Width, bitmap.PixelSize.Height, this.Bounds);
+            }
+            else
+            {
+                Log.Warning("Failed to create frozen background bitmap");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to initialize frozen background - falling back to live capture");
+            this.Opacity = 1;
         }
     }
 
@@ -160,14 +246,7 @@ public partial class OverlayWindow : Window
             // Create a hole in mask over selection using Path (even-odd)
             selector.SelectionChanged += r =>
             {
-                if (this.FindControl<Avalonia.Controls.Shapes.Path>("MaskPath") is { } mask)
-                {
-                    var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
-                    group.Children.Add(new RectangleGeometry(new Rect(0, 0, Bounds.Width, Bounds.Height)));
-                    if (r.Width > 0 && r.Height > 0)
-                        group.Children.Add(new RectangleGeometry(r));
-                    mask.Data = group;
-                }
+                UpdateMaskForSelection(r);
                 if (_annotator != null)
                 {
                     _annotator.SelectionRect = r;
@@ -178,32 +257,24 @@ public partial class OverlayWindow : Window
 
             selector.ConfirmRequested += async r =>
             {
-                Bitmap? compositeImage = null;
-
-                var annotations = _annotator?.GetAnnotationService()?.Manager?.Items;
-                if (annotations != null && annotations.Any())
+                // Directly capture the window region (includes background + annotations)
+                // This avoids coordinate transformation issues
+                Bitmap? finalImage = null;
+                
+                try
                 {
-                    try
-                    {
-                        Log.Debug("Creating composite image with {Count} annotations from selector (unified)", annotations.Count());
-                        // Capture the base screenshot first
-                        var screenshot = await CaptureRegionAsync(r);
-                        if (screenshot != null)
-                        {
-                            // Create composite image with annotations
-                            var exportService = new ExportService();
-                            compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
-                            Log.Debug("Composite image created successfully from selector (unified)");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "Failed to create composite image from selector, will use base screenshot (unified)");
-                    }
+                    Log.Debug("Capturing window region with annotations: {Region}", r);
+                    finalImage = await CaptureWindowRegionWithAnnotationsAsync(r);
+                    Log.Debug("Window region captured successfully");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Failed to capture window region, falling back to frozen background");
+                    finalImage = await GetBaseScreenshotForRegionAsync(r);
                 }
 
-                // Raise region selected event - SimplifiedOverlayManager will handle closing all windows
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, compositeImage));
+                // Raise region selected event with final image
+                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
             };
         }
 
@@ -226,31 +297,24 @@ public partial class OverlayWindow : Window
             // Handle double-click confirm (unified cross-platform logic)
             _annotator.ConfirmRequested += async r =>
             {
-                Bitmap? compositeImage = null;
-                var annotations = _annotator.GetAnnotationService()?.Manager?.Items;
-                if (annotations != null && annotations.Any())
+                // Directly capture the window region (includes background + annotations)
+                // This avoids coordinate transformation issues
+                Bitmap? finalImage = null;
+                
+                try
                 {
-                    try
-                    {
-                        Log.Debug("Creating composite image with {Count} annotations (unified)", annotations.Count());
-                        // Capture the base screenshot first
-                        var screenshot = await CaptureRegionAsync(r);
-                        if (screenshot != null)
-                        {
-                            // Create composite image with annotations
-                            var exportService = new ExportService();
-                            compositeImage = await exportService.CreateCompositeImageWithAnnotationsAsync(screenshot, annotations, r);
-                            Log.Debug("Composite image created successfully (unified)");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "Failed to create composite image, will use base screenshot (unified)");
-                    }
+                    Log.Debug("Capturing window region with annotations: {Region}", r);
+                    finalImage = await CaptureWindowRegionWithAnnotationsAsync(r);
+                    Log.Debug("Window region captured successfully");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Failed to capture window region, falling back to frozen background");
+                    finalImage = await GetBaseScreenshotForRegionAsync(r);
                 }
 
-                // Raise region selected event with composite image (if created)
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, compositeImage));
+                // Raise region selected event with final image
+                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
 
                 var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
@@ -286,7 +350,31 @@ public partial class OverlayWindow : Window
         {
             GlobalSelectionState.ClearSelection(this);
             Log.Information("OverlayWindow: Cleared global selection state on window close");
+            try
+            {
+                if (_frozenBackground != null)
+                {
+                    _frozenBackground.Dispose();
+                    _frozenBackground = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "Error disposing frozen background");
+            }
         };
+    }
+
+    private void UpdateMaskForSelection(Rect selection)
+    {
+        if (this.FindControl<Avalonia.Controls.Shapes.Path>("MaskPath") is not { } mask)
+            return;
+
+        var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        group.Children.Add(new RectangleGeometry(new Rect(0, 0, Bounds.Width, Bounds.Height)));
+        if (selection.Width > 0 && selection.Height > 0)
+            group.Children.Add(new RectangleGeometry(selection));
+        mask.Data = group;
     }
 
     private void UpdateToolbarPosition(Rect selection)
@@ -668,62 +756,6 @@ public partial class OverlayWindow : Window
     // See IClipboardStrategy and its implementations
 
     /// <summary>
-    /// Avalonia clipboard fallback method
-    /// </summary>
-    private async Task<bool> CopyRegionToClipboardAvaloniaAsync(Avalonia.Rect rect)
-    {
-        try
-        {
-            var bitmap = await CaptureRegionAsync(rect);
-            if (bitmap == null)
-            {
-                Log.Warning("Failed to capture region for clipboard");
-                return false;
-            }
-
-            // Use Avalonia's clipboard API for cross-platform support
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard == null)
-            {
-                Log.Warning("Clipboard not available");
-                return false;
-            }
-
-            // Try multiple formats for better compatibility
-            var dataObject = new Avalonia.Input.DataObject();
-
-            // Try setting as bitmap directly
-            dataObject.Set("image/png", bitmap);
-
-            // Also try common clipboard formats
-            try
-            {
-                // Convert bitmap to byte array for more formats
-                using var stream = new System.IO.MemoryStream();
-                bitmap.Save(stream);
-                var imageData = stream.ToArray();
-
-                dataObject.Set("PNG", imageData);
-                dataObject.Set("image/png", imageData);
-                dataObject.Set("CF_DIB", imageData);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Failed to set additional clipboard formats");
-            }
-
-            await clipboard.SetDataObjectAsync(dataObject);
-            Log.Information("Successfully copied region to clipboard using Avalonia API");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to copy region to clipboard using Avalonia API");
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Cross-platform screenshot capture method using strategy pattern
     /// </summary>
     private async Task<Bitmap?> CaptureRegionAsync(Avalonia.Rect rect)
@@ -744,6 +776,137 @@ public partial class OverlayWindow : Window
             Log.Error(ex, "Failed to capture region");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Capture what the user sees: render the actual window region including background and annotation overlay.
+    /// This avoids coordinate transformation issues by capturing the already-rendered content.
+    /// </summary>
+    private async Task<Bitmap?> CaptureWindowRegionWithAnnotationsAsync(Avalonia.Rect region)
+    {
+        try
+        {
+            // Calculate DPI scaling
+            var scaleX = 1.0;
+            var scaleY = 1.0;
+            if (_frozenBackground != null)
+            {
+                scaleX = _frozenBackground.PixelSize.Width / Math.Max(1.0, this.Bounds.Width);
+                scaleY = _frozenBackground.PixelSize.Height / Math.Max(1.0, this.Bounds.Height);
+            }
+
+            // End text editing before capture to prevent TextBox background artifacts
+            if (_annotator != null)
+            {
+                var endTextEditingMethod = _annotator.GetType()
+                    .GetMethod("EndTextEditing", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                endTextEditingMethod?.Invoke(_annotator, null);
+            }
+
+            // Temporarily hide UI elements
+            var selector = this.FindControl<SelectionOverlay>("Selector");
+            bool selectorWasVisible = selector?.IsVisible ?? false;
+            if (selector != null)
+            {
+                selector.IsVisible = false;
+            }
+
+            try
+            {
+                var baseScreenshot = ExtractRegionFromFrozenBackground(region);
+                if (baseScreenshot == null)
+                {
+                    Log.Warning("Failed to extract region from frozen background");
+                    return null;
+                }
+
+                var annotations = GetAnnotationsFromAnnotator();
+                if (annotations == null || !annotations.Any())
+                {
+                    return baseScreenshot;
+                }
+
+                var exportService = new ExportService();
+                return await exportService.CreateCompositeImageWithAnnotationsAsync(
+                    baseScreenshot, annotations, region);
+            }
+            finally
+            {
+                // Restore UI elements
+                if (selector != null && selectorWasVisible)
+                {
+                    selector.IsVisible = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to capture window region with annotations");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get annotations from annotator
+    /// </summary>
+    private IEnumerable<IAnnotationItem>? GetAnnotationsFromAnnotator()
+    {
+        if (_annotator == null)
+            return null;
+
+        // Access annotation service using reflection (necessary due to private field)
+        var annotationServiceField = _annotator.GetType()
+            .GetField("_annotationService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var annotationService = annotationServiceField?.GetValue(_annotator) as Services.Annotation.IAnnotationService;
+        
+        return annotationService?.Manager?.Items;
+    }
+
+    /// <summary>
+    /// Returns base screenshot for a region: uses frozen background if available, otherwise live capture.
+    /// </summary>
+    private async Task<Bitmap?> GetBaseScreenshotForRegionAsync(Avalonia.Rect region)
+    {
+        if (_frozenBackground != null)
+        {
+            Log.Debug("Using frozen background for region {Region}", region);
+            return ExtractRegionFromFrozenBackground(region);
+        }
+        Log.Debug("Frozen background not available, using live capture for region {Region}", region);
+        return await CaptureRegionAsync(region);
+    }
+
+    /// <summary>
+    /// Extract a region from the frozen background with DPI-aware source rect scaling.
+    /// </summary>
+    private Bitmap? ExtractRegionFromFrozenBackground(Avalonia.Rect region)
+    {
+        if (_frozenBackground == null)
+            return null;
+
+        var totalDipWidth = Math.Max(1.0, this.Bounds.Width);
+        var totalDipHeight = Math.Max(1.0, this.Bounds.Height);
+        var scaleX = _frozenBackground.PixelSize.Width / totalDipWidth;
+        var scaleY = _frozenBackground.PixelSize.Height / totalDipHeight;
+
+        // Calculate source rectangle in physical pixels
+        var sourceRect = new Avalonia.Rect(
+            region.X * scaleX,
+            region.Y * scaleY,
+            Math.Max(1.0, region.Width * scaleX),
+            Math.Max(1.0, region.Height * scaleY));
+
+        // Target should be in physical pixels, not DIPs
+        var targetWidth = Math.Max(1, (int)Math.Round(region.Width * scaleX));
+        var targetHeight = Math.Max(1, (int)Math.Round(region.Height * scaleY));
+
+        // Create bitmap at physical pixel resolution with standard 96 DPI
+        var target = new RenderTargetBitmap(new PixelSize(targetWidth, targetHeight), new Vector(96, 96));
+        using (var ctx = target.CreateDrawingContext())
+        {
+            ctx.DrawImage(_frozenBackground, sourceRect, new Avalonia.Rect(0, 0, targetWidth, targetHeight));
+        }
+        return target;
     }
 
     /// <summary>
@@ -858,18 +1021,16 @@ public partial class OverlayWindow : Window
 
                 try
                 {
-                    // Capture screenshot without selection border
+                    // Use WYSIWYG capture: directly capture what user sees
                     progressDialog.UpdateProgress(10, "Capturing screenshot...");
-                    var screenshot = await CaptureRegionAsync(selectionRect);
-                    if (screenshot == null)
+                    var finalImage = await CaptureWindowRegionWithAnnotationsAsync(selectionRect);
+                    if (finalImage == null)
                     {
                         throw new InvalidOperationException("Failed to capture screenshot");
                     }
 
-                    var annotations = _annotator.GetAnnotationService().Manager.Items;
-
-                    // Export with progress callback - ensure UI thread safety
-                    await exportService.ExportToFileAsync(screenshot, annotations, selectionRect, file.Path.LocalPath, settings,
+                    // Export the captured image directly (no re-rendering)
+                    await exportService.ExportToFileDirectAsync(finalImage, file.Path.LocalPath, settings,
                         (percentage, status) =>
                         {
                             // Ensure progress updates are always dispatched to UI thread

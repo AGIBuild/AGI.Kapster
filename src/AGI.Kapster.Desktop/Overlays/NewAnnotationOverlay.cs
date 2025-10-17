@@ -58,7 +58,6 @@ public sealed class NewAnnotationOverlay : Canvas
     // Selection rect for hit testing
     private Rect _selectionRect;
 
-
     // Event for double-click confirm
     public event Action<Rect>? ConfirmRequested;
 
@@ -285,7 +284,12 @@ public sealed class NewAnnotationOverlay : Canvas
                     e.Handled = true;
                     break;
                 case Key.M when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey M pressed - switching to Emoji tool");
+                    Log.Debug("Tool hotkey M pressed - switching to Mosaic tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Mosaic;
+                    e.Handled = true;
+                    break;
+                case Key.J when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey J pressed - switching to Emoji tool");
                     _annotationService.CurrentTool = AnnotationToolType.Emoji;
                     e.Handled = true;
                     break;
@@ -449,9 +453,8 @@ public sealed class NewAnnotationOverlay : Canvas
         }
         else if (CurrentTool != AnnotationToolType.None)
         {
-            // Drawing tool selected and inside selection - FORCE cross cursor
+            // Drawing tool selected and inside selection - cross cursor
             Cursor = new Cursor(StandardCursorType.Cross);
-            Log.Information("OnPointerMoved: FORCING Cross cursor - CurrentTool={CurrentTool}, InSelection={InSelection}", CurrentTool, pointInSelection);
         }
         else
         {
@@ -588,6 +591,11 @@ public sealed class NewAnnotationOverlay : Canvas
             _isCreating = false;
             RefreshRender();
         }
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
     }
 
     /// <summary>
@@ -757,7 +765,6 @@ public sealed class NewAnnotationOverlay : Canvas
         // This avoids conflicts between static tool-based cursor and dynamic position-based cursor
         Log.Debug("UpdateCursor called: CurrentTool={CurrentTool} (cursor will be set by OnPointerMoved)", CurrentTool);
     }
-
 
     #region Selection and Transformation
 

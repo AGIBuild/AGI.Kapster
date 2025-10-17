@@ -68,6 +68,34 @@ public class ExportService : IExportService
     }
 
     /// <summary>
+    /// Export pre-rendered image directly to file (WYSIWYG approach - no re-rendering)
+    /// </summary>
+    public async Task ExportToFileDirectAsync(Bitmap finalImage, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
+    {
+        try
+        {
+            progressCallback?.Invoke(10, "Preparing image...");
+            Log.Information("Exporting pre-rendered image directly (WYSIWYG): {W}x{H}", 
+                finalImage.PixelSize.Width, finalImage.PixelSize.Height);
+
+            progressCallback?.Invoke(40, "Converting image format...");
+            // Convert Avalonia bitmap to SkiaSharp for advanced format support
+            using var skiaBitmap = await ConvertToSkiaBitmapAsync(finalImage, settings);
+
+            progressCallback?.Invoke(70, "Encoding image...");
+            await SaveSkiaBitmapAsync(skiaBitmap, filePath, settings, progressCallback);
+
+            progressCallback?.Invoke(100, "Export completed");
+            Log.Information("Exported image directly to {FilePath} with format {Format}", filePath, settings.Format);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to export image to {FilePath}", filePath);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Export annotated screenshot to clipboard (simplified)
     /// </summary>
     public async Task ExportToClipboardAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect)
@@ -172,7 +200,14 @@ public class ExportService : IExportService
     {
         try
         {
-            // Create a canvas to render annotations
+            // Use screenshot's actual pixel size for high quality (it's already at physical resolution)
+            var pixelWidth = screenshot.PixelSize.Width;
+            var pixelHeight = screenshot.PixelSize.Height;
+            
+            // Calculate scale factor between screenshot pixels and selection DIPs
+            var scaleX = pixelWidth / selectionRect.Width;
+            var scaleY = pixelHeight / selectionRect.Height;
+            
             var canvas = new Canvas
             {
                 Width = selectionRect.Width,
@@ -180,57 +215,60 @@ public class ExportService : IExportService
                 Background = Brushes.Transparent
             };
 
-            // Adjust annotation coordinates to be relative to selection area
             var annotationList = annotations.ToList();
             if (annotationList.Any())
             {
-                // Create offset annotations for proper positioning
                 var offsetAnnotations = new List<IAnnotationItem>();
+                var offsetX = -selectionRect.X;
+                var offsetY = -selectionRect.Y;
+                
                 foreach (var annotation in annotationList)
                 {
-                    var offsetAnnotation = CreateOffsetAnnotation(annotation, -selectionRect.X, -selectionRect.Y);
+                    var offsetAnnotation = CreateOffsetAnnotation(annotation, offsetX, offsetY);
                     offsetAnnotations.Add(offsetAnnotation);
                 }
 
                 _renderer.RenderAll(canvas, offsetAnnotations);
             }
 
-            // Create render target bitmap for annotations
+            // Force layout pass before rendering
+            canvas.Measure(new Size(selectionRect.Width, selectionRect.Height));
+            canvas.Arrange(new Rect(0, 0, selectionRect.Width, selectionRect.Height));
+
+            // Apply scale transform for high-DPI rendering
+            canvas.RenderTransform = new ScaleTransform(scaleX, scaleY);
+
             var annotationBitmap = new RenderTargetBitmap(
-                new PixelSize((int)selectionRect.Width, (int)selectionRect.Height),
+                new PixelSize(pixelWidth, pixelHeight),
                 new Vector(96, 96));
 
-            annotationBitmap.Render(canvas);
+            // Clear with transparent background before rendering
+            using (var clearCtx = annotationBitmap.CreateDrawingContext())
+            {
+                clearCtx.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, pixelWidth, pixelHeight));
+            }
 
-            // Create final composite bitmap
+            annotationBitmap.Render(canvas);
+            canvas.RenderTransform = null;
+
+            // Create final composite
             var composite = new RenderTargetBitmap(
-                new PixelSize((int)selectionRect.Width, (int)selectionRect.Height),
+                new PixelSize(pixelWidth, pixelHeight),
                 new Vector(96, 96));
 
             using var context = composite.CreateDrawingContext();
 
-            // Draw screenshot portion
-            // Ensure the screenshot bitmap matches the selectionRect size; if not, crop according to selectionRect
-            var destRect = new Rect(0, 0, selectionRect.Width, selectionRect.Height);
-            Rect sourceRect;
-            if (screenshot.PixelSize.Width != (int)selectionRect.Width || screenshot.PixelSize.Height != (int)selectionRect.Height)
-            {
-                // When captured from a non-primary monitor or different DPI, sizes may mismatch.
-                // Crop the screenshot to the selection size from the top-left as a safe fallback.
-                var width = Math.Min(screenshot.PixelSize.Width, (int)selectionRect.Width);
-                var height = Math.Min(screenshot.PixelSize.Height, (int)selectionRect.Height);
-                sourceRect = new Rect(0, 0, width, height);
-                destRect = new Rect(0, 0, width, height);
-            }
-            else
-            {
-                sourceRect = new Rect(0, 0, screenshot.PixelSize.Width, screenshot.PixelSize.Height);
-            }
-            context.DrawImage(screenshot, sourceRect, destRect);
+            // Draw screenshot
+            context.DrawImage(screenshot, 
+                new Rect(0, 0, pixelWidth, pixelHeight), 
+                new Rect(0, 0, pixelWidth, pixelHeight));
 
-            // Draw annotations on top
-            context.DrawImage(annotationBitmap, destRect);
-
+            // Draw annotations with alpha blending
+            using (context.PushOpacity(1.0))
+            {
+                context.DrawImage(annotationBitmap, 
+                    new Rect(0, 0, pixelWidth, pixelHeight));
+            }
             return Task.FromResult<Bitmap>(composite);
         }
         catch (Exception ex)
@@ -238,6 +276,98 @@ public class ExportService : IExportService
             Log.Error(ex, "Failed to create composite image");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Create a scaled and offset copy of an annotation for high-quality export rendering
+    /// </summary>
+    private IAnnotationItem CreateScaledOffsetAnnotation(IAnnotationItem original, double offsetX, double offsetY, double scaleX, double scaleY)
+    {
+        IAnnotationItem scaledItem = original switch
+        {
+            TextAnnotation text => new TextAnnotation(
+                new Point(text.Position.X * scaleX + offsetX, text.Position.Y * scaleY + offsetY),
+                text.Text,
+                ScaleAnnotationStyle(text.Style, scaleX, scaleY)),
+            ArrowAnnotation arrow => CreateScaledOffsetArrowAnnotation(arrow, offsetX, offsetY, scaleX, scaleY),
+            RectangleAnnotation rect => new RectangleAnnotation(
+                new Rect(rect.Rectangle.X * scaleX + offsetX, rect.Rectangle.Y * scaleY + offsetY,
+                         rect.Rectangle.Width * scaleX, rect.Rectangle.Height * scaleY),
+                ScaleAnnotationStyle(rect.Style, scaleX, scaleY)),
+            EllipseAnnotation ellipse => new EllipseAnnotation(
+                new Rect(ellipse.BoundingRect.X * scaleX + offsetX, ellipse.BoundingRect.Y * scaleY + offsetY,
+                         ellipse.BoundingRect.Width * scaleX, ellipse.BoundingRect.Height * scaleY),
+                ScaleAnnotationStyle(ellipse.Style, scaleX, scaleY)),
+            MosaicAnnotation mosaic => CreateScaledOffsetMosaicAnnotation(mosaic, offsetX, offsetY, scaleX, scaleY),
+            FreehandAnnotation freehand => CreateScaledOffsetFreehandAnnotation(freehand, offsetX, offsetY, scaleX, scaleY),
+            EmojiAnnotation emoji => new EmojiAnnotation(
+                new Point(emoji.Position.X * scaleX + offsetX, emoji.Position.Y * scaleY + offsetY),
+                emoji.Emoji,
+                ScaleAnnotationStyle(emoji.Style, scaleX, scaleY)),
+            _ => original
+        };
+
+        scaledItem.State = AnnotationState.Normal;
+        return scaledItem;
+    }
+
+    /// <summary>
+    /// Scale annotation style for high-quality rendering
+    /// </summary>
+    private IAnnotationStyle ScaleAnnotationStyle(IAnnotationStyle original, double scaleX, double scaleY)
+    {
+        var avgScale = (scaleX + scaleY) / 2.0;
+        return new AnnotationStyle
+        {
+            StrokeColor = original.StrokeColor,
+            StrokeWidth = original.StrokeWidth * avgScale,
+            LineStyle = original.LineStyle,
+            FillColor = original.FillColor,
+            FillMode = original.FillMode,
+            Opacity = original.Opacity,
+            FontFamily = original.FontFamily,
+            FontSize = original.FontSize * avgScale,
+            FontWeight = original.FontWeight,
+            FontStyle = original.FontStyle
+        };
+    }
+
+    /// <summary>
+    /// Create scaled offset arrow annotation with trail points
+    /// </summary>
+    private ArrowAnnotation CreateScaledOffsetArrowAnnotation(ArrowAnnotation original, double offsetX, double offsetY, double scaleX, double scaleY)
+    {
+        var scaledArrow = new ArrowAnnotation(
+            new Point(original.StartPoint.X * scaleX + offsetX, original.StartPoint.Y * scaleY + offsetY),
+            new Point(original.EndPoint.X * scaleX + offsetX, original.EndPoint.Y * scaleY + offsetY),
+            ScaleAnnotationStyle(original.Style, scaleX, scaleY));
+
+        // Scale and offset trail points
+        if (original.Trail != null && original.Trail.Count > 0)
+        {
+            scaledArrow.Trail = original.Trail
+                .Select(p => new Point(p.X * scaleX + offsetX, p.Y * scaleY + offsetY))
+                .ToList();
+        }
+
+        return scaledArrow;
+    }
+
+    /// <summary>
+    /// Create scaled offset freehand annotation
+    /// </summary>
+    private FreehandAnnotation CreateScaledOffsetFreehandAnnotation(FreehandAnnotation original, double offsetX, double offsetY, double scaleX, double scaleY)
+    {
+        var scaledPoints = original.Points.Select(p => 
+            new Point(p.X * scaleX + offsetX, p.Y * scaleY + offsetY)).ToList();
+        
+        var scaled = new FreehandAnnotation();
+        foreach (var point in scaledPoints)
+        {
+            scaled.AddPoint(point);
+        }
+        scaled.Style = ScaleAnnotationStyle(original.Style, scaleX, scaleY);
+        return scaled;
     }
 
     /// <summary>
@@ -251,18 +381,16 @@ public class ExportService : IExportService
                 new Point(text.Position.X + offsetX, text.Position.Y + offsetY),
                 text.Text,
                 text.Style),
-            ArrowAnnotation arrow => new ArrowAnnotation(
-                new Point(arrow.StartPoint.X + offsetX, arrow.StartPoint.Y + offsetY),
-                new Point(arrow.EndPoint.X + offsetX, arrow.EndPoint.Y + offsetY),
-                arrow.Style),
+            ArrowAnnotation arrow => CreateOffsetArrowAnnotation(arrow, offsetX, offsetY),
             RectangleAnnotation rect => new RectangleAnnotation(
-                new Rect(rect.Bounds.X + offsetX, rect.Bounds.Y + offsetY,
-                         rect.Bounds.Width, rect.Bounds.Height),
+                new Rect(rect.Rectangle.X + offsetX, rect.Rectangle.Y + offsetY,
+                         rect.Rectangle.Width, rect.Rectangle.Height),
                 rect.Style),
             EllipseAnnotation ellipse => new EllipseAnnotation(
-                new Rect(ellipse.Bounds.X + offsetX, ellipse.Bounds.Y + offsetY,
-                         ellipse.Bounds.Width, ellipse.Bounds.Height),
+                new Rect(ellipse.BoundingRect.X + offsetX, ellipse.BoundingRect.Y + offsetY,
+                         ellipse.BoundingRect.Width, ellipse.BoundingRect.Height),
                 ellipse.Style),
+            MosaicAnnotation mosaic => CreateOffsetMosaicAnnotation(mosaic, offsetX, offsetY),
             FreehandAnnotation freehand => CreateOffsetFreehandAnnotation(freehand, offsetX, offsetY),
             EmojiAnnotation emoji => new EmojiAnnotation(
                 new Point(emoji.Position.X + offsetX, emoji.Position.Y + offsetY),
@@ -274,6 +402,27 @@ public class ExportService : IExportService
         // Ensure the offset item is not selected for clean export
         offsetItem.State = AnnotationState.Normal;
         return offsetItem;
+    }
+
+    /// <summary>
+    /// Create offset arrow annotation with trail points
+    /// </summary>
+    private ArrowAnnotation CreateOffsetArrowAnnotation(ArrowAnnotation original, double offsetX, double offsetY)
+    {
+        var offsetArrow = new ArrowAnnotation(
+            new Point(original.StartPoint.X + offsetX, original.StartPoint.Y + offsetY),
+            new Point(original.EndPoint.X + offsetX, original.EndPoint.Y + offsetY),
+            original.Style);
+
+        // Offset trail points
+        if (original.Trail != null && original.Trail.Count > 0)
+        {
+            offsetArrow.Trail = original.Trail
+                .Select(p => new Point(p.X + offsetX, p.Y + offsetY))
+                .ToList();
+        }
+
+        return offsetArrow;
     }
 
     /// <summary>
@@ -293,11 +442,48 @@ public class ExportService : IExportService
     }
 
     /// <summary>
+    /// Create scaled offset mosaic annotation
+    /// </summary>
+    private MosaicAnnotation CreateScaledOffsetMosaicAnnotation(MosaicAnnotation original, double offsetX, double offsetY, double scaleX, double scaleY)
+    {
+        var scaledPoints = original.Points.Select(p => 
+            new Point(p.X * scaleX + offsetX, p.Y * scaleY + offsetY)).ToList();
+        
+        var scaled = new MosaicAnnotation(
+            ScaleAnnotationStyle(original.Style, scaleX, scaleY), 
+            original.BrushSize, 
+            original.PixelSize);
+        
+        foreach (var point in scaledPoints)
+        {
+            scaled.AddPoint(point);
+        }
+        
+        return scaled;
+    }
+
+    /// <summary>
+    /// Create offset mosaic annotation by manually copying points
+    /// </summary>
+    private MosaicAnnotation CreateOffsetMosaicAnnotation(MosaicAnnotation original, double offsetX, double offsetY)
+    {
+        var offsetMosaic = new MosaicAnnotation(original.Style, original.BrushSize, original.PixelSize);
+
+        // Add offset points one by one
+        foreach (var point in original.Points)
+        {
+            offsetMosaic.AddPoint(new Point(point.X + offsetX, point.Y + offsetY));
+        }
+
+        return offsetMosaic;
+    }
+
+    /// <summary>
     /// Convert Avalonia bitmap to SkiaSharp bitmap with optimal quality preservation
     /// </summary>
-    private async Task<SKBitmap> ConvertToSkiaBitmapAsync(Bitmap avaloniabitmap, ExportSettings settings)
+    private Task<SKBitmap> ConvertToSkiaBitmapAsync(Bitmap avaloniabitmap, ExportSettings settings)
     {
-        return await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
@@ -353,9 +539,9 @@ public class ExportService : IExportService
     /// <summary>
     /// Save SkiaSharp bitmap with specific format and quality settings
     /// </summary>
-    private async Task SaveSkiaBitmapAsync(SKBitmap bitmap, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
+    private Task SaveSkiaBitmapAsync(SKBitmap bitmap, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
     {
-        await Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
