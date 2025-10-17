@@ -31,7 +31,7 @@ public class SimplifiedOverlayManager : IOverlayController
 
     public bool IsActive => _windows.Count > 0;
 
-    public async void ShowAll()
+    public async Task ShowAll()
     {
         try
         {

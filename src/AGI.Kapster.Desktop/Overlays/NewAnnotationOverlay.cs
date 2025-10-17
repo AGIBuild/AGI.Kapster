@@ -58,7 +58,6 @@ public sealed class NewAnnotationOverlay : Canvas
     // Selection rect for hit testing
     private Rect _selectionRect;
 
-
     // Event for double-click confirm
     public event Action<Rect>? ConfirmRequested;
 
@@ -454,7 +453,7 @@ public sealed class NewAnnotationOverlay : Canvas
         }
         else if (CurrentTool != AnnotationToolType.None)
         {
-            // Drawing tool selected and inside selection - FORCE cross cursor
+            // Drawing tool selected and inside selection - cross cursor
             Cursor = new Cursor(StandardCursorType.Cross);
         }
         else
@@ -592,6 +591,11 @@ public sealed class NewAnnotationOverlay : Canvas
             _isCreating = false;
             RefreshRender();
         }
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
     }
 
     /// <summary>
@@ -761,7 +765,6 @@ public sealed class NewAnnotationOverlay : Canvas
         // This avoids conflicts between static tool-based cursor and dynamic position-based cursor
         Log.Debug("UpdateCursor called: CurrentTool={CurrentTool} (cursor will be set by OnPointerMoved)", CurrentTool);
     }
-
 
     #region Selection and Transformation
 

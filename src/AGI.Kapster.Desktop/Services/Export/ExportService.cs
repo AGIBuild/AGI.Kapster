@@ -371,7 +371,7 @@ public class ExportService : IExportService
     }
 
     /// <summary>
-    /// Create an offset copy of an annotation for export rendering (deprecated, use CreateScaledOffsetAnnotation)
+    /// Create an offset copy of an annotation for export rendering
     /// </summary>
     private IAnnotationItem CreateOffsetAnnotation(IAnnotationItem original, double offsetX, double offsetY)
     {

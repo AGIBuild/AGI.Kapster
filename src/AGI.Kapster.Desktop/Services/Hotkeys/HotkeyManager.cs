@@ -114,9 +114,13 @@ public class HotkeyManager : IHotkeyManager
                     Log.Debug("Capture hotkey ignored - overlay is already active");
                     return;
                 }
-                _overlayController.ShowAll();
-
-                RegisterEscapeHotkey();
+                
+                // Dispatch async call to UI thread (hotkey callbacks occur on system thread)
+                Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                {
+                    await _overlayController.ShowAll();
+                    RegisterEscapeHotkey();
+                });
             });
 
             if (success)

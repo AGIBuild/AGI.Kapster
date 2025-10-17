@@ -241,7 +241,29 @@ public class MosaicAnnotation : AnnotationItemBase
         if (data.TryGetValue("Points", out var pointsObj))
         {
             _points.Clear();
-            // TODO: Implement proper point deserialization based on your serialization format
+            // Deserialize points from the expected format: array of objects with X and Y properties
+            if (pointsObj is IEnumerable<object> pointsEnumerable)
+            {
+                foreach (var pointItem in pointsEnumerable)
+                {
+                    // Try to handle both Dictionary<string, object> and dynamic objects
+                    double x = 0, y = 0;
+                    if (pointItem is Dictionary<string, object> dict)
+                    {
+                        if (dict.TryGetValue("X", out var xObj)) x = Convert.ToDouble(xObj);
+                        if (dict.TryGetValue("Y", out var yObj)) y = Convert.ToDouble(yObj);
+                    }
+                    else
+                    {
+                        var type = pointItem.GetType();
+                        var xProp = type.GetProperty("X");
+                        var yProp = type.GetProperty("Y");
+                        if (xProp != null) x = Convert.ToDouble(xProp.GetValue(pointItem));
+                        if (yProp != null) y = Convert.ToDouble(yProp.GetValue(pointItem));
+                    }
+                    _points.Add(new Point(x, y));
+                }
+            }
         }
 
         var brushSize = data.TryGetValue("BrushSize", out var bVal) ? Convert.ToInt32(bVal) : 20;
