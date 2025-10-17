@@ -15,7 +15,8 @@ public enum AnnotationType
     Rectangle,
     Ellipse,
     Freehand,
-    Emoji
+    Emoji,
+    Mosaic
 }
 
 /// <summary>

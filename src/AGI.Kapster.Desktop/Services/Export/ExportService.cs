@@ -298,6 +298,7 @@ public class ExportService : IExportService
                 new Rect(ellipse.BoundingRect.X * scaleX + offsetX, ellipse.BoundingRect.Y * scaleY + offsetY,
                          ellipse.BoundingRect.Width * scaleX, ellipse.BoundingRect.Height * scaleY),
                 ScaleAnnotationStyle(ellipse.Style, scaleX, scaleY)),
+            MosaicAnnotation mosaic => CreateScaledOffsetMosaicAnnotation(mosaic, offsetX, offsetY, scaleX, scaleY),
             FreehandAnnotation freehand => CreateScaledOffsetFreehandAnnotation(freehand, offsetX, offsetY, scaleX, scaleY),
             EmojiAnnotation emoji => new EmojiAnnotation(
                 new Point(emoji.Position.X * scaleX + offsetX, emoji.Position.Y * scaleY + offsetY),
@@ -389,6 +390,7 @@ public class ExportService : IExportService
                 new Rect(ellipse.BoundingRect.X + offsetX, ellipse.BoundingRect.Y + offsetY,
                          ellipse.BoundingRect.Width, ellipse.BoundingRect.Height),
                 ellipse.Style),
+            MosaicAnnotation mosaic => CreateOffsetMosaicAnnotation(mosaic, offsetX, offsetY),
             FreehandAnnotation freehand => CreateOffsetFreehandAnnotation(freehand, offsetX, offsetY),
             EmojiAnnotation emoji => new EmojiAnnotation(
                 new Point(emoji.Position.X + offsetX, emoji.Position.Y + offsetY),
@@ -437,6 +439,43 @@ public class ExportService : IExportService
         }
 
         return offsetFreehand;
+    }
+
+    /// <summary>
+    /// Create scaled offset mosaic annotation
+    /// </summary>
+    private MosaicAnnotation CreateScaledOffsetMosaicAnnotation(MosaicAnnotation original, double offsetX, double offsetY, double scaleX, double scaleY)
+    {
+        var scaledPoints = original.Points.Select(p => 
+            new Point(p.X * scaleX + offsetX, p.Y * scaleY + offsetY)).ToList();
+        
+        var scaled = new MosaicAnnotation(
+            ScaleAnnotationStyle(original.Style, scaleX, scaleY), 
+            original.BrushSize, 
+            original.PixelSize);
+        
+        foreach (var point in scaledPoints)
+        {
+            scaled.AddPoint(point);
+        }
+        
+        return scaled;
+    }
+
+    /// <summary>
+    /// Create offset mosaic annotation by manually copying points
+    /// </summary>
+    private MosaicAnnotation CreateOffsetMosaicAnnotation(MosaicAnnotation original, double offsetX, double offsetY)
+    {
+        var offsetMosaic = new MosaicAnnotation(original.Style, original.BrushSize, original.PixelSize);
+
+        // Add offset points one by one
+        foreach (var point in original.Points)
+        {
+            offsetMosaic.AddPoint(new Point(point.X + offsetX, point.Y + offsetY));
+        }
+
+        return offsetMosaic;
     }
 
     /// <summary>

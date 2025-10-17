@@ -285,7 +285,12 @@ public sealed class NewAnnotationOverlay : Canvas
                     e.Handled = true;
                     break;
                 case Key.M when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey M pressed - switching to Emoji tool");
+                    Log.Debug("Tool hotkey M pressed - switching to Mosaic tool");
+                    _annotationService.CurrentTool = AnnotationToolType.Mosaic;
+                    e.Handled = true;
+                    break;
+                case Key.J when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+                    Log.Debug("Tool hotkey J pressed - switching to Emoji tool");
                     _annotationService.CurrentTool = AnnotationToolType.Emoji;
                     e.Handled = true;
                     break;

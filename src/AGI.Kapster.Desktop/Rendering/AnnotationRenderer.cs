@@ -67,6 +67,9 @@ public class AnnotationRenderer : IAnnotationRenderer
             case EmojiAnnotation emoji:
                 RenderEmoji(canvas, emoji, controls);
                 break;
+            case MosaicAnnotation mosaic:
+                RenderMosaic(canvas, mosaic, controls);
+                break;
         }
 
         // Render selection handles if selected
@@ -941,6 +944,126 @@ public class AnnotationRenderer : IAnnotationRenderer
 
         canvas.Children.Add(textBlock);
         controls.Add(textBlock);
+    }
+
+    /// <summary>
+    /// Render brush-style mosaic annotation along trail points
+    /// </summary>
+    private void RenderMosaic(Canvas canvas, MosaicAnnotation mosaic, List<Control> controls)
+    {
+        if (!mosaic.IsVisible || mosaic.Points.Count == 0) return;
+
+        var pixelSize = mosaic.PixelSize;
+        var brushRadius = mosaic.BrushSize / 2.0;
+        var brushRadiusSquared = brushRadius * brushRadius;
+        
+        // Use the persistent rendered cells set from the annotation
+        var allCells = mosaic.RenderedCells;
+
+        // Process ALL points to update the complete cell coverage
+        for (int i = 0; i < mosaic.Points.Count; i++)
+        {
+            var point = mosaic.Points[i];
+            
+            // Calculate the bounding box of the circular brush area
+            var left = (int)Math.Floor((point.X - brushRadius) / pixelSize);
+            var top = (int)Math.Floor((point.Y - brushRadius) / pixelSize);
+            var right = (int)Math.Ceiling((point.X + brushRadius) / pixelSize);
+            var bottom = (int)Math.Ceiling((point.Y + brushRadius) / pixelSize);
+
+            // Check cells within the circular brush area
+            for (int row = top; row <= bottom; row++)
+            {
+                for (int col = left; col <= right; col++)
+                {
+                    // Skip if already in set
+                    if (allCells.Contains((row, col)))
+                        continue;
+
+                    // Check if tile (rectangle) intersects with circular brush
+                    // Use closest point on rectangle to circle center
+                    var tileLeft = col * pixelSize;
+                    var tileTop = row * pixelSize;
+                    var tileRight = tileLeft + pixelSize;
+                    var tileBottom = tileTop + pixelSize;
+                    
+                    // Find closest point on rectangle to circle center
+                    var closestX = Math.Clamp(point.X, tileLeft, tileRight);
+                    var closestY = Math.Clamp(point.Y, tileTop, tileBottom);
+                    
+                    // Check distance from circle center to closest point
+                    var dx = closestX - point.X;
+                    var dy = closestY - point.Y;
+
+                    if (dx * dx + dy * dy <= brushRadiusSquared)
+                    {
+                        allCells.Add((row, col)); // Add to persistent set
+                    }
+                }
+            }
+        }
+        
+        // Render ALL cells in the set (complete re-render each time)
+        var cellsToDraw = allCells;
+
+        // Batch render all cells with mosaic pattern effect
+        if (cellsToDraw.Count > 0)
+        {
+            // Group cells by alternating colors for checkerboard pattern
+            var darkCells = new List<(int, int)>();
+            var lightCells = new List<(int, int)>();
+            
+            foreach (var (row, col) in cellsToDraw)
+            {
+                // Checkerboard pattern
+                if ((row + col) % 2 == 0)
+                    darkCells.Add((row, col));
+                else
+                    lightCells.Add((row, col));
+            }
+            
+            // Render dark cells
+            if (darkCells.Count > 0)
+            {
+                var darkPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+                var darkGeometry = new GeometryGroup();
+                
+                foreach (var (row, col) in darkCells)
+                {
+                    darkGeometry.Children.Add(new RectangleGeometry(
+                        new Rect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)));
+                }
+                
+                darkPath.Data = darkGeometry;
+                darkPath.Fill = new SolidColorBrush(Color.FromArgb(255, 100, 100, 100));
+                darkPath.Stroke = null;
+                darkPath.Opacity = mosaic.Style.Opacity;
+                
+                canvas.Children.Add(darkPath);
+                controls.Add(darkPath);
+            }
+            
+            // Render light cells
+            if (lightCells.Count > 0)
+            {
+                var lightPath = _pathPool.Count > 0 ? _pathPool.Pop() : new Path();
+                var lightGeometry = new GeometryGroup();
+                
+                foreach (var (row, col) in lightCells)
+                {
+                    lightGeometry.Children.Add(new RectangleGeometry(
+                        new Rect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)));
+                }
+                
+                lightPath.Data = lightGeometry;
+                lightPath.Fill = new SolidColorBrush(Color.FromArgb(255, 150, 150, 150));
+                lightPath.Stroke = null;
+                lightPath.Opacity = mosaic.Style.Opacity;
+                
+                canvas.Children.Add(lightPath);
+                controls.Add(lightPath);
+            }
+        }
     }
 
     /// <summary>
