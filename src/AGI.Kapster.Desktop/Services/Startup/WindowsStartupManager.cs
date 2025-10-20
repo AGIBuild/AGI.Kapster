@@ -43,13 +43,13 @@ public class WindowsStartupManager : IStartupManager
                 // Add --minimized flag for startup
                 var startupCommand = $"\"{exePath}\" --minimized";
                 key.SetValue(AppName, startupCommand, RegistryValueKind.String);
-                Log.Debug("Added application to Windows startup: {Command}", startupCommand);
+                Log.Information("Added application to Windows startup: {Command}", startupCommand);
             }
             else
             {
                 // Remove from startup
                 key.DeleteValue(AppName, false);
-                Log.Debug("Removed application from Windows startup");
+                Log.Information("Removed application from Windows startup");
             }
 
             return Task.FromResult(true);
