@@ -3,53 +3,57 @@ globs: *.cs
 description: C# coding standards and patterns for AGI.Kapster
 ---
 
-# C# Coding Standards for AGI.Kapster
+# C# Coding Standards
 
-## Naming Conventions
+## Naming
 - **PascalCase**: Classes, methods, properties, enums, public fields
-- **camelCase**: Local variables, parameters, private fields (without underscore)
-- **_camelCase**: Private fields with underscore prefix
+- **camelCase**: Local variables, parameters
+- **_camelCase**: Private fields
 - **UPPER_CASE**: Constants
 
-## Service Lifecycle Patterns
-- **ISettingsService**: Singleton pattern via DI container
-- Must use dependency injection - no direct instantiation
-- Settings loaded in constructor with 3-tier approach
-- Changes visible immediately across all consumers
-
-## Error Handling
-- Use structured logging with Serilog
-- Log levels: Debug, Information (avoid), Warning, Error
-- Prefer `Log.Debug()` over `Log.Information()` for development logs
-- Always include context in log messages
-- Gracefully handle permission errors without throwing
-
-## Async Patterns
-- Use `async/await` for I/O operations
-- Use `ConfigureAwait(false)` in library code
-- Prefer `Task.Run()` for CPU-bound work
-- Use `TaskCompletionSource` for event-driven async operations
-
-## MVVM Patterns
-- Use CommunityToolkit.Mvvm attributes: `[ObservableProperty]`, `[RelayCommand]`
-- ViewModels should not reference UI controls directly
-- Use weak event patterns for loosely coupled communication
-- Implement `INotifyPropertyChanged` through base classes
-
 ## Dependency Injection
-- Register services in [Program.cs](mdc:src/AGI.Kapster.Desktop/Program.cs)
-- Use appropriate lifetimes: Singleton for shared state, Transient for per-use
-- Prefer constructor injection over service locator pattern
-- Use interfaces for testability and abstraction
+**Service Registration** - Use extension methods in `Extensions/` directory:
+```csharp
+public static class CoreServiceExtensions
+{
+    public static IServiceCollection AddCoreServices(this IServiceCollection services)
+    {
+        services.AddSingleton<ISettingsService>(...);
+        return services;
+    }
+}
 
-## File I/O Patterns
-- Use FileShare.ReadWrite for read operations
-- Use FileShare.Read for write operations
-- Implement retry logic for sharing violations
+// In Program.cs
+builder.Services
+    .AddCoreServices()
+    .AddStartupServices()
+    .AddHotkeyServices();
+```
+
+**Lifetimes**:
+- Singleton: ISettingsService, IApplicationController, IHotkeyManager
+- Transient: IOverlayWindow, SettingsWindow
+
+**Pattern**: Constructor injection only, no service locator
+
+## Service Patterns
+**ISettingsService**: Singleton via DI, 3-tier config loading, no direct instantiation
+
+**Single Instance**: Named Mutex in Program.Main for cross-process enforcement
+
+**Platform Services**: Interface + platform-specific implementations (Windows/macOS/Linux)
+
+## Logging
+- Prefer `Log.Debug()` over `Log.Information()` for development
+- Include structured parameters: `Log.Debug("Action: {Property}", value)`
+- Serilog configured with `shared: true` for concurrent file access
+
+## File I/O
+- Read: FileShare.ReadWrite
+- Write: FileShare.Read with in-memory lock for serialization
 - Handle UnauthorizedAccessException gracefully
 
-## Platform-Specific Code
-- Use conditional compilation: `#if WINDOWS`, `#if MACOS`
-- Check runtime: `RuntimeInformation.IsOSPlatform(OSPlatform.Windows)`
-- Implement platform-specific services behind interfaces
-- Keep platform code isolated in Services/ directories
+## Platform-Specific
+- Runtime check: `RuntimeInformation.IsOSPlatform(OSPlatform.Windows)`
+- Attribute: `[SupportedOSPlatform("windows")]`
+- Isolate in dedicated implementations (e.g., WindowsStartupManager)

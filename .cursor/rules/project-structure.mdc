@@ -5,37 +5,44 @@ description: AGI.Kapster project structure and navigation guide
 
 # AGI.Kapster Project Structure
 
-This is a .NET 9 cross-platform screenshot and annotation tool built with Avalonia UI.
+.NET 9 cross-platform screenshot and annotation tool built with Avalonia UI.
 
 ## Entry Points
-- Main application: [src/AGI.Kapster.App/Program.cs](mdc:src/AGI.Kapster.App/Program.cs)
-- Application startup: [src/AGI.Kapster.App/App.axaml.cs](mdc:src/AGI.Kapster.App/App.axaml.cs)
+- [Program.cs](mdc:src/AGI.Kapster.Desktop/Program.cs) - Application entry and DI setup
+- [App.axaml.cs](mdc:src/AGI.Kapster.Desktop/App.axaml.cs) - Application lifecycle
 
-## Core Architecture
-- **MVVM Pattern**: Using CommunityToolkit.Mvvm
-- **Dependency Injection**: Microsoft.Extensions.DependencyInjection
+## Architecture
+- **Dependency Injection**: Microsoft.Extensions.DependencyInjection with extension methods
 - **Cross-platform UI**: Avalonia UI 11.x
-- **Graphics**: SkiaSharp for image processing
-- **Logging**: Serilog for structured logging
+- **Graphics**: SkiaSharp for rendering
+- **Logging**: Serilog with shared file access
+- **Single Instance**: Named Mutex for cross-process enforcement
 
-## Key Directories
-- **Models/**: Data models and DTOs
-- **Services/**: Core business logic and platform abstractions
-- **ViewModels/**: MVVM view models
-- **Views/**: UI definitions (XAML)
-- **Overlays/**: Screenshot overlay windows and annotation canvas
-- **Commands/**: Command pattern for undo/redo functionality
-- **Rendering/**: Graphics rendering and annotation drawing
+## Directory Structure
+```
+src/AGI.Kapster.Desktop/
+├── Extensions/           # Service registration extension methods
+├── Services/            # Core services grouped by functionality
+│   ├── Settings/        # Singleton settings service with 3-tier config
+│   ├── Hotkeys/         # Global hotkey management
+│   ├── Overlay/         # Screenshot overlay controller
+│   ├── Capture/         # Screen capture strategies
+│   ├── Clipboard/       # Clipboard operations
+│   ├── Startup/         # Platform-specific auto-start managers
+│   └── Update/          # Auto-update service
+├── Overlays/           # Overlay UI and event handling
+├── Models/             # Data models and annotations
+├── Rendering/          # Graphics rendering
+├── Commands/           # Undo/redo command pattern
+└── Views/              # Settings windows and dialogs
+```
 
-## Critical Services
-- [ISettingsService](mdc:src/AGI.Kapster.App/Services/ISettingsService.cs): Settings management (transient lifecycle)
-- [IHotkeyProvider](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyProvider.cs): Global hotkey registration
-- [IOverlayController](mdc:src/AGI.Kapster.App/Services/IOverlayController.cs): Screenshot overlay management
-- [IAnnotationService](mdc:src/AGI.Kapster.App/Services/AnnotationService.cs): Drawing tools and annotation logic
-- [IExportService](mdc:src/AGI.Kapster.App/Services/ExportService.cs): Image encoding and file export
+## Key Services
+- [ISettingsService](mdc:src/AGI.Kapster.Desktop/Services/Settings/ISettingsService.cs) - Singleton settings with 3-tier loading
+- [IStartupManager](mdc:src/AGI.Kapster.Desktop/Services/IStartupManager.cs) - Platform-specific auto-start
+- [IOverlayController](mdc:src/AGI.Kapster.Desktop/Services/IOverlayController.cs) - Screenshot overlay management
+- [IHotkeyManager](mdc:src/AGI.Kapster.Desktop/Services/Hotkeys/IHotkeyManager.cs) - Global hotkey registration
+- [IExportService](mdc:src/AGI.Kapster.Desktop/Services/Export/IExportService.cs) - Image export
 
-## Main Windows
-- [OverlayWindow](mdc:src/AGI.Kapster.App/Overlays/OverlayWindow.axaml.cs): Screenshot capture overlay
-- [NewAnnotationOverlay](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationOverlay.cs): Drawing canvas
-- [NewAnnotationToolbar](mdc:src/AGI.Kapster.App/Overlays/NewAnnotationToolbar.axaml.cs): Tool selection UI
-- [SettingsWindow](mdc:src/AGI.Kapster.App/Views/SettingsWindow.axaml.cs): Application settings UI
+## Release Format
+- Tag format: `v1.1.0` (semantic versioning with 'v' prefix)
