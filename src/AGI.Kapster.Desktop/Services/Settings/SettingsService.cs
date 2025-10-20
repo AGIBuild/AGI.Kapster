@@ -159,9 +159,9 @@ public class SettingsService : ISettingsService
 
     public async Task SaveAsync()
     {
-        string json;
         
         // Serialize within lock (fast operation)
+        string json;
         lock (_saveLock)
         {
             // Create a copy for saving to user directory with limited AutoUpdate fields
