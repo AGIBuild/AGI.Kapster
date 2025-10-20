@@ -173,7 +173,7 @@ public class SettingsService : ISettingsService
         try
         {
             await _fileSystemService.WriteAllTextAsync(_settingsFilePath, json);
-            Log.Debug("Settings saved successfully to {FilePath}", _settingsFilePath);
+            Log.Information("Settings saved successfully to {FilePath}", _settingsFilePath);
         }
         catch (UnauthorizedAccessException ex)
         {
