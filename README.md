@@ -15,22 +15,22 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 ## ✨ Features
 
 ### 🎯 Smart Capture
-- **Global Hotkeys**: Customizable shortcuts (`Alt+A` default)
-- **Region Selection**: Pixel-perfect selection with visual feedback
-- **Multi-Monitor Support**: Seamless across multiple displays
-- **Element Detection**: Automatic UI element detection (Windows)
+- **Global Hotkeys**: `Alt+A` to capture, `Alt+S` for settings
+- **Multi-Monitor**: Seamless across all displays
+- **Element Detection**: Auto UI element detection (Windows)
+- **Single Instance**: Only one app instance runs at a time
 
 ### 🎨 Annotation Tools
-- **Drawing Tools**: Arrow, rectangle, ellipse, text, freehand, emoji
-- **Style Customization**: Colors, thickness, fonts, sizes
-- **Undo/Redo**: Multi-step operation history
-- **Layer Management**: Independent annotation editing
+- **Tools**: Arrow (A), Rectangle (R), Ellipse (E), Text (T), Freehand (F), Mosaic (M), Emoji (J)
+- **Customization**: Colors, thickness, fonts, sizes
+- **Undo/Redo**: `Ctrl+Z` / `Ctrl+Y`
+- **Hotkey Access**: Press tool key while drawing
 
-### 💾 Export Options
-- **Multiple Formats**: PNG, JPEG, BMP, TIFF, WebP with quality control
-- **Quick Actions**: Copy to clipboard (`Enter`) or save (`Ctrl+S`)
-- **Batch Processing**: Export multiple captures consistently
-- **Clipboard Integration**: Advanced clipboard operations
+### 💾 Export & Settings
+- **Formats**: PNG, JPEG, BMP, TIFF, WebP
+- **Quick Export**: `Enter` (clipboard) or `Ctrl+S` (save)
+- **Auto-Update**: Configurable update checking
+- **System Startup**: Optional auto-start with OS
 
 ## 🚀 Quick Start
 
@@ -108,8 +108,9 @@ cd AGI.Kapster
 | **Ellipse** | `E` | Draw ellipses |
 | **Text** | `T` | Add text |
 | **Freehand** | `F` | Free drawing |
-| **Emoji** | `M` | Insert emoji |
-| **Color Picker** | `C` | Pick color (when available) |
+| **Mosaic** | `M` | Pixelate/blur regions |
+| **Emoji** | `J` | Insert emoji |
+| **Color Picker** | `C` | Pick color |
 
 ## 🛠️ Development
 

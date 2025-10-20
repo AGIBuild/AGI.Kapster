@@ -1,64 +1,37 @@
 ---
 description: Global hotkey system architecture and platform patterns
-globs: **/Hotkeys/*.cs,**/Services/*Hotkey*.cs
+globs: **/Services/Hotkeys/*.cs
 ---
 
-# Hotkey System Architecture
+# Hotkey System
 
-## Core Interfaces
-- [IHotkeyProvider](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyProvider.cs): Platform-specific hotkey registration
-- [IHotkeyManager](mdc:src/AGI.Kapster.App/Services/Hotkeys/IHotkeyManager.cs): High-level hotkey management
-- [IApplicationController](mdc:src/AGI.Kapster.App/Services/IApplicationController.cs): Application lifecycle control
+## Architecture
+- **IHotkeyProvider** - Platform-specific registration (Windows/macOS/unsupported)
+- **IHotkeyManager** - High-level management and settings integration
+- **IApplicationController** - Application lifecycle coordination
 
-## Platform Implementation
-- **Windows**: Uses Windows API (RegisterHotKey/UnregisterHotKey)
-- **macOS**: Platform-specific implementation (planned)
-- Factory pattern selects correct provider at runtime
-
-## Async Event Pattern
-```csharp
-// Use TaskCompletionSource for async hotkey waiting
-private TaskCompletionSource<bool>? _hotkeyPressedTcs;
-
-public async Task<bool> WaitForHotkeyAsync(CancellationToken cancellationToken)
-{
-    _hotkeyPressedTcs = new TaskCompletionSource<bool>();
-    // Register hotkey, wait for trigger
-    return await _hotkeyPressedTcs.Task;
-}
-```
+## Platform Implementations
+- **Windows**: RegisterHotKey/UnregisterHotKey API
+- **macOS**: Platform-specific implementation
+- **Unsupported**: No-op implementation for other platforms
 
 ## Settings Integration
-- Hotkeys stored in [settings.json](mdc:settings.json)
-- Dynamic registration/unregistration when settings change
-- Validation of hotkey combinations
-- Conflict detection with system hotkeys
+- Hotkeys stored in user settings.json
+- Dynamic registration on settings changes
+- Default: Alt+A (capture), Alt+S (settings)
 
-## Error Handling
-- Graceful fallback when hotkey registration fails
-- User notification of conflicts
-- Retry mechanisms for transient failures
-- Platform-specific error codes handling
-
-## Thread Safety
-- Hotkey callbacks occur on different threads
-- Use Dispatcher.Invoke for UI thread operations
-- Synchronize access to shared state
-- Avoid blocking UI thread in callbacks
-
-## Memory Management
-- Unregister hotkeys on application exit
-- Dispose of platform resources properly
-- Weak references where appropriate
-- Clean up event subscriptions
-
-## Configuration Patterns
+## Async Pattern
+Use TaskCompletionSource for async hotkey events:
 ```csharp
-// Hotkey configuration structure
-public class HotkeyConfig
+private TaskCompletionSource<bool>? _hotkeyTcs;
+public async Task<bool> WaitForHotkeyAsync(CancellationToken ct)
 {
-    public ModifierKeys Modifiers { get; set; }
-    public Key Key { get; set; }
-    public string Action { get; set; }
+    _hotkeyTcs = new TaskCompletionSource<bool>();
+    return await _hotkeyTcs.Task;
 }
 ```
+
+## Thread Safety
+- Hotkey callbacks on different threads
+- Use Dispatcher for UI thread operations
+- Unregister on application exit

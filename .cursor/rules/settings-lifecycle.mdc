@@ -3,112 +3,42 @@ description: Settings service lifecycle and singleton pattern
 globs: **/Services/*Settings*.cs,**/Services/SettingsService.cs
 ---
 
-# Settings Service Lifecycle Patterns
+# Settings Service Lifecycle
 
-## Singleton Instance Model
-The project uses a **singleton pattern** for ISettingsService via dependency injection.
+## Pattern: Singleton via DI
+ISettingsService is registered as singleton in DI container. Must use dependency injection - no direct instantiation.
 
-## Key Principles
-1. **3-Tier Configuration Loading**: Default → appsettings.json → user settings.json
-2. **Constructor Loading**: All settings loaded synchronously in constructor
-3. **In-Memory Singleton**: Single instance shared across application
-4. **DI Only**: Must use dependency injection, no direct instantiation
-5. **Graceful Persistence**: Handles permission errors without throwing
+## 3-Tier Configuration Loading
+1. **Default** → hardcoded in AppSettings
+2. **appsettings.json** → repository/system config (IConfiguration)
+3. **user settings.json** → user preferences (%AppData%/AGI.Kapster/)
 
-## Implementation Pattern
+Later tiers override earlier ones, with one exception: AutoUpdate.Enabled is user-configurable, all other AutoUpdate fields come from appsettings.json.
+
+## Usage Pattern
 ```csharp
-// CORRECT: Use dependency injection
-public class SomeService
+// Inject in constructor (recommended)
+public MyService(ISettingsService settingsService)
 {
-    private readonly ISettingsService _settingsService;
-    
-    public SomeService(ISettingsService settingsService)
-    {
-        _settingsService = settingsService;
-        var currentSettings = _settingsService.Settings;
-    }
+    _settingsService = settingsService;
 }
 
-// INCORRECT: Don't create instances directly
-// var settingsService = new SettingsService(); // AVOID - use DI instead
+// Update settings
+await _settingsService.UpdateSettingsAsync(newSettings);
+// All consumers see changes immediately (singleton)
 ```
 
-## Service Registration
+## File I/O
+- In-memory lock serializes writes
+- FileShare.ReadWrite for reads, FileShare.Read for writes
+- Graceful handling of UnauthorizedAccessException
+- Location: `%AppData%/AGI.Kapster/settings.json`
+
+## Registration
 ```csharp
-// In Program.cs - register as singleton
 services.AddSingleton<ISettingsService>(provider =>
     new SettingsService(
         provider.GetRequiredService<IFileSystemService>(),
         provider.GetRequiredService<IConfiguration>()
     ));
 ```
-
-## 3-Tier Configuration Loading
-```csharp
-// Tier 1: Default settings (hardcoded in AppSettings)
-var settings = new AppSettings();
-
-// Tier 2: Merge with appsettings.json (via IConfiguration)
-// AutoUpdate (all fields), Repository settings, etc.
-
-// Tier 3: Merge with user settings.json (user data directory)
-// User preferences (General, Hotkeys, DefaultStyles)
-// AutoUpdate: ONLY Enabled field (other fields stay from Tier 2)
-```
-
-## AutoUpdate Configuration Policy
-- **User-Configurable**: `Enabled` (on/off switch in settings UI)
-- **System-Only** (from appsettings.json):
-  - `NotifyBeforeInstall`
-  - `UsePreReleases`
-  - `RepositoryOwner`
-  - `RepositoryName`
-  - `LastCheckTime`
-
-This ensures repository configuration is controlled by the application, 
-while users can only enable/disable the update feature.
-
-## Update Pattern
-```csharp
-public async Task UpdateSettingsAsync(AppSettings newSettings)
-{
-    _settings = newSettings;
-    await SaveAsync(); // Save to user directory
-}
-
-// Settings window usage:
-await _settingsService.UpdateSettingsAsync(updatedSettings);
-// All services immediately see changes (singleton)
-```
-
-## Consumer Pattern
-```csharp
-// Get from DI container (automatic in constructors)
-var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService;
-var currentSettings = settingsService?.Settings;
-
-// In constructors (recommended)
-public MyService(ISettingsService settingsService)
-{
-    _settingsService = settingsService;
-}
-```
-
-## Benefits
-- Single source of truth across application
-- Immediate visibility of changes
-- 3-tier configuration merging
-- Graceful permission error handling
-- Thread-safe (singleton managed by DI)
-- No file locking issues (proper FileShare usage)
-
-## File Persistence
-- Default location: `%AppData%/AGI.Kapster/settings.json`
-- Automatic retry on file access conflicts
-- Graceful degradation on permission errors
-- FileShare.ReadWrite for concurrent access
-
-## Files Following This Pattern
-- [SettingsService.cs](mdc:src/AGI.Kapster.Desktop/Services/Settings/SettingsService.cs): Singleton implementation
-- [FileSystemService.cs](mdc:src/AGI.Kapster.Desktop/Services/Settings/FileSystemService.cs): Retry logic with FileShare
-- [Program.cs](mdc:src/AGI.Kapster.Desktop/Program.cs): Singleton registration
