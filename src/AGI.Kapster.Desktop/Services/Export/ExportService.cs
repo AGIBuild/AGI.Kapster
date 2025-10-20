@@ -141,7 +141,7 @@ public class ExportService : IExportService
         {
             // Get singleton settings service from DI container
             var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService
-                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in Program.cs");
+                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
 
             var appSettings = settingsService.Settings;
 
