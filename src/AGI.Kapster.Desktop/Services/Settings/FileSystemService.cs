@@ -116,104 +116,43 @@ public class FileSystemService : IFileSystemService
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
 
-    private const int RetryDelayBaseMs = 100;
-    private const int UnauthorizedRetryDelayBaseMs = 200;
-
-    private string ReadAllTextWithRetry(string path, int maxRetries = 3)
+    private string ReadAllTextWithRetry(string path)
     {
-        for (int i = 0; i < maxRetries; i++)
-        {
-            try
-            {
-                // Use FileShare.ReadWrite to allow concurrent access
-                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(stream);
-                return reader.ReadToEnd();
-            }
-            catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
-            {
-                System.Threading.Thread.Sleep(RetryDelayBaseMs * (i + 1));
-            }
-        }
-        // Final attempt without retry
-        using var finalStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var finalReader = new StreamReader(finalStream);
-        return finalReader.ReadToEnd();
+        // Use FileShare.ReadWrite to allow concurrent access
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
-    private void WriteAllTextWithRetry(string path, string content, int maxRetries = 3)
+    private void WriteAllTextWithRetry(string path, string content)
     {
-        for (int i = 0; i < maxRetries; i++)
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
-            try
-            {
-                // Ensure directory exists
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                // Direct write with FileShare.Read - allows concurrent reads, exclusive write
-                using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-                using var writer = new StreamWriter(stream);
-                writer.Write(content);
-                writer.Flush();
-                return;
-            }
-            catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
-            {
-                System.Threading.Thread.Sleep(RetryDelayBaseMs * (i + 1));
-            }
-            catch (UnauthorizedAccessException) when (i < maxRetries - 1)
-            {
-                // Handle permission issues - wait and retry
-                System.Threading.Thread.Sleep(UnauthorizedRetryDelayBaseMs * (i + 1));
-            }
+            Directory.CreateDirectory(directory);
         }
-        
-        // Final attempt without retry - let exception propagate
-        using var finalStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-        using var finalWriter = new StreamWriter(finalStream);
-        finalWriter.Write(content);
-        finalWriter.Flush();
+
+        // Direct write with FileShare.Read - allows concurrent reads, exclusive write
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        using var writer = new StreamWriter(stream);
+        writer.Write(content);
+        writer.Flush();
     }
 
-    private async Task WriteAllTextWithRetryAsync(string path, string content, int maxRetries = 3)
+    private async Task WriteAllTextWithRetryAsync(string path, string content)
     {
-        for (int i = 0; i < maxRetries; i++)
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
-            try
-            {
-                // Ensure directory exists
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                // Direct write with FileShare.Read - allows concurrent reads, exclusive write
-                await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-                await using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(content);
-                await writer.FlushAsync();
-                return;
-            }
-            catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
-            {
-                await Task.Delay(RetryDelayBaseMs * (i + 1));
-            }
-            catch (UnauthorizedAccessException) when (i < maxRetries - 1)
-            {
-                // Handle permission issues - wait and retry
-                await Task.Delay(UnauthorizedRetryDelayBaseMs * (i + 1));
-            }
+            Directory.CreateDirectory(directory);
         }
-        
-        // Final attempt without retry - let exception propagate
-        await using var finalStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-        await using var finalWriter = new StreamWriter(finalStream);
-        await finalWriter.WriteAsync(content);
-        await finalWriter.FlushAsync();
+
+        // Direct write with FileShare.Read - allows concurrent reads, exclusive write
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(content);
+        await writer.FlushAsync();
     }
 }
