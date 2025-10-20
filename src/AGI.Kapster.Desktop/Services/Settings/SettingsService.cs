@@ -240,7 +240,7 @@ public class SettingsService : ISettingsService
             }
 
             // Direct write outside lock (I/O operation)
-            _fileSystemService.WriteAllTextAsync(_settingsFilePath, json).GetAwaiter().GetResult();
+            _fileSystemService.WriteAllText(_settingsFilePath, json);
 
             Log.Debug("Settings saved synchronously to {FilePath}", _settingsFilePath);
         }
