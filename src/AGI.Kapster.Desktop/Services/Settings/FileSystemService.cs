@@ -137,6 +137,8 @@ public class FileSystemService : IFileSystemService
     {
         for (int i = 0; i < maxRetries; i++)
         {
+            var tempPath = path + ".tmp";
+            
             try
             {
                 // Ensure directory exists
@@ -146,27 +148,68 @@ public class FileSystemService : IFileSystemService
                     Directory.CreateDirectory(directory);
                 }
 
-                // Use FileShare.Read to allow reading while writing
-                await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-                await using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(content);
-                await writer.FlushAsync();
+                // Write to temp file first (non-blocking approach)
+                // Write temp file with FileShare.None (exclusive but short duration)
+                await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var writer = new StreamWriter(stream))
+                {
+                    await writer.WriteAsync(content);
+                    await writer.FlushAsync();
+                }
+
+                // Atomic replace: delete old and rename temp
+                // This operation is very fast and won't block readers for long
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+                File.Move(tempPath, path);
+                
                 return;
             }
             catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
             {
+                // Clean up temp file on failure
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
                 await Task.Delay(100 * (i + 1));
             }
             catch (UnauthorizedAccessException ex) when (i < maxRetries - 1)
             {
+                // Clean up temp file on failure
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
                 // Handle permission issues - wait and retry
                 await Task.Delay(200 * (i + 1));
             }
+            catch
+            {
+                // Clean up temp file on any other failure
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                throw;
+            }
         }
+        
         // Final attempt without retry - let exception propagate
-        await using var finalStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-        await using var finalWriter = new StreamWriter(finalStream);
-        await finalWriter.WriteAsync(content);
-        await finalWriter.FlushAsync();
+        var finalTempPath = path + ".tmp";
+        try
+        {
+            await using (var finalStream = new FileStream(finalTempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (var finalWriter = new StreamWriter(finalStream))
+            {
+                await finalWriter.WriteAsync(content);
+                await finalWriter.FlushAsync();
+            }
+            
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+            File.Move(finalTempPath, path);
+        }
+        catch
+        {
+            // Clean up temp file on failure
+            try { if (File.Exists(finalTempPath)) File.Delete(finalTempPath); } catch { }
+            throw;
+        }
     }
 }

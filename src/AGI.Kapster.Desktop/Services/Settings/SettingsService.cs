@@ -41,6 +41,9 @@ public class SettingsService : ISettingsService
 
         _settingsFilePath = Path.Combine(appFolder, "settings.json");
 
+        // Clean up any leftover temp files from previous crashes
+        CleanupTempFiles();
+
         // Load settings immediately in constructor using 3-tier approach
         _settings = LoadSettingsWithThreeTierApproach();
 
@@ -176,10 +179,12 @@ public class SettingsService : ISettingsService
     }
 
     /// <summary>
-    /// Synchronous save for constructor use
+    /// Synchronous save for constructor use (non-blocking via temp file)
     /// </summary>
     private void SaveSettingsSync(AppSettings settings)
     {
+        var tempPath = _settingsFilePath + ".tmp";
+        
         try
         {
             var json = JsonSerializer.Serialize(settings, AppJsonContext.Default.AppSettings);
@@ -191,21 +196,34 @@ public class SettingsService : ISettingsService
                 _fileSystemService.EnsureDirectoryExists(directory);
             }
 
-            // Write synchronously
-            using var stream = _fileSystemService.CreateFileStream(_settingsFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
-            using var writer = new StreamWriter(stream);
-            writer.Write(json);
-            writer.Flush();
+            // Write to temp file first (non-blocking approach)
+            using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(json);
+                writer.Flush();
+            }
+
+            // Atomic replace
+            if (File.Exists(_settingsFilePath))
+            {
+                File.Delete(_settingsFilePath);
+            }
+            File.Move(tempPath, _settingsFilePath);
 
             Log.Debug("Settings saved synchronously to {FilePath}", _settingsFilePath);
         }
         catch (UnauthorizedAccessException ex)
         {
+            // Clean up temp file
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
             Log.Warning(ex, "Insufficient permissions to save initial settings to {FilePath}", _settingsFilePath);
             // Don't throw - gracefully handle permission issues
         }
         catch (Exception ex)
         {
+            // Clean up temp file
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
             Log.Warning(ex, "Failed to save initial settings to {FilePath}", _settingsFilePath);
             // Don't throw in constructor
         }
@@ -255,5 +273,25 @@ public class SettingsService : ISettingsService
         }
 
         return defaultSettings;
+    }
+
+    /// <summary>
+    /// Clean up leftover temporary files from previous crashes
+    /// </summary>
+    private void CleanupTempFiles()
+    {
+        try
+        {
+            var tempPath = _settingsFilePath + ".tmp";
+            if (_fileSystemService.FileExists(tempPath))
+            {
+                _fileSystemService.DeleteFile(tempPath);
+                Log.Debug("Cleaned up leftover temp file: {TempPath}", tempPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to clean up temp files, ignoring");
+        }
     }
 }
