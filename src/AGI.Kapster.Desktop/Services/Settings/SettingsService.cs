@@ -156,32 +156,30 @@ public class SettingsService : ISettingsService
 
     public async Task SaveAsync()
     {
-        // Use lock to prevent concurrent writes
-        await Task.Run(() =>
+        string json;
+        
+        // Serialize within lock (fast operation)
+        lock (_saveLock)
         {
-            lock (_saveLock)
-            {
-                try
-                {
-                    var json = JsonSerializer.Serialize(_settings, AppJsonContext.Default.AppSettings);
+            json = JsonSerializer.Serialize(_settings, AppJsonContext.Default.AppSettings);
+        }
 
-                    // Synchronous write within lock to ensure atomicity
-                    _fileSystemService.WriteAllTextAsync(_settingsFilePath, json).GetAwaiter().GetResult();
-
-                    Log.Debug("Settings saved successfully to {FilePath}", _settingsFilePath);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    Log.Warning(ex, "Insufficient permissions to save settings to {FilePath}, operation skipped", _settingsFilePath);
-                    // Don't throw - gracefully handle permission issues
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Failed to save settings to {FilePath}", _settingsFilePath);
-                    throw;
-                }
-            }
-        });
+        // Write outside lock (I/O operation)
+        try
+        {
+            await _fileSystemService.WriteAllTextAsync(_settingsFilePath, json);
+            Log.Debug("Settings saved successfully to {FilePath}", _settingsFilePath);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log.Warning(ex, "Insufficient permissions to save settings to {FilePath}, operation skipped", _settingsFilePath);
+            // Don't throw - gracefully handle permission issues
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to save settings to {FilePath}", _settingsFilePath);
+            throw;
+        }
     }
 
     /// <summary>
@@ -189,34 +187,37 @@ public class SettingsService : ISettingsService
     /// </summary>
     private void SaveSettingsSync(AppSettings settings)
     {
-        lock (_saveLock)
+        try
         {
-            try
+            string json;
+            
+            // Serialize within lock (fast operation)
+            lock (_saveLock)
             {
-                var json = JsonSerializer.Serialize(settings, AppJsonContext.Default.AppSettings);
-                
-                // Use synchronous write for constructor
-                var directory = Path.GetDirectoryName(_settingsFilePath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    _fileSystemService.EnsureDirectoryExists(directory);
-                }
+                json = JsonSerializer.Serialize(settings, AppJsonContext.Default.AppSettings);
+            }
+            
+            // Use synchronous write for constructor
+            var directory = Path.GetDirectoryName(_settingsFilePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                _fileSystemService.EnsureDirectoryExists(directory);
+            }
 
-                // Direct write with lock protection
-                _fileSystemService.WriteAllTextAsync(_settingsFilePath, json).GetAwaiter().GetResult();
+            // Direct write outside lock (I/O operation)
+            _fileSystemService.WriteAllTextAsync(_settingsFilePath, json).GetAwaiter().GetResult();
 
-                Log.Debug("Settings saved synchronously to {FilePath}", _settingsFilePath);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                Log.Warning(ex, "Insufficient permissions to save initial settings to {FilePath}", _settingsFilePath);
-                // Don't throw - gracefully handle permission issues
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Failed to save initial settings to {FilePath}", _settingsFilePath);
-                // Don't throw in constructor
-            }
+            Log.Debug("Settings saved synchronously to {FilePath}", _settingsFilePath);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log.Warning(ex, "Insufficient permissions to save initial settings to {FilePath}", _settingsFilePath);
+            // Don't throw - gracefully handle permission issues
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to save initial settings to {FilePath}", _settingsFilePath);
+            // Don't throw in constructor
         }
     }
 
