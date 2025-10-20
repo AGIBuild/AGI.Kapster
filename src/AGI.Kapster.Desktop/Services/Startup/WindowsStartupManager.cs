@@ -37,12 +37,8 @@ public class WindowsStartupManager : IStartupManager
             if (enabled)
             {
                 // Add to startup
-                var exePath = Process.GetCurrentProcess().MainModule?.FileName;
-                if (string.IsNullOrEmpty(exePath))
-                {
-                    Log.Error("Could not determine application executable path");
-                    return Task.FromResult(false);
-                }
+                var exePath = Process.GetCurrentProcess().MainModule?.FileName
+                    ?? throw new InvalidOperationException("Could not determine application executable path");
 
                 // Add --minimized flag for startup
                 var startupCommand = $"\"{exePath}\" --minimized";
