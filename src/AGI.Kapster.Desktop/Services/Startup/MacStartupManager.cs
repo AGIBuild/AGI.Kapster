@@ -13,6 +13,8 @@ namespace AGI.Kapster.Desktop.Services.Startup;
 public class MacStartupManager : IStartupManager
 {
     private const string LaunchAgentLabel = "com.agibuild.kapster";
+    private const int LaunchCtlTimeoutMs = 5000;
+    
     private string LaunchAgentPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         "Library", "LaunchAgents", $"{LaunchAgentLabel}.plist");
@@ -163,7 +165,7 @@ public class MacStartupManager : IStartupManager
                 RedirectStandardError = true
             });
 
-            process?.WaitForExit(5000);
+            process?.WaitForExit(LaunchCtlTimeoutMs);
             Log.Debug("Loaded macOS LaunchAgent");
         }
         catch (Exception ex)
@@ -185,7 +187,7 @@ public class MacStartupManager : IStartupManager
                 RedirectStandardError = true
             });
 
-            process?.WaitForExit(5000);
+            process?.WaitForExit(LaunchCtlTimeoutMs);
             Log.Debug("Unloaded macOS LaunchAgent");
         }
         catch (Exception ex)

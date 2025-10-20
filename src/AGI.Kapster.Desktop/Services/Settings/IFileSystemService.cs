@@ -29,6 +29,11 @@ public interface IFileSystemService
     string ReadAllText(string path);
 
     /// <summary>
+    /// Write all text to a file synchronously
+    /// </summary>
+    void WriteAllText(string path, string content);
+
+    /// <summary>
     /// Ensure directory exists
     /// </summary>
     void EnsureDirectoryExists(string path);

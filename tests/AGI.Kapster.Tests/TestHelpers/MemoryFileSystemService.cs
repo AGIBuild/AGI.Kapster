@@ -49,6 +49,12 @@ public class MemoryFileSystemService : IFileSystemService, IDisposable
         throw new FileNotFoundException($"File not found: {path}");
     }
 
+    public void WriteAllText(string path, string content)
+    {
+        var normalizedPath = NormalizePath(path);
+        _files[normalizedPath] = System.Text.Encoding.UTF8.GetBytes(content);
+    }
+
     public void EnsureDirectoryExists(string path)
     {
         var normalizedPath = NormalizePath(path);

@@ -71,6 +71,7 @@ public class SettingsServiceTests : TestBase
     public async Task Settings_ShouldPersistChanges()
     {
         // Arrange
+        var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
         var newHotkey = "Ctrl+Alt+C";
 
         // Act
@@ -79,6 +80,7 @@ public class SettingsServiceTests : TestBase
 
         // Assert
         _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be(newHotkey);
+        _settingsService.Settings.Hotkeys.CaptureRegion.Should().NotBe(originalHotkey);
     }
 
     [Theory]
