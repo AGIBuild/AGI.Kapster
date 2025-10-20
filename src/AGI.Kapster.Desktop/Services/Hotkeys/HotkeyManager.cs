@@ -169,7 +169,7 @@ public class HotkeyManager : IHotkeyManager
         {
             // Get services from DI container
             var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService
-                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in Program.cs");
+                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
             
             var applicationController = App.Services?.GetService(typeof(IApplicationController)) as IApplicationController;
             var updateService = App.Services?.GetService(typeof(IUpdateService)) as IUpdateService;
