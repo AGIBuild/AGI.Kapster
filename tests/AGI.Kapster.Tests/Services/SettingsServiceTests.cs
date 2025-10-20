@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -14,11 +15,13 @@ public class SettingsServiceTests : TestBase
 {
     private readonly SettingsService _settingsService;
     private readonly MemoryFileSystemService _fileSystemService;
+    private readonly IConfiguration? _configuration;
 
     public SettingsServiceTests(ITestOutputHelper output) : base(output)
     {
         _fileSystemService = new MemoryFileSystemService();
-        _settingsService = new SettingsService(_fileSystemService);
+        _configuration = null; // Use default configuration for most tests
+        _settingsService = new SettingsService(_fileSystemService, _configuration);
     }
 
     [Fact]
@@ -39,15 +42,6 @@ public class SettingsServiceTests : TestBase
         settings.Should().NotBeNull();
         settings.Hotkeys.CaptureRegion.Should().NotBeNullOrEmpty();
         settings.Hotkeys.OpenSettings.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void SaveSettings_ShouldNotThrowException()
-    {
-        // Note: SaveSettings is not exposed by ISettingsService
-        // This test would need to be implemented differently
-        var action = () => { /* SaveSettings method not available */ };
-        action.Should().NotThrow();
     }
 
     [Fact]
@@ -86,6 +80,7 @@ public class SettingsServiceTests : TestBase
 
         // Assert
         _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be(newHotkey);
+        _settingsService.Settings.Hotkeys.CaptureRegion.Should().NotBe(originalHotkey);
     }
 
     [Theory]
@@ -120,7 +115,7 @@ public class SettingsServiceTests : TestBase
     }
 
     [Fact]
-    public void Settings_ShouldMaintainIndependence()
+    public void Settings_ShouldMaintainSingleInstance()
     {
         // Arrange
         var settings1 = _settingsService.Settings;
@@ -130,9 +125,10 @@ public class SettingsServiceTests : TestBase
         settings1.Hotkeys.CaptureRegion = "Ctrl+1";
         settings2.Hotkeys.CaptureRegion = "Ctrl+2";
 
-        // Assert
-        settings1.Hotkeys.CaptureRegion.Should().Be("Ctrl+2"); // Should be the same instance
+        // Assert - Should be the same instance (singleton pattern)
+        settings1.Hotkeys.CaptureRegion.Should().Be("Ctrl+2");
         settings2.Hotkeys.CaptureRegion.Should().Be("Ctrl+2");
+        settings1.Should().BeSameAs(settings2);
     }
 
     [Fact]
@@ -191,23 +187,63 @@ public class SettingsServiceTests : TestBase
     public async Task Settings_ShouldLoadAndSaveCorrectly()
     {
         // Arrange
-        var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
         var newHotkey = "Ctrl+Shift+S";
 
         // Act - Change setting
         _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
         await _settingsService.SaveAsync();
 
-        // Create new service instance to test loading
+        // Create new service instance to test loading (simulating singleton behavior)
         var newFileSystem = new MemoryFileSystemService();
         // Copy the saved data to the new file system
         var savedData = _fileSystemService.ReadAllText(_settingsService.GetSettingsFilePath());
         await newFileSystem.WriteAllTextAsync(_settingsService.GetSettingsFilePath(), savedData);
 
-        var newSettingsService = new SettingsService(newFileSystem);
+        var newSettingsService = new SettingsService(newFileSystem, _configuration);
 
         // Assert
         newSettingsService.Settings.Hotkeys.CaptureRegion.Should().Be(newHotkey);
+    }
+
+    [Fact]
+    public async Task UpdateSettingsAsync_ShouldUpdateAndSave()
+    {
+        // Arrange
+        var newSettings = new AppSettings();
+        newSettings.Hotkeys.CaptureRegion = "Alt+X";
+        newSettings.General.StartWithWindows = false;
+
+        // Act
+        await _settingsService.UpdateSettingsAsync(newSettings);
+
+        // Assert
+        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be("Alt+X");
+        _settingsService.Settings.General.StartWithWindows.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ResetToDefaults_ShouldResetAllSettings()
+    {
+        // Arrange
+        _settingsService.Settings.Hotkeys.CaptureRegion = "Custom+Hotkey";
+        var originalDefaults = new AppSettings();
+
+        // Act
+        _settingsService.ResetToDefaults();
+
+        // Assert
+        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be(originalDefaults.Hotkeys.CaptureRegion);
+    }
+
+    [Fact]
+    public void GetSettingsFilePath_ShouldReturnValidPath()
+    {
+        // Act
+        var path = _settingsService.GetSettingsFilePath();
+
+        // Assert
+        path.Should().NotBeNullOrEmpty();
+        path.Should().EndWith("settings.json");
     }
 
     public override void Dispose()

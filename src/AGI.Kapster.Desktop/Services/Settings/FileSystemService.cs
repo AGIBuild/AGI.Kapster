@@ -21,12 +21,17 @@ public class FileSystemService : IFileSystemService
 
     public async Task WriteAllTextAsync(string path, string content)
     {
-        await File.WriteAllTextAsync(path, content);
+        await WriteAllTextWithRetryAsync(path, content);
     }
 
     public string ReadAllText(string path)
     {
-        return File.ReadAllText(path);
+        return ReadAllTextWithRetry(path);
+    }
+
+    public void WriteAllText(string path, string content)
+    {
+        WriteAllTextWithRetry(path, content);
     }
 
     public void EnsureDirectoryExists(string path)
@@ -110,4 +115,44 @@ public class FileSystemService : IFileSystemService
 
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
+
+    private string ReadAllTextWithRetry(string path)
+    {
+        // Use FileShare.ReadWrite to allow concurrent access
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private void WriteAllTextWithRetry(string path, string content)
+    {
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // Direct write with FileShare.Read - allows concurrent reads, exclusive write
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        using var writer = new StreamWriter(stream);
+        writer.Write(content);
+        writer.Flush();
+    }
+
+    private async Task WriteAllTextWithRetryAsync(string path, string content)
+    {
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // Direct write with FileShare.Read - allows concurrent reads, exclusive write
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(content);
+        await writer.FlushAsync();
+    }
 }

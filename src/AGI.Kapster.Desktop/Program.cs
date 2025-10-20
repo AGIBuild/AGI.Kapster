@@ -1,46 +1,57 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using AGI.Kapster.Desktop.Services.Hotkeys;
-using AGI.Kapster.Desktop.Services.Overlay;
-using AGI.Kapster.Desktop.Services.Overlay.Platforms;
-using AGI.Kapster.Desktop.Services;
-using AGI.Kapster.Desktop.Services.Settings;
-using AGI.Kapster.Desktop.Overlays;
-using AGI.Kapster.Desktop.Services.ElementDetection;
-using AGI.Kapster.Desktop.Views;
-using AGI.Kapster.Desktop.Services.Clipboard;
-using AGI.Kapster.Desktop.Rendering.Overlays;
-using AGI.Kapster.Desktop.Services.Capture;
-using AGI.Kapster.Desktop.Services.Capture.Platforms;
-using AGI.Kapster.Desktop.Services.Clipboard.Platforms;
+using AGI.Kapster.Desktop.Extensions;
 
 namespace AGI.Kapster.Desktop;
 
 class Program
 {
+    private const string MutexName = "AGI.Kapster.SingleInstance.Mutex";
+    private static Mutex? _instanceMutex;
+
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
     public static void Main(string[] args)
     {
-        // Check for command line arguments
-        var isMinimizedStart = args.Any(arg => arg == "--minimized" || arg == "-m");
+        // Check for single instance
+        _instanceMutex = new Mutex(true, MutexName, out bool createdNew);
 
-        if (isMinimizedStart)
+        if (!createdNew)
         {
-            Log.Debug("Application started in minimized mode from command line");
+            // Another instance is already running
+            Console.WriteLine("AGI.Kapster is already running. Only one instance is allowed.");
+            Log.Warning("Application startup blocked - another instance is already running");
+            return;
         }
 
-        RunApp(args, isMinimizedStart);
+        try
+        {
+            // Check for command line arguments
+            var isMinimizedStart = args.Any(arg => arg == "--minimized" || arg == "-m");
+
+            if (isMinimizedStart)
+            {
+                Log.Debug("Application started in minimized mode from command line");
+            }
+
+            RunApp(args, isMinimizedStart);
+        }
+        finally
+        {
+            // Release mutex on exit
+            _instanceMutex?.ReleaseMutex();
+            _instanceMutex?.Dispose();
+        }
     }
 
     private static void RunApp(string[] args, bool startMinimized)
@@ -83,7 +94,8 @@ class Program
                 .MinimumLevel.Debug()
                 .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 30,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
@@ -93,7 +105,8 @@ class Program
             loggerConfiguration
                 .MinimumLevel.Warning()
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 7,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
@@ -104,7 +117,8 @@ class Program
             loggerConfiguration
                 .MinimumLevel.Information()
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 15,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
@@ -125,64 +139,13 @@ class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
-        builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
-        builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
-        builder.Services.AddTransient<ISettingsService>(provider =>
-            new SettingsService(
-                provider.GetRequiredService<IFileSystemService>(),
-                provider.GetRequiredService<IConfiguration>()
-            ));
-        builder.Services.AddSingleton<IApplicationController, ApplicationController>();
-        builder.Services.AddSingleton<IHotkeyManager, HotkeyManager>();
-        builder.Services.AddTransient<SettingsWindow>();
-        builder.Services.AddSingleton<INotificationService, NotificationService>();
-
-        // Auto-update service (only enabled in production)
-        builder.Services.AddSingleton<AGI.Kapster.Desktop.Services.Update.IUpdateService, AGI.Kapster.Desktop.Services.Update.UpdateService>();
-
-        // Register platform-specific hotkey providers
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            builder.Services.AddSingleton<IHotkeyProvider, WindowsHotkeyProvider>();
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            builder.Services.AddSingleton<IHotkeyProvider, MacHotkeyProvider>();
-        }
-        else
-        {
-            builder.Services.AddSingleton<IHotkeyProvider, UnsupportedHotkeyProvider>();
-        }
-
-        // Register platform-specific services
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            builder.Services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
-            builder.Services.AddTransient<IElementDetector, WindowsElementDetector>();
-            builder.Services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
-            builder.Services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            builder.Services.AddTransient<IOverlayWindow, MacOverlayWindow>();
-            builder.Services.AddTransient<IElementDetector, NullElementDetector>();
-            builder.Services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
-            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>(); // Reuse Windows renderer
-            builder.Services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
-        }
-        else
-        {
-            // Default to Windows implementations for other platforms
-            builder.Services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
-            builder.Services.AddTransient<IElementDetector, WindowsElementDetector>();
-            builder.Services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            builder.Services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
-            builder.Services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-        }
-
-        // Register the overlay manager
-        builder.Services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
+        // Register all application services using extension methods
+        builder.Services
+            .AddCoreServices()
+            .AddStartupServices()
+            .AddHotkeyServices()
+            .AddCaptureServices()
+            .AddOverlayServices();
 
         var host = builder.Build();
 

@@ -82,9 +82,8 @@ public class HotkeyManager : IHotkeyManager
             // Unregister all existing hotkeys
             _hotkeyProvider.UnregisterAll();
 
-            // Create new settings service instance to get latest settings
-            var settingsService = new SettingsService();
-            var settings = settingsService.Settings;
+            // Use injected singleton settings service to get latest settings
+            var settings = _settingsService.Settings;
 
             // Load hotkey configurations from settings
             RegisterCaptureRegionHotkey(settings.Hotkeys.CaptureRegion);
@@ -168,14 +167,15 @@ public class HotkeyManager : IHotkeyManager
     {
         try
         {
-            // Create proper service instances - avoid default constructor
-            var settingsService = new SettingsService();
+            // Get services from DI container
+            var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService
+                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
+            
             var applicationController = App.Services?.GetService(typeof(IApplicationController)) as IApplicationController;
             var updateService = App.Services?.GetService(typeof(IUpdateService)) as IUpdateService;
 
             var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
             settingsWindow.Show();
-
         }
         catch (Exception ex)
         {

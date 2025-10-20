@@ -109,8 +109,9 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void InitializeHeavyComponents()
     {
-        // Create settings service instance for this overlay session
-        var settingsService = new SettingsService();
+        // Get singleton settings service from DI container
+        var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService 
+            ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
 
         // Replace XAML annotator with one that has settings service
         var existingAnnotator = this.FindControl<NewAnnotationOverlay>("Annotator");

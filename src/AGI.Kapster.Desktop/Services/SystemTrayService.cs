@@ -38,8 +38,8 @@ public class SystemTrayService : ISystemTrayService, IDisposable
 
         _notificationService = services.GetRequiredService<INotificationService>();
         _updateService = services.GetRequiredService<IUpdateService>();
-        var settingsService = services.GetService<ISettingsService>();
-        _appSettings = settingsService?.Settings ?? new AppSettings();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        _appSettings = settingsService.Settings;
 
         _updateService.UpdateAvailable += OnUpdateAvailable;
     }
