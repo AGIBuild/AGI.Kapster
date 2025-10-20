@@ -58,7 +58,8 @@ public class ApplicationController : IApplicationController
         }
         catch (Exception ex)
         {
-            _errorHandler.LogError(ex, ErrorSeverity.Error, "Application controller initialization");
+            // Controller layer: catch and notify
+            await _errorHandler.HandleErrorAsync(ex, ErrorSeverity.Error, "Application controller initialization");
         }
     }
 
