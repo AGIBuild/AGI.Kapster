@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -127,7 +127,7 @@ class Program
 
         builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
         builder.Services.AddSingleton<IFileSystemService, FileSystemService>();
-        builder.Services.AddTransient<ISettingsService>(provider =>
+        builder.Services.AddSingleton<ISettingsService>(provider =>
             new SettingsService(
                 provider.GetRequiredService<IFileSystemService>(),
                 provider.GetRequiredService<IConfiguration>()

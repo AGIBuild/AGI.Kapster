@@ -12,16 +12,17 @@ description: C# coding standards and patterns for AGI.Kapster
 - **UPPER_CASE**: Constants
 
 ## Service Lifecycle Patterns
-- **ISettingsService**: Use transient instances, not singletons
-- Create new instances when needed: `new SettingsService()`
-- Settings are loaded in constructor, no need for LoadAsync()
-- No SettingsChanged events - reload service instance for fresh settings
+- **ISettingsService**: Singleton pattern via DI container
+- Must use dependency injection - no direct instantiation
+- Settings loaded in constructor with 3-tier approach
+- Changes visible immediately across all consumers
 
 ## Error Handling
 - Use structured logging with Serilog
 - Log levels: Debug, Information (avoid), Warning, Error
 - Prefer `Log.Debug()` over `Log.Information()` for development logs
 - Always include context in log messages
+- Gracefully handle permission errors without throwing
 
 ## Async Patterns
 - Use `async/await` for I/O operations
@@ -36,10 +37,16 @@ description: C# coding standards and patterns for AGI.Kapster
 - Implement `INotifyPropertyChanged` through base classes
 
 ## Dependency Injection
-- Register services in [Program.cs](mdc:src/AGI.Kapster.App/Program.cs)
-- Use appropriate lifetimes: Singleton for stateless, Transient for stateful
+- Register services in [Program.cs](mdc:src/AGI.Kapster.Desktop/Program.cs)
+- Use appropriate lifetimes: Singleton for shared state, Transient for per-use
 - Prefer constructor injection over service locator pattern
 - Use interfaces for testability and abstraction
+
+## File I/O Patterns
+- Use FileShare.ReadWrite for read operations
+- Use FileShare.Read for write operations
+- Implement retry logic for sharing violations
+- Handle UnauthorizedAccessException gracefully
 
 ## Platform-Specific Code
 - Use conditional compilation: `#if WINDOWS`, `#if MACOS`

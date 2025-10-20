@@ -21,12 +21,12 @@ public class FileSystemService : IFileSystemService
 
     public async Task WriteAllTextAsync(string path, string content)
     {
-        await File.WriteAllTextAsync(path, content);
+        await WriteAllTextWithRetryAsync(path, content);
     }
 
     public string ReadAllText(string path)
     {
-        return File.ReadAllText(path);
+        return ReadAllTextWithRetry(path);
     }
 
     public void EnsureDirectoryExists(string path)
@@ -110,4 +110,63 @@ public class FileSystemService : IFileSystemService
 
     private static bool IsSharingViolation(IOException ex)
         => ex.HResult == unchecked((int)0x80070020);
+
+    private string ReadAllTextWithRetry(string path, int maxRetries = 3)
+    {
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                // Use FileShare.ReadWrite to allow concurrent access
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
+            {
+                System.Threading.Thread.Sleep(100 * (i + 1));
+            }
+        }
+        // Final attempt without retry
+        using var finalStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var finalReader = new StreamReader(finalStream);
+        return finalReader.ReadToEnd();
+    }
+
+    private async Task WriteAllTextWithRetryAsync(string path, string content, int maxRetries = 3)
+    {
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                // Ensure directory exists
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // Use FileShare.Read to allow reading while writing
+                await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+                await using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(content);
+                await writer.FlushAsync();
+                return;
+            }
+            catch (IOException ex) when (IsSharingViolation(ex) && i < maxRetries - 1)
+            {
+                await Task.Delay(100 * (i + 1));
+            }
+            catch (UnauthorizedAccessException ex) when (i < maxRetries - 1)
+            {
+                // Handle permission issues - wait and retry
+                await Task.Delay(200 * (i + 1));
+            }
+        }
+        // Final attempt without retry - let exception propagate
+        await using var finalStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        await using var finalWriter = new StreamWriter(finalStream);
+        await finalWriter.WriteAsync(content);
+        await finalWriter.FlushAsync();
+    }
 }
