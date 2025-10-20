@@ -139,8 +139,10 @@ public class ExportService : IExportService
     {
         try
         {
-            // Create fresh settings service instance to get latest settings
-            var settingsService = new SettingsService();
+            // Get singleton settings service from DI container
+            var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService
+                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in Program.cs");
+
             var appSettings = settingsService.Settings;
 
             // Determine format from settings
@@ -164,15 +166,8 @@ public class ExportService : IExportService
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to get default settings from application settings, using fallback defaults");
-            return new ExportSettings
-            {
-                Format = ExportFormat.PNG,
-                Quality = 90,
-                Compression = 6,
-                DPI = 96,
-                PreserveTransparency = true
-            };
+            Log.Error(ex, "Failed to get default settings from application settings");
+            throw;
         }
     }
 

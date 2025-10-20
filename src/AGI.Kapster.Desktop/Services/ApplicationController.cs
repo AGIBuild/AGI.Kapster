@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Microsoft.Win32;
 using Serilog;
 using AGI.Kapster.Desktop.Services.Settings;
 
@@ -16,14 +15,13 @@ namespace AGI.Kapster.Desktop.Services;
 /// </summary>
 public class ApplicationController : IApplicationController
 {
-    private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "AGI.Kapster";
-
     private readonly ISettingsService _settingsService;
+    private readonly IStartupManager _startupManager;
 
-    public ApplicationController(ISettingsService settingsService)
+    public ApplicationController(ISettingsService settingsService, IStartupManager startupManager)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _startupManager = startupManager ?? throw new ArgumentNullException(nameof(startupManager));
     }
 
     public async Task InitializeAsync()
@@ -34,16 +32,23 @@ public class ApplicationController : IApplicationController
 
             // No main window needed - application runs in background
 
-            // Apply startup settings
-            var shouldStartWithWindows = _settingsService.Settings.General.StartWithWindows;
-            var currentlyEnabled = await IsStartupWithWindowsEnabledAsync();
-
-            if (shouldStartWithWindows != currentlyEnabled)
+            // Apply startup settings using platform-specific manager
+            if (_startupManager.IsSupported)
             {
-                await SetStartupWithWindowsAsync(shouldStartWithWindows);
-            }
+                var shouldStartWithWindows = _settingsService.Settings.General.StartWithWindows;
+                var currentlyEnabled = await _startupManager.IsStartupEnabledAsync();
 
-            Log.Debug("Application controller initialized. Startup with Windows: {StartupEnabled}", shouldStartWithWindows);
+                if (shouldStartWithWindows != currentlyEnabled)
+                {
+                    await _startupManager.SetStartupAsync(shouldStartWithWindows);
+                }
+
+                Log.Debug("Application controller initialized. Startup enabled: {StartupEnabled}", shouldStartWithWindows);
+            }
+            else
+            {
+                Log.Warning("Startup with system is not supported on this platform");
+            }
         }
         catch (Exception ex)
         {
@@ -53,77 +58,41 @@ public class ApplicationController : IApplicationController
 
     public async Task<bool> SetStartupWithWindowsAsync(bool enabled)
     {
-        if (!OperatingSystem.IsWindows())
+        if (!_startupManager.IsSupported)
         {
-            Log.Warning("Startup with Windows is only supported on Windows platform");
+            Log.Warning("Startup with system is not supported on this platform");
             return false;
         }
 
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, true);
-            if (key == null)
+            var success = await _startupManager.SetStartupAsync(enabled);
+            
+            if (success)
             {
-                Log.Error("Could not open Windows startup registry key");
-                return false;
+                // Update settings
+                _settingsService.Settings.General.StartWithWindows = enabled;
+                await _settingsService.SaveAsync();
+                Log.Debug("System startup setting updated: {Enabled}", enabled);
             }
 
-            if (enabled)
-            {
-                // Add to startup
-                var exePath = Process.GetCurrentProcess().MainModule?.FileName;
-                if (string.IsNullOrEmpty(exePath))
-                {
-                    Log.Error("Could not determine application executable path");
-                    return false;
-                }
-
-                // Add --minimized flag for startup
-                var startupCommand = $"\"{exePath}\" --minimized";
-                key.SetValue(AppName, startupCommand, RegistryValueKind.String);
-                Log.Debug("Added application to Windows startup: {Command}", startupCommand);
-            }
-            else
-            {
-                // Remove from startup
-                key.DeleteValue(AppName, false);
-                Log.Debug("Removed application from Windows startup");
-            }
-
-            // Update settings
-            _settingsService.Settings.General.StartWithWindows = enabled;
-            await _settingsService.SaveAsync();
-
-            return true;
+            return success;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to set startup with Windows: {Enabled}", enabled);
+            Log.Error(ex, "Failed to set startup with system: {Enabled}", enabled);
             return false;
         }
     }
 
     public Task<bool> IsStartupWithWindowsEnabledAsync()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!_startupManager.IsSupported)
         {
             return Task.FromResult(false);
         }
 
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, false);
-            var value = key?.GetValue(AppName) as string;
-            var isEnabled = !string.IsNullOrEmpty(value);
-
-            Log.Debug("Startup with Windows status checked: {Enabled}", isEnabled);
-            return Task.FromResult(isEnabled);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to check startup with Windows status");
-            return Task.FromResult(false);
-        }
+        return _startupManager.IsStartupEnabledAsync();
     }
 
 
