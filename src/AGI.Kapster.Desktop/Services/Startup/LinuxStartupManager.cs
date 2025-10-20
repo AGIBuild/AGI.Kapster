@@ -71,12 +71,8 @@ public class LinuxStartupManager : IStartupManager
         try
         {
             // Get application executable path
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-            if (string.IsNullOrEmpty(exePath))
-            {
-                Log.Error("Could not determine application executable path");
-                return false;
-            }
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+                ?? throw new InvalidOperationException("Could not determine application executable path");
 
             // Ensure autostart directory exists
             var directory = Path.GetDirectoryName(AutostartPath);
