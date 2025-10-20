@@ -259,7 +259,7 @@ public class SettingsService : ISettingsService
     public void ResetToDefaults()
     {
         _settings = CreateDefaultSettings();
-        Log.Debug("Settings reset to defaults");
+        Log.Information("Settings reset to defaults");
     }
 
     public async Task UpdateSettingsAsync(AppSettings newSettings)
