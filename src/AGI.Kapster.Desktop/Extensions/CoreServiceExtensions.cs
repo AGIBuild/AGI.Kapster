@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update;
+using AGI.Kapster.Desktop.Services.ErrorHandling;
 using AGI.Kapster.Desktop.Views;
 
 namespace AGI.Kapster.Desktop.Extensions;
@@ -28,6 +29,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<IApplicationController, ApplicationController>();
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IErrorHandler, ErrorHandler>();
         services.AddTransient<SettingsWindow>();
 
         return services;

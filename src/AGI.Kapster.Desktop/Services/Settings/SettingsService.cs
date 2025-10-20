@@ -6,6 +6,7 @@ using System.Text.Json;
 using AGI.Kapster.Desktop.Services.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using AGI.Kapster.Desktop.Services.ErrorHandling;
 
 namespace AGI.Kapster.Desktop.Services.Settings;
 
