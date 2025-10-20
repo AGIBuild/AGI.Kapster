@@ -24,8 +24,7 @@ class Program
     public static void Main(string[] args)
     {
         // Check for single instance
-        bool createdNew;
-        _instanceMutex = new Mutex(true, MutexName, out createdNew);
+        _instanceMutex = new Mutex(true, MutexName, out bool createdNew);
 
         if (!createdNew)
         {
