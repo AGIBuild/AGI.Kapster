@@ -94,7 +94,8 @@ class Program
                 .MinimumLevel.Debug()
                 .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 30,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
@@ -104,7 +105,8 @@ class Program
             loggerConfiguration
                 .MinimumLevel.Warning()
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 7,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
@@ -115,7 +117,8 @@ class Program
             loggerConfiguration
                 .MinimumLevel.Information()
                 .WriteTo.File(
-                    path: Path.Combine(logsDir, "app-.log"),
+                    path: Path.Combine(logsDir, ".log"),
+                    shared: true,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 15,
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
