@@ -42,6 +42,14 @@ public sealed class NewAnnotationOverlay : Canvas
     private readonly IAnnotationRenderer _renderer;
     private readonly CommandManager _commandManager;
     private IAnnotationItem? _creatingItem;
+
+    /// <summary>
+    /// Get all annotation items (public for use by OverlayWindow)
+    /// </summary>
+    public IEnumerable<IAnnotationItem> GetAnnotations()
+    {
+        return _annotationService?.Manager?.Items ?? Enumerable.Empty<IAnnotationItem>();
+    }
     private bool _isCreating;
 
     // Text editing
@@ -1552,9 +1560,9 @@ public sealed class NewAnnotationOverlay : Canvas
     }
 
     /// <summary>
-    /// End text editing
+    /// End text editing (public for use by OverlayWindow)
     /// </summary>
-    private void EndTextEditing()
+    public void EndTextEditing()
     {
         if (_editingTextBox == null || _editingTextItem == null) return;
 

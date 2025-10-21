@@ -13,7 +13,7 @@
         <Image x:Name="BackgroundImage" Stretch="Fill" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality"/>
         <Path x:Name="MaskPath" Fill="#66000000" IsHitTestVisible="False"/>
         <local:SelectionOverlay x:Name="Selector"/>
-        <local:NewAnnotationOverlay x:Name="Annotator"/>
+        <!-- Annotator is created in code-behind with DI-resolved settings service -->
         <Canvas x:Name="UiCanvas">
             <local:NewAnnotationToolbar x:Name="Toolbar"/>
         </Canvas>

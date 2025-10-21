@@ -2,284 +2,215 @@
 
 ## Core Interfaces
 
-### IOverlayController
-**Purpose**: Main overlay lifecycle management  
-**Implementation**: `SimplifiedOverlayManager`  
-
+### IScreenshotService (High-Level API)
 ```csharp
-void ShowAll();        // Show overlays on all screens
-void CloseAll();       // Close all active overlays
-bool IsActive { get; } // Check if any overlays are active
+bool IsActive { get; }
+Task TakeScreenshotAsync();
+void Cancel();
+```
+**Usage**: `IScreenshotService` → inject and call `TakeScreenshotAsync()`
+
+### IOverlayCoordinator (Platform Abstraction)
+```csharp
+Task<IOverlaySession> StartSessionAsync();
+void CloseCurrentSession();
+bool HasActiveSession { get; }
+```
+**Implementations**: `WindowsOverlayCoordinator`, `MacOverlayCoordinator`
+
+### IOverlaySession (Lifecycle Management)
+```csharp
+IReadOnlyList<Window> Windows { get; }
+void ShowAll();
+void CloseAll();
+bool HasSelection { get; }
+```
+**Lifecycle**: Created per screenshot, disposed after completion
+
+### IOverlayWindow (Window Interface)
+```csharp
+PixelPoint Position { get; set; }
+double Width { get; set; }
+double Height { get; set; }
+void Show();
+void Close();
+void SetMaskSize(double width, double height);
+void SetSession(IOverlaySession? session);
+Window AsWindow();
+```
+**Implementation**: `OverlayWindow` (Avalonia)
+
+### IScreenCoordinateMapper (Coordinate System)
+```csharp
+PixelRect MapToPhysicalRect(Rect logicalRect, Screen screen);
+Rect MapToLogicalRect(PixelRect physicalRect, Screen screen);
+Screen? GetScreenFromPoint(PixelPoint point, IReadOnlyList<Screen> screens);
+```
+**Implementations**: `WindowsCoordinateMapper`, `MacCoordinateMapper`
+
+## Service Lifetimes
+
+| Service | Lifetime | Reason |
+|---------|----------|--------|
+| `IScreenshotService` | Singleton | High-level API |
+| `IOverlayCoordinator` | Singleton | Session orchestration |
+| `IOverlaySessionFactory` | Singleton | Factory pattern |
+| `IOverlayWindowFactory` | Singleton | Factory pattern |
+| `IScreenCoordinateMapper` | **Transient** | Fresh screen data |
+| `IScreenCaptureStrategy` | Transient | Per-capture instance |
+
+## Common Usage
+
+### Take Screenshot
+```csharp
+var screenshotService = serviceProvider.GetRequiredService<IScreenshotService>();
+await screenshotService.TakeScreenshotAsync();
 ```
 
-### IOverlayWindow
-**Purpose**: Platform-specific overlay window  
-**Implementations**: `WindowsOverlayWindow`, `MacOverlayWindow`
-
+### Cancel Screenshot
 ```csharp
-void Show();                // Display overlay window
-void Close();               // Close overlay window
-void SetFullScreen(Screen screen);
-void SetRegion(PixelRect region);
-bool ElementDetectionEnabled { get; set; }
-Screen? Screen { get; }     // Associated screen
+screenshotService.Cancel();  // Closes all overlays
 ```
 
-### IScreenCaptureStrategy
-**Purpose**: Platform-specific screen capture  
-**Implementations**: `WindowsScreenCaptureStrategy`, `MacScreenCaptureStrategy`
-
+### Check Active Status
 ```csharp
-Task<SKBitmap> CaptureRegionAsync(PixelRect region);     // Capture specific region
-Task<SKBitmap> CaptureFullScreenAsync(Screen screen);    // Capture entire screen
-```
-
-## Key Events
-
-### RegionSelected
-```csharp
-public class CaptureRegionEventArgs : EventArgs
+if (screenshotService.IsActive)
 {
-  public PixelRect Region { get; }           // Selected screen region
-  public CaptureMode Mode { get; }           // FullScreen/Window/Region/Element
-  public object? CaptureTarget { get; }      // Window handle or element info
-  public IOverlayWindow? SourceWindow { get; } // Origin overlay window
+    // Screenshot in progress
 }
 ```
 
-**Event Flow**: `OverlayWindow` → `OverlayManager` → `Clipboard` → `CloseAll`
+## Event Flow
 
-### Cancelled
-Triggered when user cancels selection (ESC key or click outside)
-
-## Service Registration
-
-### Dependency Injection Setup
-```csharp
-// Core services
-services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
-
-// Platform-specific (Windows)
-if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-{
-    services.AddTransient<IOverlayWindow, WindowsOverlayWindow>();
-    services.AddTransient<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-}
-
-// Platform-specific (macOS)
-else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-{
-    services.AddTransient<IOverlayWindow, MacOverlayWindow>();
-    services.AddTransient<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
-    services.AddTransient<IElementDetector, NullElementDetector>();
-}
 ```
-
-## Common Usage Patterns
-
-### Basic Overlay Display
-```csharp
-var overlayController = serviceProvider.GetRequiredService<IOverlayController>();
-
-// Show overlays on all screens
-overlayController.ShowAll();
-
-// Handle region selection
-overlayController.RegionSelected += async (sender, args) =>
-{
-    // Process captured region
-    await ProcessCapturedRegion(args.Region, args.CapturedImage);
-    
-    // Close overlays explicitly if needed
-    overlayController.CloseAll();
-};
-```
-
-### Screen Capture Integration
-```csharp
-var captureStrategy = serviceProvider.GetRequiredService<IScreenCaptureStrategy>();
-
-// Capture specific region
-var region = new PixelRect(100, 100, 300, 200);
-var bitmap = await captureStrategy.CaptureRegionAsync(region);
-
-// Capture full screen
-var screen = Screen.AllScreens.First();
-var fullScreenBitmap = await captureStrategy.CaptureFullScreenAsync(screen);
+User clicks hotkey
+    ↓
+IScreenshotService.TakeScreenshotAsync()
+    ↓
+IOverlayCoordinator.StartSessionAsync()
+    ↓
+IOverlaySession.ShowAll()
+    ↓
+[User selects region]
+    ↓
+OverlayWindow.RegionSelected event
+    ↓
+IOverlayCoordinator.CloseCurrentSession()
+    ↓
+IOverlaySession.Dispose()
 ```
 
 ## Platform Differences
 
-| Capability | Windows | macOS | Notes |
-|------------|---------|-------|-------|
-| Screen capture (full/region) | ✅ | ✅ (region via screencapture) | macOS full/window planned via CoreGraphics |
-| Window capture | ✅ | ⚠️ Not implemented | `CaptureWindowAsync` returns null on macOS |
-| Element capture | ✅ | ❌ | macOS not supported yet |
-| Element detection | ✅ UI Automation | ❌ | `NullElementDetector` on macOS |
-| Multi-screen overlays | ✅ | ✅ | Different positioning strategies |
-| Permissions | None | Screen Recording required | User must grant once |
-| Performance | High (native BitBlt) | Medium (shell command + IO) | Future CG optimizations |
+| Feature | Windows | macOS |
+|---------|---------|-------|
+| **Window strategy** | Single virtual desktop | Per-screen windows |
+| **Coordinate system** | Virtual desktop bounds (negative coords) | Per-screen positive coords |
+| **DPI handling** | System DPI awareness | Retina scaling |
+| **Screen capture** | Win32 BitBlt (fast) | screencapture command |
+| **Element detection** | ✅ UI Automation | ❌ Not supported |
+| **Permissions** | None required | Screen Recording permission |
 
-## Debugging
+## Architecture Patterns
 
-### Check Overlay Status
+### Template Method Pattern
+`OverlayCoordinatorBase` defines session creation flow:
+1. `GetScreensAsync()` - Get available screens
+2. `CalculateTargetRegions()` - Platform-specific (virtual desktop vs per-screen)
+3. `CreateAndConfigureWindowsAsync()` - Platform-specific window creation
+4. `session.ShowAll()` - Display overlays
+
+### Factory Pattern
+- `IOverlayWindowFactory` creates `IOverlayWindow` with DI
+- `IOverlaySessionFactory` creates `IOverlaySession`
+
+### Coordinator Pattern
+- Abstracts platform differences at orchestration level
+- Single entry point via `IScreenshotService`
+
+## Testing
+
+### Mock IScreenshotService
 ```csharp
-var overlayController = serviceProvider.GetRequiredService<IOverlayController>();
-Console.WriteLine($"Overlays active: {overlayController.IsActive}");
+var mockService = Substitute.For<IScreenshotService>();
+mockService.IsActive.Returns(false);
 ```
 
-### Screen Information
+### Mock IOverlayCoordinator
 ```csharp
-foreach (var screen in Screen.AllScreens)
-{
-    Console.WriteLine($"Screen: {screen.DeviceName}");
-    Console.WriteLine($"Bounds: {screen.Bounds}");
-    Console.WriteLine($"Primary: {screen.Primary}");
-}
+var mockCoordinator = Substitute.For<IOverlayCoordinator>();
+mockCoordinator.HasActiveSession.Returns(true);
 ```
 
-### Event Debugging
+### Mock IOverlayWindow
 ```csharp
-overlayController.RegionSelected += (sender, args) =>
-{
-    Console.WriteLine($"Region selected: {args.Region}");
-    Console.WriteLine($"Editable: {args.IsEditableSelection}");
-    Console.WriteLine($"Has image: {args.CapturedImage != null}");
-};
-
-overlayController.Cancelled += (sender, args) =>
-{
-    Console.WriteLine("Overlay cancelled by user");
-};
+var mockWindow = Substitute.For<IOverlayWindow>();
+mockWindow.Width.Returns(1920);
+mockWindow.Height.Returns(1080);
 ```
 
-## Common Issues & Solutions
-
-### Issue: macOS Black Screen
-**Problem**: Secondary monitors show black overlay  
-**Solution**: Enhanced screen coverage validation implemented  
-**Code**: Check `MacOverlayWindow.EnsureProperScreenCoverage()`
-
-### Issue: Event Handler Memory Leaks
-**Problem**: Event handlers not unsubscribed  
-**Solution**: Proper disposal pattern  
-**Code**: Use `using` statements and explicit cleanup
-
-### Issue: Windows Element Detection Fails
-**Problem**: UI Automation fails on some apps  
-**Solution**: Graceful degradation to manual selection  
-**Code**: Try/catch with fallback to region selection
+### Cannot Test
+- `OverlayWindow` instantiation (requires IWindowingPlatform)
+- Actual window rendering (requires UI thread)
 
 ## File Locations
 
-### Core Implementation
 ```
 src/AGI.Kapster.Desktop/
 ├── Services/
-│   ├── Overlay/
-│   │   ├── SimplifiedOverlayManager.cs      # Main controller
-│   │   └── Platforms/
-│   │       ├── WindowsOverlayWindow.cs      # Windows implementation
-│   │       └── MacOverlayWindow.cs          # macOS implementation
-│   └── Capture/
-│       └── Platforms/
-│           ├── WindowsScreenCaptureStrategy.cs
-│           └── MacScreenCaptureStrategy.cs
-```
-
-### UI Components
-```
-src/AGI.Kapster.Desktop/
-├── Rendering/
-│   └── Overlays/
-│       ├── OverlayWindow.axaml              # Avalonia overlay window
-│       ├── OverlayWindow.axaml.cs           # Window code-behind
-│       └── OverlayViewModel.cs              # Window view model
-```
-
-### Tests
-```
-tests/AGI.Kapster.Tests/
-├── Services/
+│   ├── Screenshot/IScreenshotService.cs
 │   └── Overlay/
-│       └── OverlayManagerTests.cs          # Manager unit tests
+│       ├── Coordinators/
+│       │   ├── IOverlayCoordinator.cs
+│       │   ├── WindowsOverlayCoordinator.cs
+│       │   └── MacOverlayCoordinator.cs
+│       └── State/IOverlaySession.cs
+└── Overlays/
+    ├── IOverlayWindow.cs
+    └── OverlayWindow.axaml.cs
+
+tests/AGI.Kapster.Tests/Services/
+├── Screenshot/ScreenshotServiceTests.cs
+├── Overlay/
+│   ├── OverlayCoordinatorBaseTests.cs
+│   └── OverlayWindowFactoryTests.cs
 ```
 
-## Performance Tips
+## Common Issues
 
-### Memory Management
-```csharp
-// Dispose bitmaps after use
-using var bitmap = await captureStrategy.CaptureRegionAsync(region);
-// Process bitmap
-// Automatic disposal on scope exit
-```
+**Issue**: Second screenshot fails to draw selection  
+**Fix**: Session-scoped state via `IOverlaySession`
 
-### Event Subscription Cleanup
-```csharp
-public void Dispose()
-{
-    if (_overlayController != null)
-    {
-        _overlayController.RegionSelected -= OnRegionSelected;
-        _overlayController.Cancelled -= OnCancelled;
-    }
-}
-```
+**Issue**: Mask doesn't cover all screens  
+**Fix**: Use `SetMaskSize()` and `ClientSize` instead of `Bounds`
 
-### Efficient Screen Enumeration
-```csharp
-// Cache screen list if called frequently
-private static readonly Screen[] CachedScreens = Screen.AllScreens.ToArray();
-```
+**Issue**: Saved image blurry  
+**Fix**: Adaptive DPI based on screen scaling
 
-## Testing Helpers
-
-### Mock Overlay Controller
-```csharp
-var mockController = Substitute.For<IOverlayController>();
-mockController.IsActive.Returns(false);
-```
-
-### Test Event Triggering
-```csharp
-var eventArgs = new CaptureRegionEventArgs(
-    new PixelRect(0, 0, 100, 100),
-    CaptureMode.Region,
-    captureTarget: null,
-    sourceWindow: null
-);
-
-// Trigger event for testing
-mockController.RegionSelected += Raise.EventWith(mockController, eventArgs);
-```
-
-### Integration Test Setup
-```csharp
-var services = new ServiceCollection();
-services.AddSingleton<IOverlayController, SimplifiedOverlayManager>();
-services.AddTransient<IOverlayWindow, MockOverlayWindow>();
-var provider = services.BuildServiceProvider();
-```
+**Issue**: Test fails with "Unable to locate IWindowingPlatform"  
+**Fix**: Mock `IOverlayWindow` interface, don't instantiate `OverlayWindow`
 
 ## Quick Commands
 
-### Show Overlays
 ```csharp
-overlayController.ShowAll();
+// Take screenshot
+await screenshotService.TakeScreenshotAsync();
+
+// Cancel
+screenshotService.Cancel();
+
+// Check status
+bool isActive = screenshotService.IsActive;
+
+// Get screens
+var coordinator = serviceProvider.GetRequiredService<IOverlayCoordinator>();
+// (Screens obtained internally via GetScreensAsync)
 ```
 
-### Close All Overlays
-```csharp
-overlayController.CloseAll();
-```
+## Key Reminders
 
-### Capture Region
-```csharp
-var bitmap = await captureStrategy.CaptureRegionAsync(region);
-```
-
-### Check Platform Capabilities
-```csharp
-bool canDetectElements = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-```
+- ✅ `IScreenCoordinateMapper` is **Transient** (fresh screen data)
+- ✅ `IOverlayWindow` enables DI and testing
+- ✅ `AsWindow()` method for `IOverlaySession.AddWindow()` compatibility
+- ✅ Platform differences isolated in coordinators
+- ✅ Session auto-cleanup via `IDisposable`

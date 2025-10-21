@@ -33,22 +33,22 @@ public class ExportService : IExportService
     /// <summary>
     /// Export annotated screenshot to file with default settings
     /// </summary>
-    public async Task ExportToFileAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, string filePath)
+    public async Task ExportToFileAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, string filePath, Screen? targetScreen = null)
     {
         var defaultSettings = GetDefaultSettings();
-        await ExportToFileAsync(screenshot, annotations, selectionRect, filePath, defaultSettings);
+        await ExportToFileAsync(screenshot, annotations, selectionRect, filePath, defaultSettings, null, targetScreen);
     }
 
     /// <summary>
     /// Export annotated screenshot to file with custom settings
     /// </summary>
-    public async Task ExportToFileAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null)
+    public async Task ExportToFileAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, string filePath, ExportSettings settings, Action<int, string>? progressCallback = null, Screen? targetScreen = null)
     {
         try
         {
             progressCallback?.Invoke(10, "Creating composite image...");
             // UI operations must run on UI thread
-            var compositeImage = await CreateCompositeImageAsync(screenshot, annotations, selectionRect);
+            var compositeImage = await CreateCompositeImageAsync(screenshot, annotations, selectionRect, targetScreen);
 
             progressCallback?.Invoke(40, "Converting image format...");
             // Convert Avalonia bitmap to SkiaSharp for advanced format support
@@ -98,14 +98,14 @@ public class ExportService : IExportService
     /// <summary>
     /// Export annotated screenshot to clipboard (simplified)
     /// </summary>
-    public async Task ExportToClipboardAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect)
+    public async Task ExportToClipboardAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, Screen? targetScreen = null)
     {
         try
         {
             // For now, save to a temp file and notify - clipboard image support can be improved later
             var defaultSettings = GetDefaultSettings();
             var tempPath = Path.Combine(Path.GetTempPath(), $"AGI_Kapster_Export_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-            await ExportToFileAsync(screenshot, annotations, selectionRect, tempPath, defaultSettings);
+            await ExportToFileAsync(screenshot, annotations, selectionRect, tempPath, defaultSettings, null, targetScreen);
 
             Log.Information("Exported annotated screenshot to temporary file: {TempPath}", tempPath);
         }
@@ -174,11 +174,11 @@ public class ExportService : IExportService
     /// <summary>
     /// Create composite image with annotations for macOS clipboard support
     /// </summary>
-    public async Task<Bitmap?> CreateCompositeImageWithAnnotationsAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect)
+    public async Task<Bitmap?> CreateCompositeImageWithAnnotationsAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, Screen? targetScreen = null)
     {
         try
         {
-            return await CreateCompositeImageAsync(screenshot, annotations, selectionRect);
+            return await CreateCompositeImageAsync(screenshot, annotations, selectionRect, targetScreen);
         }
         catch (Exception ex)
         {
@@ -191,7 +191,7 @@ public class ExportService : IExportService
     /// Create composite image with annotations rendered on top of screenshot
     /// Must be called on UI thread due to Canvas and RenderTargetBitmap operations
     /// </summary>
-    private Task<Bitmap> CreateCompositeImageAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect)
+    private Task<Bitmap> CreateCompositeImageAsync(Bitmap screenshot, IEnumerable<IAnnotationItem> annotations, Rect selectionRect, Screen? targetScreen = null)
     {
         try
         {
@@ -199,9 +199,9 @@ public class ExportService : IExportService
             var pixelWidth = screenshot.PixelSize.Width;
             var pixelHeight = screenshot.PixelSize.Height;
             
-            // Calculate scale factor between screenshot pixels and selection DIPs
-            var scaleX = pixelWidth / selectionRect.Width;
-            var scaleY = pixelHeight / selectionRect.Height;
+            // Calculate scale factor between screenshot pixels and selection DIPs (for RenderTransform)
+            var pixelScaleX = pixelWidth / selectionRect.Width;
+            var pixelScaleY = pixelHeight / selectionRect.Height;
             
             var canvas = new Canvas
             {
@@ -231,11 +231,37 @@ public class ExportService : IExportService
             canvas.Arrange(new Rect(0, 0, selectionRect.Width, selectionRect.Height));
 
             // Apply scale transform for high-DPI rendering
-            canvas.RenderTransform = new ScaleTransform(scaleX, scaleY);
+            canvas.RenderTransform = new ScaleTransform(pixelScaleX, pixelScaleY);
+
+            // Calculate effective DPI for rendering quality
+            // Use target screen's actual DPI scaling if provided, otherwise derive from pixel scale
+            double screenScaling;
+            if (targetScreen != null)
+            {
+                // Use real screen DPI scaling for multi-monitor support
+                screenScaling = targetScreen.Scaling;
+                Log.Debug("Using target screen DPI scaling: {Scaling}", screenScaling);
+            }
+            else
+            {
+                // Fallback: derive from pixel/DIP ratio (handles single monitor or unknown screen)
+                screenScaling = pixelScaleX; // Assume uniform scaling
+                Log.Debug("No target screen specified, deriving DPI from pixel scale: {Scale}", screenScaling);
+            }
+            
+            var effectiveDpiX = 96 * screenScaling;
+            var effectiveDpiY = 96 * screenScaling;
+            
+            // Cap DPI to reasonable limit (300 DPI) to avoid excessive memory usage
+            effectiveDpiX = Math.Min(300, effectiveDpiX);
+            effectiveDpiY = Math.Min(300, effectiveDpiY);
+            
+            Log.Debug("Rendering annotations at {DpiX}x{DpiY} DPI for screen scaling {Scaling} (pixel scale: {PixelScaleX}x{PixelScaleY})",
+                effectiveDpiX, effectiveDpiY, screenScaling, pixelScaleX, pixelScaleY);
 
             var annotationBitmap = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(96, 96));
+                new Vector(effectiveDpiX, effectiveDpiY));
 
             // Clear with transparent background before rendering
             using (var clearCtx = annotationBitmap.CreateDrawingContext())
@@ -246,14 +272,14 @@ public class ExportService : IExportService
             annotationBitmap.Render(canvas);
             canvas.RenderTransform = null;
 
-            // Create final composite
+            // Create final composite with high DPI for maximum quality
             var composite = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(96, 96));
+                new Vector(effectiveDpiX, effectiveDpiY));
 
             using var context = composite.CreateDrawingContext();
 
-            // Draw screenshot
+            // Draw screenshot with high-quality interpolation
             context.DrawImage(screenshot, 
                 new Rect(0, 0, pixelWidth, pixelHeight), 
                 new Rect(0, 0, pixelWidth, pixelHeight));
@@ -264,6 +290,10 @@ public class ExportService : IExportService
                 context.DrawImage(annotationBitmap, 
                     new Rect(0, 0, pixelWidth, pixelHeight));
             }
+            
+            Log.Debug("Composite image created at {Width}x{Height} with {DpiX}x{DpiY} DPI",
+                pixelWidth, pixelHeight, effectiveDpiX, effectiveDpiY);
+                
             return Task.FromResult<Bitmap>(composite);
         }
         catch (Exception ex)

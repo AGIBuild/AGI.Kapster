@@ -14,7 +14,7 @@ using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Hotkeys;
 using AGI.Kapster.Desktop.Services.Update;
-using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Views;
 
@@ -126,11 +126,11 @@ public partial class App : Application
     {
         try
         {
-            // Check if overlay windows are currently active (screenshot in progress)
-            var overlayController = Services!.GetRequiredService<IOverlayController>();
-            if (overlayController.IsActive)
+            // Check if screenshot is currently in progress
+            var screenshotService = Services!.GetRequiredService<IScreenshotService>();
+            if (screenshotService.IsActive)
             {
-                Log.Debug("Settings window request ignored - screenshot overlay is active");
+                Log.Debug("Settings window request ignored - screenshot is active");
                 return;
             }
 
