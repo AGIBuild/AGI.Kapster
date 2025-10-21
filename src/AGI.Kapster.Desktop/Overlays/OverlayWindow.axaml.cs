@@ -920,9 +920,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
             var centerPoint = new PixelPoint((int)centerX, (int)centerY);
 
             // Find screen containing this point
-            if (_coordinateMapper == null || _screens == null || _screens.Count == 0)
+            if (_screens == null || _screens.Count == 0)
             {
-                Log.Warning("Cannot determine target screen: coordinateMapper or screens not available");
+                Log.Warning("Cannot determine target screen: screens not available");
                 return null;
             }
 
