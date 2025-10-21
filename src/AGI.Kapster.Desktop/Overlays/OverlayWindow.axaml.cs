@@ -30,6 +30,16 @@ public partial class OverlayWindow : Window
     private bool _hasEditableSelection = false; // Track if there's an editable selection
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
 
+    // Cached control references to avoid FindControl<>() abuse
+    private Image? _backgroundImage;
+    private Avalonia.Controls.Shapes.Path? _maskPath;
+    private SelectionOverlay? _selector;
+    private NewAnnotationToolbar? _toolbar;
+    private Canvas? _uiCanvas;
+
+    // Mask size is set by overlay controller based on platform strategy
+    private Size _maskSize;
+
     // Throttling for element detection to prevent excessive updates
     private PixelPoint _lastDetectionPos;
     private DateTime _lastDetectionTime = DateTime.MinValue;
@@ -60,6 +70,9 @@ public partial class OverlayWindow : Window
         // Fast initialization: only XAML parsing
         InitializeComponent();
 
+        // Cache control references immediately after InitializeComponent
+        CacheControlReferences();
+
         // Minimal setup for immediate display
         this.Cursor = new Cursor(StandardCursorType.Cross);
         _isElementPickerMode = false;
@@ -73,13 +86,10 @@ public partial class OverlayWindow : Window
 		this.Opened += async (_, __) =>
 		{
 		    // Display pre-captured background immediately if available
-		    if (_precapturedBackground != null)
+		    if (_precapturedBackground != null && _backgroundImage != null)
 		    {
-		        if (this.FindControl<Image>("BackgroundImage") is { } img)
-		        {
-		            img.Source = _precapturedBackground;
-		            _frozenBackground = _precapturedBackground;
-		        }
+		        _backgroundImage.Source = _precapturedBackground;
+		        _frozenBackground = _precapturedBackground;
 		    }
 		    else
 		    {
@@ -105,6 +115,20 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
+    /// Cache control references to avoid repeated FindControl<>() calls
+    /// </summary>
+    private void CacheControlReferences()
+    {
+        _backgroundImage = this.FindControl<Image>("BackgroundImage");
+        _maskPath = this.FindControl<Avalonia.Controls.Shapes.Path>("MaskPath");
+        _selector = this.FindControl<SelectionOverlay>("Selector");
+        _toolbar = this.FindControl<NewAnnotationToolbar>("Toolbar");
+        _uiCanvas = this.FindControl<Canvas>("UiCanvas");
+        
+        // Note: _annotator will be cached after replacement in InitializeHeavyComponents
+    }
+
+    /// <summary>
     /// Initialize heavy UI components (Annotator, Toolbar, ElementHighlight) after background is visible
     /// </summary>
     private void InitializeHeavyComponents()
@@ -113,31 +137,20 @@ public partial class OverlayWindow : Window
         var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService 
             ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
 
-        // Replace XAML annotator with one that has settings service
-        var existingAnnotator = this.FindControl<NewAnnotationOverlay>("Annotator");
-        if (existingAnnotator != null)
+        // Create annotator with settings service and add to grid
+        _annotator = new NewAnnotationOverlay(settingsService)
         {
-            // Create a new NewAnnotationOverlay with settings service and replace the XAML one
-            var newAnnotator = new NewAnnotationOverlay(settingsService);
-            newAnnotator.Name = "Annotator";
+            Name = "Annotator"
+        };
 
-            // Find the parent grid and replace the old annotator
-            if (this.Content is Grid grid)
-            {
-                var index = grid.Children.IndexOf(existingAnnotator);
-                if (index >= 0)
-                {
-                    grid.Children.RemoveAt(index);
-                    grid.Children.Insert(index, newAnnotator);
-
-                    // Update the reference for later setup
-                    existingAnnotator = newAnnotator;
-                    _annotator = newAnnotator; // Store reference to avoid FindControl issues
-
-                    // Set focus to enable keyboard shortcuts
-                    newAnnotator.Focus();
-                }
-            }
+        // Add annotator to grid (after Selector, before UiCanvas)
+        if (this.Content is Grid grid && _selector != null && _uiCanvas != null)
+        {
+            var selectorIndex = grid.Children.IndexOf(_selector);
+            grid.Children.Insert(selectorIndex + 1, _annotator);
+            
+            // Set focus to enable keyboard shortcuts
+            _annotator.Focus();
         }
 
         SetupElementHighlight();
@@ -148,11 +161,10 @@ public partial class OverlayWindow : Window
         }
 
         // Show selection overlay by default for free selection
-        var selectorOverlay = this.FindControl<SelectionOverlay>("Selector");
-        if (selectorOverlay != null)
+        if (_selector != null)
         {
-            selectorOverlay.IsVisible = true;
-            selectorOverlay.IsHitTestVisible = true;
+            _selector.IsVisible = true;
+            _selector.IsHitTestVisible = true;
         }
 
         // Setup selection overlay
@@ -181,6 +193,17 @@ public partial class OverlayWindow : Window
         _precapturedBackground = bitmap;
     }
 
+    /// <summary>
+    /// Set mask size for platform-specific overlay strategies (called by controller before Show())
+    /// </summary>
+    /// <param name="width">Mask width (logical pixels)</param>
+    /// <param name="height">Mask height (logical pixels)</param>
+    public void SetMaskSize(double width, double height)
+    {
+        _maskSize = new Size(width, height);
+        Log.Debug("Mask size set to: {Width}x{Height}", width, height);
+    }
+
     private async Task InitializeFrozenBackgroundAsync()
     {
         if (_screenCaptureStrategy == null)
@@ -202,9 +225,9 @@ public partial class OverlayWindow : Window
             if (bitmap != null)
             {
                 _frozenBackground = bitmap;
-                if (this.FindControl<Image>("BackgroundImage") is { } img)
+                if (_backgroundImage != null)
                 {
-                    img.Source = _frozenBackground;
+                    _backgroundImage.Source = _frozenBackground;
                 }
                 Log.Information("Frozen background initialized: {W}x{H} pixels for window bounds {Bounds}", 
                     bitmap.PixelSize.Width, bitmap.PixelSize.Height, this.Bounds);
@@ -223,11 +246,11 @@ public partial class OverlayWindow : Window
 
     private void SetupSelectionOverlay()
     {
-        if (this.FindControl<SelectionOverlay>("Selector") is { } selector)
+        if (_selector != null)
         {
             // Backdrop removed to avoid blur/ghosting issues
 
-            selector.SelectionFinished += r =>
+            _selector.SelectionFinished += r =>
             {
                 // Keep selection for annotation; don't capture yet
                 _hasEditableSelection = true; // Mark that we have an editable selection
@@ -245,7 +268,7 @@ public partial class OverlayWindow : Window
             };
 
             // Create a hole in mask over selection using Path (even-odd)
-            selector.SelectionChanged += r =>
+            _selector.SelectionChanged += r =>
             {
                 UpdateMaskForSelection(r);
                 if (_annotator != null)
@@ -256,7 +279,7 @@ public partial class OverlayWindow : Window
                 UpdateToolbarPosition(r);
             };
 
-            selector.ConfirmRequested += async r =>
+            _selector.ConfirmRequested += async r =>
             {
                 // Directly capture the window region (includes background + annotations)
                 // This avoids coordinate transformation issues
@@ -279,7 +302,7 @@ public partial class OverlayWindow : Window
             };
         }
 
-        if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } toolbar && _annotator != null)
+        if (_toolbar != null && _annotator != null)
         {
             // Set default tool to Arrow first
             Log.Information("Setting default tool to Arrow");
@@ -287,7 +310,7 @@ public partial class OverlayWindow : Window
             Log.Information("Default tool set to: {CurrentTool}", _annotator.CurrentTool);
 
             // Then set up toolbar (this will call UpdateUIFromTarget and sync the UI)
-            toolbar.SetTarget(_annotator);
+            _toolbar.SetTarget(_annotator);
 
             // Subscribe to export events
             _annotator.ExportRequested += HandleExportRequest;
@@ -327,17 +350,16 @@ public partial class OverlayWindow : Window
 
 
         // Hide toolbar initially
-        if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } tb)
+        if (_toolbar != null)
         {
-            Canvas.SetLeft(tb, -10000);
-            Canvas.SetTop(tb, -10000);
+            Canvas.SetLeft(_toolbar, -10000);
+            Canvas.SetTop(_toolbar, -10000);
         }
 
-        // Clear global selection state when this window closes
+        // Clean up resources when this window closes
         this.Closing += (sender, e) =>
         {
-            GlobalSelectionState.ClearSelection(this);
-            Log.Information("OverlayWindow: Cleared global selection state on window close");
+            Log.Information("OverlayWindow: Window closing, cleaning up resources");
             try
             {
                 if (_frozenBackground != null)
@@ -374,25 +396,30 @@ public partial class OverlayWindow : Window
 
     private void UpdateMaskForSelection(Rect selection)
     {
-        if (this.FindControl<Avalonia.Controls.Shapes.Path>("MaskPath") is not { } mask)
+        if (_maskPath == null)
             return;
 
+        // Use mask size set by controller (platform-specific)
+        // Fallback to ClientSize if not set (for backwards compatibility)
+        var maskWidth = _maskSize.Width > 0 ? _maskSize.Width : this.ClientSize.Width;
+        var maskHeight = _maskSize.Height > 0 ? _maskSize.Height : this.ClientSize.Height;
+
         var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
-        group.Children.Add(new RectangleGeometry(new Rect(0, 0, Bounds.Width, Bounds.Height)));
+        group.Children.Add(new RectangleGeometry(new Rect(0, 0, maskWidth, maskHeight)));
         if (selection.Width > 0 && selection.Height > 0)
             group.Children.Add(new RectangleGeometry(selection));
-        mask.Data = group;
+        _maskPath.Data = group;
     }
 
     private void UpdateToolbarPosition(Rect selection)
     {
-        if (this.FindControl<NewAnnotationToolbar>("Toolbar") is not { } tb || this.FindControl<Canvas>("UiCanvas") is not { } canvas)
+        if (_toolbar == null || _uiCanvas == null)
             return;
 
         if (selection.Width <= 0 || selection.Height <= 0)
         {
-            Canvas.SetLeft(tb, -10000);
-            Canvas.SetTop(tb, -10000);
+            Canvas.SetLeft(_toolbar, -10000);
+            Canvas.SetTop(_toolbar, -10000);
             return;
         }
 
@@ -402,12 +429,12 @@ public partial class OverlayWindow : Window
         double desiredY = selection.Bottom + offset;
 
         // Toolbar size estimation: measure
-        tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var size = tb.DesiredSize;
+        _toolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var size = _toolbar.DesiredSize;
 
-        // Window bounds
-        double maxX = Bounds.Width;
-        double maxY = Bounds.Height;
+        // Use mask size set by controller (platform-specific)
+        double maxX = _maskSize.Width > 0 ? _maskSize.Width : this.ClientSize.Width;
+        double maxY = _maskSize.Height > 0 ? _maskSize.Height : this.ClientSize.Height;
 
         // Auto-flip horizontally if overflowing right; vertically if overflowing bottom
         if (desiredX + size.Width > maxX)
@@ -429,8 +456,8 @@ public partial class OverlayWindow : Window
             }
         }
 
-        Canvas.SetLeft(tb, desiredX);
-        Canvas.SetTop(tb, desiredY);
+        Canvas.SetLeft(_toolbar, desiredX);
+        Canvas.SetTop(_toolbar, desiredY);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -457,11 +484,10 @@ public partial class OverlayWindow : Window
                 }
 
                 // Hide selection overlay
-                var selector = this.FindControl<SelectionOverlay>("Selector");
-                if (selector != null)
+                if (_selector != null)
                 {
-                    selector.IsVisible = false;
-                    selector.IsHitTestVisible = false;
+                    _selector.IsVisible = false;
+                    _selector.IsHitTestVisible = false;
                 }
 
                 // Set cursor for element selection
@@ -499,9 +525,9 @@ public partial class OverlayWindow : Window
         }
         else if (e.Key == Key.Enter)
         {
-            if (this.FindControl<SelectionOverlay>("Selector") is { } selector && selector is not null)
+            if (_selector != null)
             {
-                var r = selector.SelectionRect;
+                var r = _selector.SelectionRect;
                 if (r.Width > 0)
                 {
                     // Raise region selected event
@@ -531,15 +557,14 @@ public partial class OverlayWindow : Window
                 if (_elementHighlight != null)
                 {
                     _elementHighlight.IsActive = false;
-                    GlobalElementHighlightState.Instance.ClearOwner(_elementHighlight);
+                    // Element highlight state is managed internally
                 }
 
                 // Show selection overlay
-                var selector = this.FindControl<SelectionOverlay>("Selector");
-                if (selector != null)
+                if (_selector != null)
                 {
-                    selector.IsVisible = true;
-                    selector.IsHitTestVisible = true;
+                    _selector.IsVisible = true;
+                    _selector.IsHitTestVisible = true;
                 }
 
                 // Set cursor for free selection
@@ -559,10 +584,9 @@ public partial class OverlayWindow : Window
 
         // Add to the grid after SelectionOverlay but before AnnotationOverlay
         var grid = (Grid)this.Content!;
-        var selector = this.FindControl<SelectionOverlay>("Selector");
-        if (selector != null)
+        if (_selector != null)
         {
-            var index = grid.Children.IndexOf(selector) + 1;
+            var index = grid.Children.IndexOf(_selector) + 1;
             grid.Children.Insert(index, _elementHighlight);
         }
         else
@@ -583,11 +607,10 @@ public partial class OverlayWindow : Window
         }
 
         // Hide/show selection overlay based on mode
-        var selector = this.FindControl<SelectionOverlay>("Selector");
-        if (selector != null)
+        if (_selector != null)
         {
-            selector.IsHitTestVisible = !_isElementPickerMode;
-            selector.IsVisible = !_isElementPickerMode;
+            _selector.IsHitTestVisible = !_isElementPickerMode;
+            _selector.IsVisible = !_isElementPickerMode;
         }
 
         // Set appropriate cursor
@@ -609,11 +632,10 @@ public partial class OverlayWindow : Window
             }
 
             // Hide/show selection overlay based on mode
-            var selector = this.FindControl<SelectionOverlay>("Selector");
-            if (selector != null)
+            if (_selector != null)
             {
-                selector.IsHitTestVisible = !_isElementPickerMode;
-                selector.IsVisible = !_isElementPickerMode;
+                _selector.IsHitTestVisible = !_isElementPickerMode;
+                _selector.IsVisible = !_isElementPickerMode;
             }
 
             // Set appropriate cursor
@@ -626,8 +648,7 @@ public partial class OverlayWindow : Window
         Log.Information("Element selected: {Name} - {Bounds}", element.Name, element.Bounds);
 
         // Convert element bounds to overlay coordinates and set selection
-        var selector = this.FindControl<SelectionOverlay>("Selector");
-        if (selector != null)
+        if (_selector != null)
         {
             // Convert screen coordinates to window coordinates with proper bounds checking
             var screenBounds = element.Bounds;
@@ -643,11 +664,11 @@ public partial class OverlayWindow : Window
                 Math.Abs(overlayBottomRight.Y - overlayTopLeft.Y));
 
             // Show and enable selection overlay
-            selector.IsVisible = true;
-            selector.IsHitTestVisible = true;
+            _selector.IsVisible = true;
+            _selector.IsHitTestVisible = true;
 
             // Set the selection and switch back to normal mode
-            selector.SetSelection(selectionRect);
+            _selector.SetSelection(selectionRect);
 
             // Disable element picker mode and set editable selection flag
             _isElementPickerMode = false;
@@ -656,7 +677,7 @@ public partial class OverlayWindow : Window
             if (_elementHighlight != null)
             {
                 _elementHighlight.IsActive = false;
-                GlobalElementHighlightState.Instance.ClearOwner(_elementHighlight);
+                // Element highlight state is managed internally
             }
 
             // Reset cursor to normal selection mode (let overlay handle cursor)
@@ -790,19 +811,13 @@ public partial class OverlayWindow : Window
             }
 
             // End text editing before capture to prevent TextBox background artifacts
-            if (_annotator != null)
-            {
-                var endTextEditingMethod = _annotator.GetType()
-                    .GetMethod("EndTextEditing", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                endTextEditingMethod?.Invoke(_annotator, null);
-            }
+            _annotator?.EndTextEditing();
 
             // Temporarily hide UI elements
-            var selector = this.FindControl<SelectionOverlay>("Selector");
-            bool selectorWasVisible = selector?.IsVisible ?? false;
-            if (selector != null)
+            bool selectorWasVisible = _selector?.IsVisible ?? false;
+            if (_selector != null)
             {
-                selector.IsVisible = false;
+                _selector.IsVisible = false;
             }
 
             try
@@ -827,9 +842,9 @@ public partial class OverlayWindow : Window
             finally
             {
                 // Restore UI elements
-                if (selector != null && selectorWasVisible)
+                if (_selector != null && selectorWasVisible)
                 {
-                    selector.IsVisible = true;
+                    _selector.IsVisible = true;
                 }
             }
         }
@@ -845,15 +860,7 @@ public partial class OverlayWindow : Window
     /// </summary>
     private IEnumerable<IAnnotationItem>? GetAnnotationsFromAnnotator()
     {
-        if (_annotator == null)
-            return null;
-
-        // Access annotation service using reflection (necessary due to private field)
-        var annotationServiceField = _annotator.GetType()
-            .GetField("_annotationService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var annotationService = annotationServiceField?.GetValue(_annotator) as Services.Annotation.IAnnotationService;
-        
-        return annotationService?.Manager?.Items;
+        return _annotator?.GetAnnotations();
     }
 
     /// <summary>
@@ -999,16 +1006,15 @@ public partial class OverlayWindow : Window
             var progressTask = progressDialog.ShowDialog(this);
 
             // Hide selection border before capturing screenshot
-            var selector = this.FindControl<SelectionOverlay>("Selector");
-            var wasVisible = selector?.IsVisible ?? false;
+            var wasVisible = _selector?.IsVisible ?? false;
 
             try
             {
                 progressDialog.UpdateProgress(5, "Preparing capture...");
 
-                if (selector != null)
+                if (_selector != null)
                 {
-                    selector.IsVisible = false;
+                    _selector.IsVisible = false;
                     // Give a moment for the UI to update
                     await Task.Delay(50);
                 }
@@ -1043,18 +1049,18 @@ public partial class OverlayWindow : Window
                 finally
                 {
                     // Restore selection border visibility
-                    if (selector != null && wasVisible)
+                    if (_selector != null && wasVisible)
                     {
-                        selector.IsVisible = true;
+                        _selector.IsVisible = true;
                     }
                 }
             }
             catch (Exception exportEx)
             {
                 // Restore selection border visibility on error
-                if (selector != null && wasVisible)
+                if (_selector != null && wasVisible)
                 {
-                    selector.IsVisible = true;
+                    _selector.IsVisible = true;
                 }
 
                 var errorMessage = exportEx.InnerException?.Message ?? exportEx.Message;
@@ -1075,22 +1081,10 @@ public partial class OverlayWindow : Window
     {
         try
         {
-            // Find the toolbar and trigger color picker
-            if (this.FindControl<NewAnnotationToolbar>("Toolbar") is { } toolbar)
+            if (_toolbar != null)
             {
-                // Use reflection to call the private ShowColorPicker method
-                var showColorPickerMethod = toolbar.GetType()
-                    .GetMethod("ShowColorPicker", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                
-                if (showColorPickerMethod != null)
-                {
-                    showColorPickerMethod.Invoke(toolbar, null);
-                    Log.Debug("Color picker opened via keyboard shortcut");
-                }
-                else
-                {
-                    Log.Warning("Could not find ShowColorPicker method in toolbar");
-                }
+                _toolbar.ShowColorPicker();
+                Log.Debug("Color picker opened via keyboard shortcut");
             }
             else
             {

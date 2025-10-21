@@ -169,7 +169,10 @@ public partial class NewAnnotationToolbar : UserControl
         ShowColorPicker();
     }
 
-    private void ShowColorPicker()
+    /// <summary>
+    /// Show color picker (public for use by OverlayWindow keyboard shortcut)
+    /// </summary>
+    public void ShowColorPicker()
     {
         if (_colorPickerWindow != null)
         {
