@@ -2,10 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AGI.Kapster.Desktop.Overlays;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.Clipboard;
+using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Serilog;
+using SkiaSharp;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 
@@ -18,17 +25,23 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     protected readonly IOverlaySessionFactory _sessionFactory;
     protected readonly IOverlayWindowFactory _windowFactory;
     protected readonly IScreenCoordinateMapper _coordinateMapper;
+    protected readonly IScreenCaptureStrategy? _captureStrategy;
+    protected readonly IClipboardStrategy? _clipboardStrategy;
     
     protected IOverlaySession? _currentSession;
 
     protected OverlayCoordinatorBase(
         IOverlaySessionFactory sessionFactory,
         IOverlayWindowFactory windowFactory,
-        IScreenCoordinateMapper coordinateMapper)
+        IScreenCoordinateMapper coordinateMapper,
+        IScreenCaptureStrategy? captureStrategy,
+        IClipboardStrategy? clipboardStrategy)
     {
         _sessionFactory = sessionFactory;
         _windowFactory = windowFactory;
         _coordinateMapper = coordinateMapper;
+        _captureStrategy = captureStrategy;
+        _clipboardStrategy = clipboardStrategy;
     }
 
     public bool HasActiveSession => _currentSession != null;
@@ -77,15 +90,50 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 
     /// <summary>
     /// Close the current session if active
+    /// Unsubscribes from events and disposes the session
     /// </summary>
-    public abstract void CloseCurrentSession();
+    public virtual void CloseCurrentSession()
+    {
+        if (_currentSession == null)
+            return;
+
+        try
+        {
+            Log.Information("[{Platform}] Closing current session", PlatformName);
+
+            // Unsubscribe from all windows
+            foreach (var window in _currentSession.Windows)
+            {
+                if (window is OverlayWindow overlayWindow)
+                {
+                    overlayWindow.RegionSelected -= OnRegionSelected;
+                    overlayWindow.Cancelled -= OnCancelled;
+                }
+            }
+
+            // Dispose session (will close all windows automatically)
+            _currentSession.Dispose();
+            _currentSession = null;
+
+            Log.Debug("[{Platform}] Session closed", PlatformName);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[{Platform}] Error closing session", PlatformName);
+            _currentSession = null;
+        }
+    }
 
     /// <summary>
-    /// Hook method: Get screen information for current session
+    /// Get screen information for current session
     /// Handles screen hot-plug scenarios by fetching latest configuration
+    /// Uses temporary window approach (cross-platform)
     /// </summary>
     /// <returns>List of available screens</returns>
-    protected abstract Task<IReadOnlyList<Screen>> GetScreensAsync();
+    protected async Task<IReadOnlyList<Screen>> GetScreensAsync()
+    {
+        return await GetScreensUsingTempWindowAsync();
+    }
 
     /// <summary>
     /// Hook method: Calculate target regions for overlay windows
@@ -193,6 +241,112 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
         }
 
         return new Rect(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    // Event handling methods (shared by all platforms)
+
+    /// <summary>
+    /// Handle region selection event from overlay window
+    /// </summary>
+    protected async void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
+    {
+        try
+        {
+            // If this is an editable selection (for annotation), don't close the session
+            if (e.IsEditableSelection)
+            {
+                Log.Debug("[{Platform}] Editable selection created, keeping session open for annotation", PlatformName);
+                return;
+            }
+
+            // Only process final image (from double-click or export)
+            if (e.FinalImage != null)
+            {
+                Log.Information("[{Platform}] Region selected: {Region}, copying to clipboard", PlatformName, e.SelectedRegion);
+                await CopyImageToClipboardAsync(e.FinalImage);
+            }
+
+            // Close session after final image processing
+            CloseCurrentSession();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[{Platform}] Error handling region selection", PlatformName);
+        }
+    }
+
+    /// <summary>
+    /// Handle cancellation event from overlay window
+    /// </summary>
+    protected void OnCancelled(object? sender, OverlayCancelledEventArgs e)
+    {
+        Log.Information("[{Platform}] Screenshot cancelled", PlatformName);
+        CloseCurrentSession();
+    }
+
+    /// <summary>
+    /// Copy image to clipboard
+    /// </summary>
+    protected async Task CopyImageToClipboardAsync(Bitmap image)
+    {
+        var skBitmap = BitmapConverter.ConvertToSKBitmap(image);
+        if (skBitmap != null)
+        {
+            if (_clipboardStrategy != null)
+            {
+                var success = await _clipboardStrategy.SetImageAsync(skBitmap);
+                if (success)
+                {
+                    Log.Information("[{Platform}] Image copied to clipboard successfully", PlatformName);
+                }
+                else
+                {
+                    Log.Warning("[{Platform}] Failed to copy image to clipboard", PlatformName);
+                }
+            }
+            else
+            {
+                Log.Warning("[{Platform}] Clipboard strategy not available", PlatformName);
+            }
+
+            skBitmap.Dispose();
+        }
+        else
+        {
+            Log.Warning("[{Platform}] Failed to convert image for clipboard", PlatformName);
+        }
+    }
+
+    /// <summary>
+    /// Pre-capture background for a region
+    /// </summary>
+    protected async Task<Bitmap?> PrecaptureBackgroundAsync(Rect bounds, Screen screen)
+    {
+        if (_captureStrategy == null)
+        {
+            Log.Warning("[{Platform}] No capture strategy available for pre-capture", PlatformName);
+            return null;
+        }
+
+        try
+        {
+            var physicalBounds = _coordinateMapper.MapToPhysicalRect(bounds, screen);
+            Log.Debug("[{Platform}] Pre-capturing region: {PhysicalBounds}", PlatformName, physicalBounds);
+
+            var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);
+            if (skBitmap == null)
+            {
+                Log.Warning("[{Platform}] Screen capture returned null", PlatformName);
+                return null;
+            }
+
+            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[{Platform}] Failed to pre-capture background", PlatformName);
+            return null;
+        }
     }
 }
 
