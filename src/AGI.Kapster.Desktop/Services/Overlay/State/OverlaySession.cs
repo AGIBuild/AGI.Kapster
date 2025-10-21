@@ -10,7 +10,7 @@ namespace AGI.Kapster.Desktop.Services.Overlay.State;
 /// Scoped overlay session for a single screenshot operation
 /// Automatically cleans up state on disposal
 /// </summary>
-internal class OverlaySession : IOverlaySession
+public class OverlaySession : IOverlaySession
 {
     private readonly List<Window> _windows = new();
     private bool _hasSelection = false;
