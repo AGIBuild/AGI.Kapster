@@ -132,7 +132,6 @@ public async Task CaptureScreen_ShouldReturnBitmap()
 - **Strategy Tests**: Platform strategy implementations
 
 ### Integration Tests
-- **Overlay System**: End-to-end overlay window management
 - **Clipboard Integration**: Cross-platform clipboard operations
 - **Settings Persistence**: File system integration testing
 - **Service Composition**: Dependency injection container validation
@@ -141,6 +140,145 @@ public async Task CaptureScreen_ShouldReturnBitmap()
 - **Windows-Specific**: UI Automation and Win32 API tests
 - **macOS-Specific**: Native API integration tests
 - **Cross-Platform**: Shared functionality validation
+
+## Overlay System Testing
+
+### Key Challenges
+
+#### Cannot Test OverlayWindow Directly
+**Problem**: `OverlayWindow` inherits from `Avalonia.Controls.Window`
+- Requires `IWindowingPlatform` (UI thread and platform services)
+- Cannot be instantiated in headless tests
+- NSubstitute cannot mock `Window` constructor
+
+**Solution**: Use `IOverlayWindow` interface
+```csharp
+// ❌ Fails in tests
+var window = new OverlayWindow(...);  // Error: Unable to locate IWindowingPlatform
+
+// ✅ Works in tests
+var mockWindow = Substitute.For<IOverlayWindow>();
+mockWindow.Width.Returns(1920);
+```
+
+### Testing Strategies
+
+#### 1. Test Factory Structure (Not Creation)
+```csharp
+[Fact]
+public void Factory_ShouldImplementInterface()
+{
+    // Arrange
+    var factory = new OverlayWindowFactory(null, null, null);
+    
+    // Assert - Test structure, not actual Create()
+    factory.Should().BeAssignableTo<IOverlayWindowFactory>();
+}
+```
+
+#### 2. Test Coordinator Logic (Mock Windows)
+```csharp
+[Fact]
+public async Task Coordinator_ShouldCreateSession()
+{
+    // Arrange
+    var mockSessionFactory = Substitute.For<IOverlaySessionFactory>();
+    var mockSession = Substitute.For<IOverlaySession>();
+    mockSessionFactory.CreateSession().Returns(mockSession);
+    
+    var coordinator = new TestOverlayCoordinator(mockSessionFactory, ...);
+    
+    // Act
+    var session = await coordinator.StartSessionAsync();
+    
+    // Assert
+    session.Should().NotBeNull();
+    mockSessionFactory.Received(1).CreateSession();
+}
+```
+
+#### 3. Test OverlayCoordinatorBase with Test Implementation
+```csharp
+private class TestOverlayCoordinator : OverlayCoordinatorBase
+{
+    protected override string PlatformName => "TestCoordinator";
+    
+    protected override IEnumerable<Rect> CalculateTargetRegions(...)
+    {
+        // Simple test logic without creating actual windows
+        yield return new Rect(0, 0, 1920, 1080);
+    }
+    
+    protected override Task CreateAndConfigureWindowsAsync(...)
+    {
+        // Don't create actual windows in tests
+        return Task.CompletedTask;
+    }
+}
+```
+
+### What Can Be Tested
+
+✅ **Factory structure** (interface implementation, constructor)  
+✅ **Coordinator logic** (session creation flow, screen calculations)  
+✅ **Session management** (window tracking, selection state)  
+✅ **Event routing** (RegionSelected, Cancelled)  
+✅ **Coordinate mapping** (DPI scaling, coordinate transformations)  
+
+### What Cannot Be Tested
+
+❌ **Actual OverlayWindow instantiation** (requires UI platform)  
+❌ **Window rendering** (requires GPU/graphics context)  
+❌ **User interaction** (requires real mouse/keyboard input)  
+❌ **Platform-specific UI behavior** (tested in production runtime)
+
+### Test Coverage
+
+```
+├── ScreenshotServiceTests (6 tests)
+│   └── Tests high-level API delegation
+├── OverlayCoordinatorBaseTests (8 tests)
+│   └── Tests shared coordinator logic
+├── OverlaySessionTests (10 tests)
+│   └── Tests session lifecycle
+└── OverlayWindowFactoryTests (4 tests)
+    └── Tests factory structure (no Create() calls)
+
+Total: 28 overlay-specific tests
+```
+
+### Example: Complete Coordinator Test
+```csharp
+[Fact]
+public async Task WindowsCoordinator_ShouldCreateSingleWindow()
+{
+    // Arrange
+    var mockSessionFactory = Substitute.For<IOverlaySessionFactory>();
+    var mockWindowFactory = Substitute.For<IOverlayWindowFactory>();
+    var mockCoordinateMapper = Substitute.For<IScreenCoordinateMapper>();
+    
+    var mockSession = Substitute.For<IOverlaySession>();
+    var mockWindow = Substitute.For<IOverlayWindow>();
+    var mockAvaloniaWindow = Substitute.For<Window>();
+    
+    mockSessionFactory.CreateSession().Returns(mockSession);
+    mockWindowFactory.Create().Returns(mockWindow);
+    mockWindow.AsWindow().Returns(mockAvaloniaWindow);
+    
+    var coordinator = new WindowsOverlayCoordinator(
+        mockSessionFactory,
+        mockWindowFactory,
+        mockCoordinateMapper,
+        null, null);
+    
+    // Act
+    var session = await coordinator.StartSessionAsync();
+    
+    // Assert
+    session.Should().Be(mockSession);
+    mockWindowFactory.Received(1).Create();
+    mockSession.Received(1).ShowAll();
+}
 
 ## Test Base Classes
 
@@ -238,23 +376,20 @@ await mockClipboard.Received(1).SetImageAsync(Arg.Any<SKBitmap>());
 ### Event Testing
 ```csharp
 [Test]
-public void OverlayManager_ShouldRaiseRegionSelectedEvent()
+public async Task ScreenshotService_ShouldDelegateToCoordinator()
 {
     // Arrange
-    var overlayManager = new SimplifiedOverlayManager();
-    var eventRaised = false;
-    CaptureRegionEventArgs? eventArgs = null;
-
-    // Example only: This reflects the current API structure for illustration purposes.
-    // Note: The actual manager implementation has changed significantly from the example pattern shown,
-    // and now handles events internally and closes overlays.
+    var mockCoordinator = Substitute.For<IOverlayCoordinator>();
+    var mockSession = Substitute.For<IOverlaySession>();
+    mockCoordinator.StartSessionAsync().Returns(mockSession);
+    
+    var screenshotService = new ScreenshotService(mockCoordinator);
 
     // Act
-    overlayManager.TriggerRegionSelected(new PixelRect(0, 0, 100, 100));
+    await screenshotService.TakeScreenshotAsync();
 
     // Assert
-    Assert.That(eventRaised, Is.True);
-    Assert.That(eventArgs?.Region.Width, Is.EqualTo(100));
+    await mockCoordinator.Received(1).StartSessionAsync();
 }
 ```
 
@@ -300,16 +435,15 @@ public class TestDataBuilder
 ### Memory Leak Detection
 ```csharp
 [Test]
-public void OverlayWindow_ShouldNotLeakMemory()
+public void OverlaySession_ShouldDisposeCorrectly()
 {
     var initialMemory = GC.GetTotalMemory(true);
     
-    // Create and dispose multiple overlay windows
+    // Create and dispose multiple sessions
     for (int i = 0; i < 100; i++)
     {
-        using var overlay = ServiceProvider.GetRequiredService<IOverlayWindow>();
-        overlay.Show();
-        overlay.Close();
+        using var session = new OverlaySession();
+        // Simulate usage
     }
     
     GC.Collect();
