@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
@@ -6,7 +8,9 @@ using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Overlay.State;
+using Avalonia;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Serilog;
 using SkiaSharp;
 
@@ -36,13 +40,32 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
     }
 
     /// <summary>
+    /// Windows-specific: Get screens using temporary window
+    /// </summary>
+    protected override async Task<IReadOnlyList<Screen>> GetScreensAsync()
+    {
+        return await GetScreensUsingTempWindowAsync();
+    }
+
+    /// <summary>
+    /// Windows-specific: Single virtual desktop region (all screens combined)
+    /// </summary>
+    protected override IEnumerable<Rect> CalculateTargetRegions(IReadOnlyList<Screen> screens)
+    {
+        var virtualBounds = CalculateVirtualDesktopBounds(screens);
+        Log.Debug("[{Platform}] Virtual desktop bounds: {Bounds}", PlatformName, virtualBounds);
+        yield return virtualBounds;
+    }
+
+    /// <summary>
     /// Windows-specific: Create single window covering virtual desktop
     /// </summary>
-    protected override Task CreateAndConfigureWindowsAsync(IOverlaySession session)
+    protected override Task CreateAndConfigureWindowsAsync(
+        IOverlaySession session, 
+        IReadOnlyList<Screen> screens,
+        IEnumerable<Rect> targetRegions)
     {
-        // Get virtual desktop bounds (Windows-specific: all screens combined)
-        var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
-        Log.Debug("[{Platform}] Virtual desktop bounds: {Bounds}", PlatformName, virtualBounds);
+        var virtualBounds = targetRegions.First(); // Single region for Windows
 
         // Create window immediately for instant display
         var window = _windowFactory.Create();
@@ -52,6 +75,7 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
 
         // Associate window with session
         window.SetSession(session);
+        window.SetScreens(screens);
         window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
 
         // Subscribe to events
@@ -66,7 +90,7 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
         {
             try
             {
-                var background = await PrecaptureBackgroundAsync(virtualBounds);
+                var background = await PrecaptureBackgroundAsync(virtualBounds, screens);
                 if (background != null)
                 {
                     // Update background on UI thread
@@ -118,7 +142,7 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
         }
     }
 
-    private async Task<Bitmap?> PrecaptureBackgroundAsync(Avalonia.Rect virtualBounds)
+    private async Task<Bitmap?> PrecaptureBackgroundAsync(Avalonia.Rect virtualBounds, IReadOnlyList<Screen> screens)
     {
         if (_captureStrategy == null)
         {
@@ -128,7 +152,15 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
 
         try
         {
-            var physicalBounds = _coordinateMapper.MapToPhysicalRect(virtualBounds);
+            // Use primary screen for coordinate mapping
+            var primaryScreen = screens.FirstOrDefault();
+            if (primaryScreen == null)
+            {
+                Log.Warning("[{Platform}] No screens available for coordinate mapping", PlatformName);
+                return null;
+            }
+
+            var physicalBounds = _coordinateMapper.MapToPhysicalRect(virtualBounds, primaryScreen);
             Log.Debug("[{Platform}] Pre-capturing virtual desktop: {PhysicalBounds}", PlatformName, physicalBounds);
 
             var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);

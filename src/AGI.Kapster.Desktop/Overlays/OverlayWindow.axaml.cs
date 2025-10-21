@@ -46,6 +46,7 @@ public partial class OverlayWindow : Window
     
     // Session for this overlay (scoped state management)
     private IOverlaySession? _session;
+    private IReadOnlyList<Screen>? _screens;
 
     // Throttling for element detection to prevent excessive updates
     private PixelPoint _lastDetectionPos;
@@ -219,6 +220,12 @@ public partial class OverlayWindow : Window
     {
         _session = session;
         Log.Debug("Overlay session set");
+    }
+
+    public void SetScreens(IReadOnlyList<Screen>? screens)
+    {
+        _screens = screens;
+        Log.Debug("Overlay screens set: {Count} screen(s)", screens?.Count ?? 0);
     }
     
     /// <summary>
@@ -907,7 +914,13 @@ public partial class OverlayWindow : Window
             var centerPoint = new PixelPoint((int)centerX, (int)centerY);
 
             // Find screen containing this point
-            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint);
+            if (_coordinateMapper == null || _screens == null || _screens.Count == 0)
+            {
+                Log.Warning("Cannot determine target screen: coordinateMapper or screens not available");
+                return null;
+            }
+
+            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint, _screens);
             if (targetScreen != null)
             {
                 Log.Debug("Selection at ({X}, {Y}) is on screen with scaling {Scaling}", 

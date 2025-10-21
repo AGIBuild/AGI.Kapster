@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
@@ -6,6 +8,7 @@ using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Overlay.State;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -38,12 +41,37 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
     }
 
     /// <summary>
+    /// macOS-specific: Get screens using temporary window
+    /// </summary>
+    protected override async Task<IReadOnlyList<Screen>> GetScreensAsync()
+    {
+        return await GetScreensUsingTempWindowAsync();
+    }
+
+    /// <summary>
+    /// macOS-specific: One region per screen (independent Retina handling)
+    /// </summary>
+    protected override IEnumerable<Rect> CalculateTargetRegions(IReadOnlyList<Screen> screens)
+    {
+        // Each screen gets its own region
+        foreach (var screen in screens)
+        {
+            yield return new Rect(
+                screen.Bounds.X,
+                screen.Bounds.Y,
+                screen.Bounds.Width,
+                screen.Bounds.Height);
+        }
+    }
+
+    /// <summary>
     /// macOS-specific: Create one window per screen (handles Retina displays independently)
     /// </summary>
-    protected override async Task CreateAndConfigureWindowsAsync(IOverlaySession session)
+    protected override async Task CreateAndConfigureWindowsAsync(
+        IOverlaySession session, 
+        IReadOnlyList<Screen> screens,
+        IEnumerable<Rect> targetRegions)
     {
-        // Get all screens (macOS-specific: one window per screen)
-        var screens = _coordinateMapper.GetAllScreens();
         if (screens.Count == 0)
         {
             Log.Warning("[{Platform}] No screens available", PlatformName);
@@ -52,10 +80,13 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
 
         Log.Information("[{Platform}] Creating overlay windows for {Count} screen(s)", PlatformName, screens.Count);
 
-        // Create window for each screen
-        foreach (var screen in screens)
+        // Create window for each screen/region pair
+        var screenList = screens.ToList();
+        var regionList = targetRegions.ToList();
+        
+        for (int i = 0; i < screenList.Count && i < regionList.Count; i++)
         {
-            await CreateWindowForScreenAsync(session, screen);
+            await CreateWindowForScreenAsync(session, screenList[i], regionList[i]);
         }
     }
 
@@ -91,16 +122,10 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
         }
     }
 
-    private Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen)
+    private Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen, Rect screenBounds)
     {
         try
         {
-            var screenBounds = new Avalonia.Rect(
-                screen.Bounds.X,
-                screen.Bounds.Y,
-                screen.Bounds.Width,
-                screen.Bounds.Height);
-
             Log.Debug("[{Platform}] Creating window for screen at {Position}, size {Size}", PlatformName,
                 screenBounds.Position, screenBounds.Size);
 
@@ -112,6 +137,7 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
 
             // Associate window with session
             window.SetSession(session);
+            window.SetScreens(new[] { screen }); // Single screen for this window
             window.SetMaskSize(screenBounds.Width, screenBounds.Height);
 
             // Subscribe to events
@@ -126,7 +152,7 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             {
                 try
                 {
-                    var background = await PrecaptureScreenBackgroundAsync(screen);
+                    var background = await PrecaptureScreenBackgroundAsync(screenBounds, screen);
                     if (background != null)
                     {
                         // Update background on UI thread
@@ -154,7 +180,7 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
         }
     }
 
-    private async Task<Bitmap?> PrecaptureScreenBackgroundAsync(Screen screen)
+    private async Task<Bitmap?> PrecaptureScreenBackgroundAsync(Rect screenBounds, Screen screen)
     {
         if (_captureStrategy == null)
         {
@@ -164,11 +190,7 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
 
         try
         {
-            var pixelBounds = _coordinateMapper.MapToPhysicalRect(
-                new Avalonia.Rect(
-                    screen.Bounds.Position.ToPoint(1.0),
-                    screen.Bounds.Size.ToSize(1.0)),
-                screen);
+            var pixelBounds = _coordinateMapper.MapToPhysicalRect(screenBounds, screen);
             
             Log.Debug("[{Platform}] Pre-capturing screen background: {PixelBounds}", PlatformName, pixelBounds);
 
