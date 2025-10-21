@@ -54,31 +54,35 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
             // 1. Create session
             var session = _sessionFactory.CreateSession();
 
-            // 2. Get virtual desktop bounds (Windows-specific)
+            // 2. Initialize screen information for this session
+            _coordinateMapper.InitializeScreens();
+            Log.Debug("[WindowsCoordinator] Initialized {Count} screen(s) for session", _coordinateMapper.Screens.Count);
+
+            // 3. Get virtual desktop bounds (Windows-specific)
             var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
             Log.Debug("[WindowsCoordinator] Virtual desktop bounds: {Bounds}", virtualBounds);
 
-            // 3. Create window immediately for instant display
+            // 4. Create window immediately for instant display
             var window = _windowFactory.Create();
             window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
             window.Width = virtualBounds.Width;
             window.Height = virtualBounds.Height;
 
-            // 4. Associate window with session
+            // 5. Associate window with session
             window.SetSession(session);
             window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
 
-            // 5. Subscribe to events
+            // 6. Subscribe to events
             window.RegionSelected += OnRegionSelected;
             window.Cancelled += OnCancelled;
 
-            // 6. Add window to session
+            // 7. Add window to session
             session.AddWindow(window);
 
-            // 7. Show window immediately (without waiting for background)
+            // 8. Show window immediately (without waiting for background)
             session.ShowAll();
 
-            // 8. Asynchronously load background in parallel (non-blocking)
+            // 9. Asynchronously load background in parallel (non-blocking)
             _ = Task.Run(async () =>
             {
                 try

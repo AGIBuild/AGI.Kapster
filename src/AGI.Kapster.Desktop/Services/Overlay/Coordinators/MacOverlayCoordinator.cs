@@ -56,7 +56,11 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             // 1. Create session
             var session = _sessionFactory.CreateSession();
 
-            // 2. Get all screens (macOS-specific: one window per screen)
+            // 2. Initialize screen information for this session
+            _coordinateMapper.InitializeScreens();
+            Log.Debug("[MacCoordinator] Initialized {Count} screen(s) for session", _coordinateMapper.Screens.Count);
+
+            // 3. Get all screens (macOS-specific: one window per screen)
             var screens = _coordinateMapper.GetAllScreens();
             if (screens.Count == 0)
             {
@@ -66,13 +70,13 @@ public class MacOverlayCoordinator : IOverlayCoordinator
 
             Log.Information("[MacCoordinator] Creating overlay windows for {Count} screen(s)", screens.Count);
 
-            // 3. Create window for each screen
+            // 4. Create window for each screen
             foreach (var screen in screens)
             {
                 await CreateWindowForScreenAsync(session, screen);
             }
 
-            // 4. Show all windows in session
+            // 5. Show all windows in session
             session.ShowAll();
 
             _currentSession = session;

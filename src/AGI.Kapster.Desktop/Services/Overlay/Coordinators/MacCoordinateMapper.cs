@@ -17,8 +17,45 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 [SupportedOSPlatform("macos")]
 public class MacCoordinateMapper : IScreenCoordinateMapper
 {
-    // Instance-level cache: valid for single screenshot operation
-    private IReadOnlyList<Screen>? _screensCache;
+    // Cached screen information for current session
+    private IReadOnlyList<Screen> _screens = Array.Empty<Screen>();
+
+    /// <summary>
+    /// Get cached screen information for current session
+    /// </summary>
+    public IReadOnlyList<Screen> Screens => _screens;
+
+    /// <summary>
+    /// Initialize screen information cache for this session
+    /// Fetches latest screen configuration to handle hot-plug scenarios
+    /// </summary>
+    public void InitializeScreens()
+    {
+        try
+        {
+            // Create minimal temporary window to access screen information
+            var tempWindow = new Window
+            {
+                Width = 1,
+                Height = 1,
+                ShowInTaskbar = false,
+                WindowState = WindowState.Minimized,
+                SystemDecorations = SystemDecorations.None,
+                Opacity = 0
+            };
+
+            tempWindow.Show();
+            _screens = tempWindow.Screens?.All?.ToList() ?? (IReadOnlyList<Screen>)Array.Empty<Screen>();
+            tempWindow.Close();
+            
+            Log.Debug("[macOS] Initialized {Count} screen(s) for current session", _screens.Count);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[macOS] Failed to initialize screens, using empty list");
+            _screens = Array.Empty<Screen>();
+        }
+    }
     public PixelRect MapToPhysicalRect(Rect logicalRect, Screen? screen = null)
     {
         var targetScreen = screen ?? GetScreenFromLogicalRect(logicalRect);
@@ -81,35 +118,15 @@ public class MacCoordinateMapper : IScreenCoordinateMapper
 
     public IReadOnlyList<Screen> GetAllScreens()
     {
-        // Return cached screens for this screenshot operation
-        if (_screensCache != null)
-            return _screensCache;
-
-        try
+        // Return cached screens from Screens property
+        // If not initialized, initialize on first access
+        if (_screens.Count == 0)
         {
-            // Create minimal temporary window to access screen information
-            var tempWindow = new Window
-            {
-                Width = 1,
-                Height = 1,
-                ShowInTaskbar = false,
-                WindowState = WindowState.Minimized,
-                SystemDecorations = SystemDecorations.None,
-                Opacity = 0
-            };
-
-            tempWindow.Show();
-            _screensCache = tempWindow.Screens?.All?.ToList() ?? (IReadOnlyList<Screen>)Array.Empty<Screen>();
-            tempWindow.Close();
-            
-            return _screensCache;
+            Log.Debug("[macOS] Screens not initialized, initializing on first access");
+            InitializeScreens();
         }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[macOS] Failed to detect screens");
-            _screensCache = Array.Empty<Screen>();
-            return _screensCache;
-        }
+        
+        return _screens;
     }
 
     public Screen? GetScreenFromPoint(PixelPoint point)

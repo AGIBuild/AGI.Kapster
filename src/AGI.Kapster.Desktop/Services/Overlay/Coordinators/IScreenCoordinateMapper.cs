@@ -7,9 +7,24 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 
 /// <summary>
 /// Platform-specific screen coordinate mapping and scaling interface
+/// Transient lifetime: one instance per screenshot session
 /// </summary>
 public interface IScreenCoordinateMapper
 {
+    /// <summary>
+    /// Cached screen information for current session
+    /// Call InitializeScreens() at session start to populate this cache
+    /// Valid only for the lifetime of this mapper instance (one screenshot operation)
+    /// </summary>
+    IReadOnlyList<Screen> Screens { get; }
+
+    /// <summary>
+    /// Initialize/refresh screen information cache
+    /// Should be called at the start of each screenshot session
+    /// Handles screen hot-plug scenarios by fetching latest screen configuration
+    /// </summary>
+    void InitializeScreens();
+
     /// <summary>
     /// Map logical DIP rectangle to physical pixel rectangle for a specific screen
     /// </summary>
@@ -40,7 +55,7 @@ public interface IScreenCoordinateMapper
     Rect GetVirtualDesktopBounds();
 
     /// <summary>
-    /// Get all available screens
+    /// Get all available screens (uses cached Screens property)
     /// </summary>
     /// <returns>List of all screens</returns>
     IReadOnlyList<Screen> GetAllScreens();
