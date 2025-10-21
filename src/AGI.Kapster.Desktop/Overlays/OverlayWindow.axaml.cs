@@ -24,7 +24,7 @@ using System.Threading.Tasks;
 
 namespace AGI.Kapster.Desktop.Overlays;
 
-public partial class OverlayWindow : Window
+public partial class OverlayWindow : Window, IOverlayWindow
 {
     private readonly IElementDetector? _elementDetector;
     private readonly IScreenCaptureStrategy? _screenCaptureStrategy;
@@ -227,6 +227,12 @@ public partial class OverlayWindow : Window
         _screens = screens;
         Log.Debug("Overlay screens set: {Count} screen(s)", screens?.Count ?? 0);
     }
+    
+    /// <summary>
+    /// Get the underlying Window instance (implements IOverlayWindow)
+    /// Required for IOverlaySession.AddWindow(Window) compatibility
+    /// </summary>
+    public Window AsWindow() => this;
     
     /// <summary>
     /// Get the current overlay session

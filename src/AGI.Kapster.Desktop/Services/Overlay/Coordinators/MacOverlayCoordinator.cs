@@ -99,8 +99,8 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             window.RegionSelected += OnRegionSelected;
             window.Cancelled += OnCancelled;
 
-            // Add window to session
-            session.AddWindow(window);
+            // Add window to session (convert to Window)
+            session.AddWindow(window.AsWindow());
 
             // Asynchronously load background in parallel (non-blocking)
             _ = Task.Run(async () =>

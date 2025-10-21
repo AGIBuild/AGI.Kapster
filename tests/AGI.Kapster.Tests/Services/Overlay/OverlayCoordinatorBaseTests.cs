@@ -8,6 +8,7 @@ using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
+using Avalonia.Controls;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -231,6 +232,7 @@ public class OverlayCoordinatorBaseTests : TestBase
             IEnumerable<Rect> targetRegions)
         {
             // Simple test implementation: don't create actual UI windows in tests
+            // Window mocking requires IWindowingPlatform which is not available
             // Just verify the session is set up correctly
             return Task.CompletedTask;
         }

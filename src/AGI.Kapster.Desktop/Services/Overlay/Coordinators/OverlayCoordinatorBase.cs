@@ -104,7 +104,7 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
             // Unsubscribe from all windows
             foreach (var window in _currentSession.Windows)
             {
-                if (window is OverlayWindow overlayWindow)
+                if (window is IOverlayWindow overlayWindow)
                 {
                     overlayWindow.RegionSelected -= OnRegionSelected;
                     overlayWindow.Cancelled -= OnCancelled;

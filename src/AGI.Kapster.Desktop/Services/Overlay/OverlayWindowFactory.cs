@@ -25,7 +25,7 @@ public class OverlayWindowFactory : IOverlayWindowFactory
         _coordinateMapper = coordinateMapper;
     }
 
-    public OverlayWindow Create()
+    public IOverlayWindow Create()
     {
         return new OverlayWindow(_elementDetector, _screenCaptureStrategy, _coordinateMapper);
     }

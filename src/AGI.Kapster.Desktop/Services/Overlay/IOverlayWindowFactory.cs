@@ -3,13 +3,15 @@ using AGI.Kapster.Desktop.Overlays;
 namespace AGI.Kapster.Desktop.Services.Overlay;
 
 /// <summary>
-/// Factory for creating OverlayWindow instances with DI-injected dependencies
+/// Factory interface for creating IOverlayWindow instances
+/// Allows dependency injection of OverlayWindow dependencies
 /// </summary>
 public interface IOverlayWindowFactory
 {
     /// <summary>
-    /// Create a new OverlayWindow instance with injected dependencies
+    /// Creates a new IOverlayWindow instance with injected dependencies
     /// </summary>
-    OverlayWindow Create();
+    /// <returns>New IOverlayWindow instance</returns>
+    IOverlayWindow Create();
 }
 
