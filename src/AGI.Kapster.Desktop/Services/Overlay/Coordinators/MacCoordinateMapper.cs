@@ -12,10 +12,13 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 /// <summary>
 /// macOS-specific screen coordinate mapper
 /// Handles Retina display scaling and per-screen coordinate mapping
+/// Transient lifetime: fresh instance per screenshot operation
 /// </summary>
 [SupportedOSPlatform("macos")]
 public class MacCoordinateMapper : IScreenCoordinateMapper
 {
+    // Instance-level cache: valid for single screenshot operation
+    private IReadOnlyList<Screen>? _screensCache;
     public PixelRect MapToPhysicalRect(Rect logicalRect, Screen? screen = null)
     {
         var targetScreen = screen ?? GetScreenFromLogicalRect(logicalRect);
@@ -78,56 +81,34 @@ public class MacCoordinateMapper : IScreenCoordinateMapper
 
     public IReadOnlyList<Screen> GetAllScreens()
     {
+        // Return cached screens for this screenshot operation
+        if (_screensCache != null)
+            return _screensCache;
+
         try
         {
-            var screens = new List<Screen>();
+            // Create minimal temporary window to access screen information
+            var tempWindow = new Window
+            {
+                Width = 1,
+                Height = 1,
+                ShowInTaskbar = false,
+                WindowState = WindowState.Minimized,
+                SystemDecorations = SystemDecorations.None,
+                Opacity = 0
+            };
+
+            tempWindow.Show();
+            _screensCache = tempWindow.Screens?.All?.ToList() ?? (IReadOnlyList<Screen>)Array.Empty<Screen>();
+            tempWindow.Close();
             
-            // Try to get screens from existing MainWindow first
-            if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                var mainWindow = desktop.MainWindow;
-                if (mainWindow?.Screens?.All != null)
-                {
-                    screens.AddRange(mainWindow.Screens.All);
-                    Log.Debug("[macOS] Got {Count} screen(s) from MainWindow", screens.Count);
-                    return screens;
-                }
-            }
-
-            // Fallback: Create temporary invisible window to access screen information
-            Log.Debug("[macOS] MainWindow not available, using temporary window to detect screens");
-            Window? tempWindow = null;
-            try
-            {
-                tempWindow = new Window
-                {
-                    Width = 1,
-                    Height = 1,
-                    ShowInTaskbar = false,
-                    WindowState = WindowState.Minimized,
-                    SystemDecorations = SystemDecorations.None,
-                    Opacity = 0
-                };
-
-                tempWindow.Show();
-                
-                if (tempWindow.Screens?.All != null)
-                {
-                    screens.AddRange(tempWindow.Screens.All);
-                    Log.Debug("[macOS] Detected {Count} screen(s) via temporary window", screens.Count);
-                }
-                
-                return screens;
-            }
-            finally
-            {
-                tempWindow?.Close();
-            }
+            return _screensCache;
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "[macOS] Failed to get screens, returning empty list");
-            return Array.Empty<Screen>();
+            Log.Warning(ex, "[macOS] Failed to detect screens");
+            _screensCache = Array.Empty<Screen>();
+            return _screensCache;
         }
     }
 
@@ -169,15 +150,6 @@ public class MacCoordinateMapper : IScreenCoordinateMapper
     {
         try
         {
-            // Try MainWindow first
-            if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                var primary = desktop.MainWindow?.Screens?.Primary;
-                if (primary != null)
-                    return primary;
-            }
-
-            // Fallback: Get from all screens
             var screens = GetAllScreens();
             return screens.FirstOrDefault();
         }

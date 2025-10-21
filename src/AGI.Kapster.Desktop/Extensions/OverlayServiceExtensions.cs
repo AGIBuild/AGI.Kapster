@@ -16,6 +16,9 @@ public static class OverlayServiceExtensions
     /// </summary>
     public static IServiceCollection AddOverlayServices(this IServiceCollection services)
     {
+        // Register OverlayWindow factory (Singleton factory creates Transient windows)
+        services.AddSingleton<IOverlayWindowFactory, OverlayWindowFactory>();
+
 #pragma warning disable CA1416 // Platform compatibility checked by RuntimeInformation.IsOSPlatform
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {

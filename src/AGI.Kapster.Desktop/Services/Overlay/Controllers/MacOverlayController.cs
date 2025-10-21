@@ -22,23 +22,20 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Controllers;
 [SupportedOSPlatform("macos")]
 public class MacOverlayController : IOverlayController
 {
-    private readonly IElementDetector? _elementDetector;
     private readonly IScreenCaptureStrategy? _captureStrategy;
-    private readonly IClipboardStrategy? _clipboardStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
+    private readonly IOverlayWindowFactory _windowFactory;
     
     private readonly List<OverlayWindow> _windows = new();
 
     public MacOverlayController(
         IScreenCaptureStrategy? captureStrategy,
-        IClipboardStrategy? clipboardStrategy,
         IScreenCoordinateMapper coordinateMapper,
-        IElementDetector? elementDetector = null)
+        IOverlayWindowFactory windowFactory)
     {
         _captureStrategy = captureStrategy;
-        _clipboardStrategy = clipboardStrategy;
         _coordinateMapper = coordinateMapper;
-        _elementDetector = elementDetector;
+        _windowFactory = windowFactory;
     }
 
     public bool IsActive => _windows.Count > 0;
@@ -93,13 +90,11 @@ public class MacOverlayController : IOverlayController
                 avaloniaBitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
             }
 
-            // Create window for this screen
-            var window = new OverlayWindow(_elementDetector, _captureStrategy)
-            {
-                Position = new Avalonia.PixelPoint(screenBounds.X, screenBounds.Y),
-                Width = screenBounds.Width,
-                Height = screenBounds.Height
-            };
+            // Create window via factory (with DI-injected dependencies)
+            var window = _windowFactory.Create();
+            window.Position = new Avalonia.PixelPoint(screenBounds.X, screenBounds.Y);
+            window.Width = screenBounds.Width;
+            window.Height = screenBounds.Height;
 
             // Set mask size for this screen (each screen has independent coordinate system on macOS)
             // This handles Retina displays correctly (logical vs physical pixels)

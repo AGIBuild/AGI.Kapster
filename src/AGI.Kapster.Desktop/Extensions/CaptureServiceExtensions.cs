@@ -29,7 +29,7 @@ public static class CaptureServiceExtensions
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
             services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-            services.AddSingleton<IScreenCoordinateMapper, WindowsCoordinateMapper>();
+            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: screen info changes dynamically
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
@@ -37,7 +37,7 @@ public static class CaptureServiceExtensions
             services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
             services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>(); // Reuse Windows renderer
             services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
-            services.AddSingleton<IScreenCoordinateMapper, MacCoordinateMapper>();
+            services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>(); // Transient: screen info changes dynamically
         }
         else
         {
@@ -46,7 +46,7 @@ public static class CaptureServiceExtensions
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
             services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-            services.AddSingleton<IScreenCoordinateMapper, WindowsCoordinateMapper>();
+            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: screen info changes dynamically
         }
 #pragma warning restore CA1416
 

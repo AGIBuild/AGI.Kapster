@@ -20,23 +20,20 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Controllers;
 [SupportedOSPlatform("windows")]
 public class WindowsOverlayController : IOverlayController
 {
-    private readonly IElementDetector? _elementDetector;
     private readonly IScreenCaptureStrategy? _captureStrategy;
-    private readonly IClipboardStrategy? _clipboardStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
+    private readonly IOverlayWindowFactory _windowFactory;
     
     private OverlayWindow? _currentWindow;
 
     public WindowsOverlayController(
         IScreenCaptureStrategy? captureStrategy,
-        IClipboardStrategy? clipboardStrategy,
         IScreenCoordinateMapper coordinateMapper,
-        IElementDetector? elementDetector = null)
+        IOverlayWindowFactory windowFactory)
     {
         _captureStrategy = captureStrategy;
-        _clipboardStrategy = clipboardStrategy;
         _coordinateMapper = coordinateMapper;
-        _elementDetector = elementDetector;
+        _windowFactory = windowFactory;
     }
 
     public bool IsActive => _currentWindow != null;
@@ -61,13 +58,11 @@ public class WindowsOverlayController : IOverlayController
                 avaloniaBitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
             }
 
-            // Create window
-            _currentWindow = new OverlayWindow(_elementDetector, _captureStrategy)
-            {
-                Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y),
-                Width = virtualBounds.Width,
-                Height = virtualBounds.Height
-            };
+            // Create window via factory (with DI-injected dependencies)
+            _currentWindow = _windowFactory.Create();
+            _currentWindow.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
+            _currentWindow.Width = virtualBounds.Width;
+            _currentWindow.Height = virtualBounds.Height;
 
             // Set mask size for the virtual desktop (important for multi-monitor with negative coordinates)
             // Mask always starts at (0,0) in window coordinates, but covers the full virtual desktop
