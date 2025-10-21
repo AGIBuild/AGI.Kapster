@@ -30,6 +30,11 @@ public class SettingsService : ISettingsService
 
     public AppSettings Settings => _settings;
 
+    /// <summary>
+    /// Event raised when settings are changed
+    /// </summary>
+    public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
+
     // Remove parameterless constructor - force DI usage
     public SettingsService(IFileSystemService fileSystemService, IConfiguration? configuration = null)
     {
@@ -268,10 +273,22 @@ public class SettingsService : ISettingsService
         if (newSettings == null)
             throw new ArgumentNullException(nameof(newSettings));
 
+        var oldSettings = _settings;
         _settings = newSettings;
         await SaveAsync();
 
+        // Raise event for all sections (caller doesn't specify which changed)
+        OnSettingsChanged(new SettingsChangedEventArgs(oldSettings, newSettings));
+
         Log.Debug("Settings updated and saved");
+    }
+
+    /// <summary>
+    /// Raise settings changed event
+    /// </summary>
+    protected virtual void OnSettingsChanged(SettingsChangedEventArgs e)
+    {
+        SettingsChanged?.Invoke(this, e);
     }
 
     public string GetSettingsFilePath()

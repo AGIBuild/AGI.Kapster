@@ -537,26 +537,7 @@ public partial class SettingsWindow : Window
             // Apply advanced settings
             await ApplyAdvancedSettings();
 
-            // Reload hotkeys if settings changed
-            try
-            {
-                var hotkeyManager = App.Services?.GetService(typeof(IHotkeyManager)) as IHotkeyManager;
-                if (hotkeyManager != null)
-                {
-                    Log.Debug("Reloading hotkeys after settings saved: CaptureRegion={CaptureRegion}, OpenSettings={OpenSettings}",
-                        _currentSettings.Hotkeys.CaptureRegion, _currentSettings.Hotkeys.OpenSettings);
-                    await hotkeyManager.ReloadHotkeysAsync();
-                    Log.Debug("Hotkeys reloaded successfully after settings change");
-                }
-                else
-                {
-                    Log.Error("HotkeyManager service not found - hotkeys will not be reloaded");
-                }
-            }
-            catch (Exception hotkeyEx)
-            {
-                Log.Error(hotkeyEx, "Failed to reload hotkeys after settings change");
-            }
+            // Note: No need to manually reload hotkeys - HotkeyManager subscribes to SettingsChanged event
 
             DialogResult = true;
             Close();

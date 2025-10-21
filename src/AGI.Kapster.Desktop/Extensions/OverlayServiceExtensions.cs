@@ -11,6 +11,7 @@ public static class OverlayServiceExtensions
 {
     /// <summary>
     /// Register overlay controller for managing screenshot overlays
+    /// Note: IOverlayWindow is registered in CaptureServiceExtensions (platform-specific)
     /// </summary>
     public static IServiceCollection AddOverlayServices(this IServiceCollection services)
     {
