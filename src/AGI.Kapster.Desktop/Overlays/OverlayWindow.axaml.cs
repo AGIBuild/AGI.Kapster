@@ -320,20 +320,7 @@ public partial class OverlayWindow : Window
                 var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
                     await System.Threading.Tasks.Task.Delay(50);
-
-                    // Close all overlay windows, not just this one
-                    var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-                    if (overlayController != null)
-                    {
-                        overlayController.CloseAll();
-                        Log.Information("All overlay windows closed after double-click save");
-                    }
-                    else
-                    {
-                        // Fallback: close just this window
-                        Close();
-                        Log.Warning("Could not get overlay controller, closing only current window");
-                    }
+                    CloseOverlayWithController("double-click save");
                 });
             };
         }
@@ -364,6 +351,25 @@ public partial class OverlayWindow : Window
                 Log.Debug(ex, "Error disposing frozen background");
             }
         };
+    }
+
+    /// <summary>
+    /// Close all overlay windows using the overlay controller
+    /// </summary>
+    private void CloseOverlayWithController(string context)
+    {
+        var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
+        if (overlayController != null)
+        {
+            overlayController.CloseAll();
+            Log.Information("All overlay windows closed after {Context}", context);
+        }
+        else
+        {
+            // Fallback: close just this window
+            Close();
+            Log.Warning("Could not get overlay controller, closing only current window after {Context}", context);
+        }
     }
 
     private void UpdateMaskForSelection(Rect selection)
@@ -504,20 +510,7 @@ public partial class OverlayWindow : Window
                     var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                     {
                         await System.Threading.Tasks.Task.Delay(50);
-
-                        // Close all overlay windows, not just this one
-                        var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-                        if (overlayController != null)
-                        {
-                            overlayController.CloseAll();
-                            Log.Information("All overlay windows closed after Enter key save");
-                        }
-                        else
-                        {
-                            // Fallback: close just this window
-                            Close();
-                            Log.Warning("Could not get overlay controller, closing only current window");
-                        }
+                        CloseOverlayWithController("Enter key save");
                     });
                 }
             }
@@ -1045,19 +1038,7 @@ public partial class OverlayWindow : Window
                     Log.Information("Successfully exported annotated screenshot to {FilePath} with settings: {Format}, Quality: {Quality}",
                         file.Path.LocalPath, settings.Format, settings.Quality);
 
-                    // Close all overlay windows, not just this one
-                    var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-                    if (overlayController != null)
-                    {
-                        overlayController.CloseAll();
-                        Log.Information("All overlay windows closed after export");
-                    }
-                    else
-                    {
-                        // Fallback: close just this window
-                        Close();
-                        Log.Warning("Could not get overlay controller, closing only current window");
-                    }
+                    CloseOverlayWithController("export");
                 }
                 finally
                 {

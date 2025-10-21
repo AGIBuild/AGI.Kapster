@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Serilog;
 using AGI.Kapster.Desktop.Services.Settings;
+using AGI.Kapster.Desktop.Services.ErrorHandling;
 
 namespace AGI.Kapster.Desktop.Services;
 
@@ -17,11 +18,16 @@ public class ApplicationController : IApplicationController
 {
     private readonly ISettingsService _settingsService;
     private readonly IStartupManager _startupManager;
+    private readonly IErrorHandler _errorHandler;
 
-    public ApplicationController(ISettingsService settingsService, IStartupManager startupManager)
+    public ApplicationController(
+        ISettingsService settingsService, 
+        IStartupManager startupManager,
+        IErrorHandler errorHandler)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _startupManager = startupManager ?? throw new ArgumentNullException(nameof(startupManager));
+        _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
     }
 
     public async Task InitializeAsync()
@@ -52,7 +58,8 @@ public class ApplicationController : IApplicationController
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to initialize application controller");
+            // Controller layer: catch and notify
+            await _errorHandler.HandleErrorAsync(ex, ErrorSeverity.Error, "Application controller initialization");
         }
     }
 

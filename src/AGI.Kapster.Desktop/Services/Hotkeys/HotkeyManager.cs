@@ -30,7 +30,17 @@ public class HotkeyManager : IHotkeyManager
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _overlayController = overlayController ?? throw new ArgumentNullException(nameof(overlayController));
 
+        // Subscribe to settings changes
+        _settingsService.SettingsChanged += OnSettingsChanged;
+
         Log.Debug("HotkeyManager constructor completed with provider: {Type}", _hotkeyProvider.GetType().Name);
+    }
+
+    private async void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
+    {
+        // Reload hotkeys when settings change
+        Log.Information("Settings changed, reloading hotkeys");
+        await ReloadHotkeysAsync();
     }
 
     public async Task InitializeAsync()
