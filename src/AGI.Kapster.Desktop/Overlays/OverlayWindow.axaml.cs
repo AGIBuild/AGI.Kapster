@@ -5,6 +5,7 @@ using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Services.Export;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.Settings;
@@ -13,6 +14,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Serilog;
 using System;
@@ -26,6 +28,7 @@ public partial class OverlayWindow : Window
 {
     private readonly IElementDetector? _elementDetector;
     private readonly IScreenCaptureStrategy? _screenCaptureStrategy;
+    private readonly IScreenCoordinateMapper? _coordinateMapper;
     private ElementHighlightOverlay? _elementHighlight;
     private bool _isElementPickerMode = false; // Default to free selection mode
     private bool _hasEditableSelection = false; // Track if there's an editable selection
@@ -66,10 +69,11 @@ public partial class OverlayWindow : Window
         set => SetElementPickerMode(value);
     }
 
-    public OverlayWindow(IElementDetector? elementDetector = null, IScreenCaptureStrategy? screenCaptureStrategy = null)
+    public OverlayWindow(IElementDetector? elementDetector = null, IScreenCaptureStrategy? screenCaptureStrategy = null, IScreenCoordinateMapper? coordinateMapper = null)
     {
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
+        _coordinateMapper = coordinateMapper;
         
         // Fast initialization: only XAML parsing
         InitializeComponent();
@@ -853,9 +857,12 @@ public partial class OverlayWindow : Window
                     return baseScreenshot;
                 }
 
+                // Determine target screen for correct DPI handling
+                var targetScreen = GetScreenForSelection(region);
+
                 var exportService = new ExportService();
                 return await exportService.CreateCompositeImageWithAnnotationsAsync(
-                    baseScreenshot, annotations, region);
+                    baseScreenshot, annotations, region, targetScreen);
             }
             finally
             {
@@ -879,6 +886,45 @@ public partial class OverlayWindow : Window
     private IEnumerable<IAnnotationItem>? GetAnnotationsFromAnnotator()
     {
         return _annotator?.GetAnnotations();
+    }
+
+    /// <summary>
+    /// Determine which screen the selection region is on (using center point)
+    /// </summary>
+    private Screen? GetScreenForSelection(Rect selectionRect)
+    {
+        if (_coordinateMapper == null)
+        {
+            Log.Debug("No coordinate mapper available, cannot determine target screen");
+            return null;
+        }
+
+        try
+        {
+            // Calculate center point of selection (in logical DIPs)
+            var centerX = selectionRect.X + selectionRect.Width / 2;
+            var centerY = selectionRect.Y + selectionRect.Height / 2;
+            var centerPoint = new PixelPoint((int)centerX, (int)centerY);
+
+            // Find screen containing this point
+            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint);
+            if (targetScreen != null)
+            {
+                Log.Debug("Selection at ({X}, {Y}) is on screen with scaling {Scaling}", 
+                    centerX, centerY, targetScreen.Scaling);
+            }
+            else
+            {
+                Log.Debug("Could not determine screen for selection at ({X}, {Y})", centerX, centerY);
+            }
+
+            return targetScreen;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to determine target screen for selection");
+            return null;
+        }
     }
 
     /// <summary>
