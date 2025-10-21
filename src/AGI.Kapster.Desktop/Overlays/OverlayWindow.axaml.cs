@@ -134,7 +134,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _toolbar = this.FindControl<NewAnnotationToolbar>("Toolbar");
         _uiCanvas = this.FindControl<Canvas>("UiCanvas");
         
-        // Note: _annotator will be cached after replacement in InitializeHeavyComponents
+        // Note: _annotator will be cached after creation in InitializeHeavyComponents
     }
 
     /// <summary>
@@ -845,7 +845,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 scaleY = _frozenBackground.PixelSize.Height / Math.Max(1.0, this.Bounds.Height);
             }
 
-            // End text editing before capture to prevent TextBox background artifacts
+            // End text editing before capture to prevent TextBox background artifacts.
+            // Null-safety is handled by the null-conditional operator (?.).
             _annotator?.EndTextEditing();
 
             // Temporarily hide UI elements

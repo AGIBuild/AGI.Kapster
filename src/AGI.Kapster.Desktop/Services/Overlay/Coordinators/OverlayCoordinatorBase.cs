@@ -202,7 +202,7 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
             };
 
             tempWindow.Show();
-            var screens = tempWindow.Screens?.All?.ToList() ?? Array.Empty<Screen>();
+            var screens = tempWindow.Screens?.All?.ToList() ?? new List<Screen>();
             tempWindow.Close();
             
             return await Task.FromResult(screens);

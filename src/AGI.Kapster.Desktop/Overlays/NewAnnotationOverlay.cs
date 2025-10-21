@@ -41,6 +41,7 @@ public sealed class NewAnnotationOverlay : Canvas
     private readonly IAnnotationService _annotationService;
     private readonly IAnnotationRenderer _renderer;
     private readonly CommandManager _commandManager;
+    private IAnnotationItem? _creatingItem;
 
     /// <summary>
     /// Get all annotation items (public for use by OverlayWindow)
@@ -49,7 +50,6 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         return _annotationService?.Manager?.Items ?? Enumerable.Empty<IAnnotationItem>();
     }
-    private IAnnotationItem? _creatingItem;
     private bool _isCreating;
 
     // Text editing

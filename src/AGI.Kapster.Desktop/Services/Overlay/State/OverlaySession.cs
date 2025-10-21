@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Avalonia.Controls;
 using Serilog;
 
@@ -147,7 +148,7 @@ public class OverlaySession : IOverlaySession
     {
         ThrowIfDisposed();
         
-        bool shouldInvoke = false;
+        Action<bool>? handlerCopy = null;
         
         lock (_lock)
         {
@@ -156,23 +157,23 @@ public class OverlaySession : IOverlaySession
 
             _hasSelection = true;
             _activeSelectionWindow = window;
-            shouldInvoke = true;
+            
+            // Capture event handler inside lock to prevent race with Dispose()
+            handlerCopy = SelectionStateChanged;
             
             Log.Debug("[OverlaySession] Selection set for window");
         }
         
         // Invoke event outside lock to avoid deadlocks
-        if (shouldInvoke)
-        {
-            SelectionStateChanged?.Invoke(true);
-        }
+        // Using captured handler ensures thread safety even if Dispose() runs concurrently
+        handlerCopy?.Invoke(true);
     }
 
     public void ClearSelection(object? window = null)
     {
         if (_disposed) return;
         
-        bool shouldInvoke = false;
+        Action<bool>? handlerCopy = null;
         
         lock (_lock)
         {
@@ -183,20 +184,24 @@ public class OverlaySession : IOverlaySession
             if (_hasSelection)
             {
                 ClearSelectionInternal();
-                shouldInvoke = true;
+                
+                // Capture event handler inside lock to prevent race with Dispose()
+                handlerCopy = SelectionStateChanged;
             }
         }
         
         // Invoke event outside lock to avoid deadlocks
-        if (shouldInvoke)
-        {
-            SelectionStateChanged?.Invoke(false);
-        }
+        // Using captured handler ensures thread safety even if Dispose() runs concurrently
+        handlerCopy?.Invoke(false);
     }
 
     public void Dispose()
     {
         if (_disposed) return;
+
+        // Atomically clear event handlers to prevent race conditions
+        // This ensures no new handlers are invoked after disposal starts
+        Interlocked.Exchange(ref SelectionStateChanged, null);
 
         // Close all windows first
         CloseAll();
@@ -206,7 +211,6 @@ public class OverlaySession : IOverlaySession
             _disposed = true;
             _hasSelection = false;
             _activeSelectionWindow = null;
-            SelectionStateChanged = null;
             
             Log.Debug("[OverlaySession] Disposed");
         }
