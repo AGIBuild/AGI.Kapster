@@ -1136,6 +1136,10 @@ internal class DesignTimeSettingsService : ISettingsService
 {
     public AppSettings Settings { get; } = new AppSettings();
 
+#pragma warning disable CS0067 // Event is never used in design-time service
+    public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
+#pragma warning restore CS0067
+
     public Task SaveAsync() => Task.CompletedTask;
     public void ResetToDefaults() { }
     public Task UpdateSettingsAsync(AppSettings newSettings) => Task.CompletedTask;
