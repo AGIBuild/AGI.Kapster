@@ -337,12 +337,12 @@ public class SystemTrayService : ISystemTrayService, IDisposable
     {
         try
         {
-            // Get overlay service and show capture UI
-            var overlayService = App.Services?.GetService(typeof(AGI.Kapster.Desktop.Services.Overlay.IOverlayController))
-                as AGI.Kapster.Desktop.Services.Overlay.IOverlayController;
-            if (overlayService != null)
+            // Get screenshot service and start capture
+            var screenshotService = App.Services?.GetService(typeof(AGI.Kapster.Desktop.Services.Screenshot.IScreenshotService))
+                as AGI.Kapster.Desktop.Services.Screenshot.IScreenshotService;
+            if (screenshotService != null)
             {
-                await overlayService.ShowAll();
+                await screenshotService.TakeScreenshotAsync();
             }
         }
         catch (Exception ex)

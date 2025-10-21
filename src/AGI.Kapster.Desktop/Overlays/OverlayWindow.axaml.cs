@@ -5,8 +5,8 @@ using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Services.Export;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
-using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.State;
+using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.Settings;
 using Avalonia;
 using Avalonia.Controls;
@@ -394,21 +394,21 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Close all overlay windows using the overlay controller
+    /// Close all overlay windows using the screenshot service
     /// </summary>
     private void CloseOverlayWithController(string context)
     {
-        var overlayController = App.Services?.GetService(typeof(IOverlayController)) as IOverlayController;
-        if (overlayController != null)
+        var screenshotService = App.Services?.GetService(typeof(IScreenshotService)) as IScreenshotService;
+        if (screenshotService != null)
         {
-            overlayController.CloseAll();
-            Log.Information("All overlay windows closed after {Context}", context);
+            screenshotService.Cancel();
+            Log.Information("Screenshot cancelled after {Context}", context);
         }
         else
         {
             // Fallback: close just this window
             Close();
-            Log.Warning("Could not get overlay controller, closing only current window after {Context}", context);
+            Log.Warning("Could not get screenshot service, closing only current window after {Context}", context);
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Controls;
 using Serilog;
 
@@ -11,13 +12,24 @@ namespace AGI.Kapster.Desktop.Services.Overlay.State;
 /// </summary>
 internal class OverlaySession : IOverlaySession
 {
-    private readonly HashSet<Window> _windows = new();
+    private readonly List<Window> _windows = new();
     private bool _hasSelection = false;
     private object? _activeSelectionWindow = null;
     private readonly object _lock = new();
     private bool _disposed = false;
 
     public event Action<bool>? SelectionStateChanged;
+
+    public IReadOnlyList<Window> Windows
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _windows.AsReadOnly();
+            }
+        }
+    }
 
     public bool HasSelection
     {
@@ -41,17 +53,17 @@ internal class OverlaySession : IOverlaySession
         }
     }
 
-    public void RegisterWindow(Window window)
+    public void AddWindow(Window window)
     {
         ThrowIfDisposed();
         lock (_lock)
         {
             _windows.Add(window);
-            Log.Debug("[OverlaySession] Window registered, total: {Count}", _windows.Count);
+            Log.Debug("[OverlaySession] Window added, total: {Count}", _windows.Count);
         }
     }
 
-    public void UnregisterWindow(Window window)
+    public void RemoveWindow(Window window)
     {
         if (_disposed) return;
 
@@ -65,7 +77,60 @@ internal class OverlaySession : IOverlaySession
                 ClearSelectionInternal();
             }
             
-            Log.Debug("[OverlaySession] Window unregistered, remaining: {Count}", _windows.Count);
+            Log.Debug("[OverlaySession] Window removed, remaining: {Count}", _windows.Count);
+        }
+    }
+
+    public void ShowAll()
+    {
+        ThrowIfDisposed();
+        
+        Window[] windowsToShow;
+        lock (_lock)
+        {
+            windowsToShow = _windows.ToArray();
+        }
+        
+        foreach (var window in windowsToShow)
+        {
+            try
+            {
+                window.Show();
+                Log.Debug("[OverlaySession] Window shown");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[OverlaySession] Failed to show window");
+            }
+        }
+    }
+
+    public void CloseAll()
+    {
+        if (_disposed) return;
+        
+        Window[] windowsToClose;
+        lock (_lock)
+        {
+            windowsToClose = _windows.ToArray();
+        }
+        
+        foreach (var window in windowsToClose)
+        {
+            try
+            {
+                window.Close();
+                Log.Debug("[OverlaySession] Window closed");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[OverlaySession] Failed to close window");
+            }
+        }
+        
+        lock (_lock)
+        {
+            _windows.Clear();
         }
     }
 
@@ -133,10 +198,12 @@ internal class OverlaySession : IOverlaySession
     {
         if (_disposed) return;
 
+        // Close all windows first
+        CloseAll();
+
         lock (_lock)
         {
             _disposed = true;
-            _windows.Clear();
             _hasSelection = false;
             _activeSelectionWindow = null;
             SelectionStateChanged = null;

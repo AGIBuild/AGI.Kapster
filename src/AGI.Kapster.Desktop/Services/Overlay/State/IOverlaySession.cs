@@ -1,23 +1,40 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Controls;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
 
 /// <summary>
 /// Represents a single screenshot session with scoped state management
-/// Each ShowAll() creates a new session, automatically cleaned up on Dispose
+/// Session owns and manages all overlay windows created during the screenshot operation
+/// Automatically cleaned up on Dispose
 /// </summary>
 public interface IOverlaySession : IDisposable
 {
     /// <summary>
-    /// Register a window in this session
+    /// Add a window to this session (establishes ownership)
     /// </summary>
-    void RegisterWindow(Window window);
+    void AddWindow(Window window);
 
     /// <summary>
-    /// Unregister a window from this session
+    /// Remove a window from this session
     /// </summary>
-    void UnregisterWindow(Window window);
+    void RemoveWindow(Window window);
+
+    /// <summary>
+    /// Get all windows in this session
+    /// </summary>
+    IReadOnlyList<Window> Windows { get; }
+
+    /// <summary>
+    /// Show all windows in this session
+    /// </summary>
+    void ShowAll();
+
+    /// <summary>
+    /// Close all windows in this session
+    /// </summary>
+    void CloseAll();
 
     /// <summary>
     /// Check if a window can start a new selection
