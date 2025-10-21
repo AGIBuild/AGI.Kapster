@@ -5,6 +5,7 @@ using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
+using Serilog;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 
@@ -78,18 +79,52 @@ public class WindowsCoordinateMapper : IScreenCoordinateMapper
         try
         {
             var screens = new List<Screen>();
+            
+            // Try to get screens from existing MainWindow first
             if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var mainWindow = desktop.MainWindow;
-                if (mainWindow?.Screens != null)
+                if (mainWindow?.Screens?.All != null)
                 {
                     screens.AddRange(mainWindow.Screens.All);
+                    Log.Debug("[Windows] Got {Count} screen(s) from MainWindow", screens.Count);
+                    return screens;
                 }
             }
-            return screens;
+
+            // Fallback: Create temporary invisible window to access screen information
+            Log.Debug("[Windows] MainWindow not available, using temporary window to detect screens");
+            Window? tempWindow = null;
+            try
+            {
+                tempWindow = new Window
+                {
+                    Width = 1,
+                    Height = 1,
+                    ShowInTaskbar = false,
+                    WindowState = WindowState.Minimized,
+                    SystemDecorations = SystemDecorations.None,
+                    Opacity = 0
+                };
+
+                tempWindow.Show();
+                
+                if (tempWindow.Screens?.All != null)
+                {
+                    screens.AddRange(tempWindow.Screens.All);
+                    Log.Debug("[Windows] Detected {Count} screen(s) via temporary window", screens.Count);
+                }
+                
+                return screens;
+            }
+            finally
+            {
+                tempWindow?.Close();
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Warning(ex, "[Windows] Failed to get screens, returning empty list");
             return Array.Empty<Screen>();
         }
     }
@@ -114,17 +149,22 @@ public class WindowsCoordinateMapper : IScreenCoordinateMapper
     {
         try
         {
+            // Try MainWindow first
             if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
-                return desktop.MainWindow?.Screens?.Primary;
+                var primary = desktop.MainWindow?.Screens?.Primary;
+                if (primary != null)
+                    return primary;
             }
+
+            // Fallback: Get from all screens
+            var screens = GetAllScreens();
+            return screens.FirstOrDefault();
         }
         catch
         {
-            // Ignored
+            return null;
         }
-
-        return null;
     }
 }
 
