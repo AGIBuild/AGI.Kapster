@@ -18,15 +18,12 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 /// macOS-specific overlay coordinator: per-screen overlay windows (handles Retina scaling)
 /// </summary>
 [SupportedOSPlatform("macos")]
-public class MacOverlayCoordinator : IOverlayCoordinator
+public class MacOverlayCoordinator : OverlayCoordinatorBase
 {
-    private readonly IOverlaySessionFactory _sessionFactory;
-    private readonly IOverlayWindowFactory _windowFactory;
     private readonly IScreenCaptureStrategy? _captureStrategy;
-    private readonly IScreenCoordinateMapper _coordinateMapper;
     private readonly IClipboardStrategy? _clipboardStrategy;
 
-    private IOverlaySession? _currentSession;
+    protected override string PlatformName => "MacCoordinator";
 
     public MacOverlayCoordinator(
         IOverlaySessionFactory sessionFactory,
@@ -34,72 +31,42 @@ public class MacOverlayCoordinator : IOverlayCoordinator
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
+        : base(sessionFactory, windowFactory, coordinateMapper)
     {
-        _sessionFactory = sessionFactory;
-        _windowFactory = windowFactory;
         _captureStrategy = captureStrategy;
-        _coordinateMapper = coordinateMapper;
         _clipboardStrategy = clipboardStrategy;
     }
 
-    public bool HasActiveSession => _currentSession != null;
-
-    public async Task<IOverlaySession> CreateAndShowSessionAsync()
+    /// <summary>
+    /// macOS-specific: Create one window per screen (handles Retina displays independently)
+    /// </summary>
+    protected override async Task CreateAndConfigureWindowsAsync(IOverlaySession session)
     {
-        try
+        // Get all screens (macOS-specific: one window per screen)
+        var screens = _coordinateMapper.GetAllScreens();
+        if (screens.Count == 0)
         {
-            Log.Information("[MacCoordinator] Creating new screenshot session");
-            
-            // Close any existing session
-            CloseCurrentSession();
-
-            // 1. Create session
-            var session = _sessionFactory.CreateSession();
-
-            // 2. Initialize screen information for this session
-            _coordinateMapper.InitializeScreens();
-            Log.Debug("[MacCoordinator] Initialized {Count} screen(s) for session", _coordinateMapper.Screens.Count);
-
-            // 3. Get all screens (macOS-specific: one window per screen)
-            var screens = _coordinateMapper.GetAllScreens();
-            if (screens.Count == 0)
-            {
-                Log.Warning("[MacCoordinator] No screens available");
-                throw new InvalidOperationException("No screens detected");
-            }
-
-            Log.Information("[MacCoordinator] Creating overlay windows for {Count} screen(s)", screens.Count);
-
-            // 4. Create window for each screen
-            foreach (var screen in screens)
-            {
-                await CreateWindowForScreenAsync(session, screen);
-            }
-
-            // 5. Show all windows in session
-            session.ShowAll();
-
-            _currentSession = session;
-            Log.Information("[MacCoordinator] Session created with {Count} window(s)", session.Windows.Count);
-
-            return session;
+            Log.Warning("[{Platform}] No screens available", PlatformName);
+            throw new InvalidOperationException("No screens detected");
         }
-        catch (Exception ex)
+
+        Log.Information("[{Platform}] Creating overlay windows for {Count} screen(s)", PlatformName, screens.Count);
+
+        // Create window for each screen
+        foreach (var screen in screens)
         {
-            Log.Error(ex, "[MacCoordinator] Failed to create session");
-            CloseCurrentSession();
-            throw;
+            await CreateWindowForScreenAsync(session, screen);
         }
     }
 
-    public void CloseCurrentSession()
+    public override void CloseCurrentSession()
     {
         if (_currentSession == null)
             return;
 
         try
         {
-            Log.Information("[MacCoordinator] Closing current session");
+            Log.Information("[{Platform}] Closing current session", PlatformName);
 
             // Unsubscribe from all windows
             foreach (var window in _currentSession.Windows)
@@ -115,11 +82,11 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             _currentSession.Dispose();
             _currentSession = null;
 
-            Log.Debug("[MacCoordinator] Session closed");
+            Log.Debug("[{Platform}] Session closed", PlatformName);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[MacCoordinator] Error closing session");
+            Log.Error(ex, "[{Platform}] Error closing session", PlatformName);
             _currentSession = null;
         }
     }
@@ -134,7 +101,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
                 screen.Bounds.Width,
                 screen.Bounds.Height);
 
-            Log.Debug("[MacCoordinator] Creating window for screen at {Position}, size {Size}",
+            Log.Debug("[{Platform}] Creating window for screen at {Position}, size {Size}", PlatformName,
                 screenBounds.Position, screenBounds.Size);
 
             // Create window immediately for instant display
@@ -166,23 +133,23 @@ public class MacOverlayCoordinator : IOverlayCoordinator
                         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             window.SetPrecapturedAvaloniaBitmap(background);
-                            Log.Debug("[MacCoordinator] Background loaded for screen at {Position}", screenBounds.Position);
+                            Log.Debug("[{Platform}] Background loaded for screen at {Position}", PlatformName, screenBounds.Position);
                         });
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "[MacCoordinator] Failed to load background asynchronously for screen");
+                    Log.Warning(ex, "[{Platform}] Failed to load background asynchronously for screen", PlatformName);
                 }
             });
 
-            Log.Debug("[MacCoordinator] Window created for screen at {Position}", screenBounds.Position);
+            Log.Debug("[{Platform}] Window created for screen at {Position}", PlatformName, screenBounds.Position);
 
             return Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[MacCoordinator] Failed to create window for screen");
+            Log.Error(ex, "[{Platform}] Failed to create window for screen", PlatformName);
             throw;
         }
     }
@@ -191,7 +158,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
     {
         if (_captureStrategy == null)
         {
-            Log.Warning("[MacCoordinator] No capture strategy available for pre-capture");
+            Log.Warning("[{Platform}] No capture strategy available for pre-capture", PlatformName);
             return null;
         }
 
@@ -203,12 +170,12 @@ public class MacOverlayCoordinator : IOverlayCoordinator
                     screen.Bounds.Size.ToSize(1.0)),
                 screen);
             
-            Log.Debug("[MacCoordinator] Pre-capturing screen background: {PixelBounds}", pixelBounds);
+            Log.Debug("[{Platform}] Pre-capturing screen background: {PixelBounds}", PlatformName, pixelBounds);
 
             var skBitmap = await _captureStrategy.CaptureRegionAsync(pixelBounds);
             if (skBitmap == null)
             {
-                Log.Warning("[MacCoordinator] Screen capture returned null");
+                Log.Warning("[{Platform}] Screen capture returned null", PlatformName);
                 return null;
             }
 
@@ -216,7 +183,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "[MacCoordinator] Failed to pre-capture screen background");
+            Log.Warning(ex, "[{Platform}] Failed to pre-capture screen background", PlatformName);
             return null;
         }
     }
@@ -228,14 +195,14 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             // If this is an editable selection (for annotation), don't close the session
             if (e.IsEditableSelection)
             {
-                Log.Debug("[MacCoordinator] Editable selection created, keeping session open for annotation");
+                Log.Debug("[{Platform}] Editable selection created, keeping session open for annotation", PlatformName);
                 return;
             }
 
             // Only process final image (from double-click or export)
             if (e.FinalImage != null)
             {
-                Log.Information("[MacCoordinator] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
+                Log.Information("[{Platform}] Region selected: {Region}, copying to clipboard", PlatformName, e.SelectedRegion);
 
                 // Convert Avalonia Bitmap to SKBitmap
                 var skBitmap = BitmapConverter.ConvertToSKBitmap(e.FinalImage);
@@ -247,23 +214,23 @@ public class MacOverlayCoordinator : IOverlayCoordinator
                         var success = await _clipboardStrategy.SetImageAsync(skBitmap);
                         if (success)
                         {
-                            Log.Information("[MacCoordinator] Image copied to clipboard successfully");
+                            Log.Information("[{Platform}] Image copied to clipboard successfully", PlatformName);
                         }
                         else
                         {
-                            Log.Warning("[MacCoordinator] Failed to copy image to clipboard");
+                            Log.Warning("[{Platform}] Failed to copy image to clipboard", PlatformName);
                         }
                     }
                     else
                     {
-                        Log.Warning("[MacCoordinator] Clipboard strategy not available");
+                        Log.Warning("[{Platform}] Clipboard strategy not available", PlatformName);
                     }
 
                     skBitmap.Dispose();
                 }
                 else
                 {
-                    Log.Warning("[MacCoordinator] Failed to convert image for clipboard");
+                    Log.Warning("[{Platform}] Failed to convert image for clipboard", PlatformName);
                 }
             }
 
@@ -272,13 +239,13 @@ public class MacOverlayCoordinator : IOverlayCoordinator
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[MacCoordinator] Error handling region selection");
+            Log.Error(ex, "[{Platform}] Error handling region selection", PlatformName);
         }
     }
 
     private void OnCancelled(object? sender, OverlayCancelledEventArgs e)
     {
-        Log.Information("[MacCoordinator] Screenshot cancelled");
+        Log.Information("[{Platform}] Screenshot cancelled", PlatformName);
         CloseCurrentSession();
     }
 }

@@ -10,10 +10,10 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 public interface IOverlayCoordinator
 {
     /// <summary>
-    /// Create and show a new screenshot session
+    /// Start a new screenshot session
     /// </summary>
     /// <returns>The created session</returns>
-    Task<IOverlaySession> CreateAndShowSessionAsync();
+    Task<IOverlaySession> StartSessionAsync();
 
     /// <summary>
     /// Close the current active session

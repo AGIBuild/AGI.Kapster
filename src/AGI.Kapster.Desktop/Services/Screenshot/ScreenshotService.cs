@@ -25,7 +25,7 @@ public class ScreenshotService : IScreenshotService
         try
         {
             Log.Information("[ScreenshotService] Starting screenshot operation");
-            await _coordinator.CreateAndShowSessionAsync();
+            await _coordinator.StartSessionAsync();
         }
         catch (Exception ex)
         {

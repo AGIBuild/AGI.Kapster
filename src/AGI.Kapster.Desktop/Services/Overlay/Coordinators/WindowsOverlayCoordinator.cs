@@ -16,15 +16,12 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 /// Windows-specific overlay coordinator: single window covering virtual desktop
 /// </summary>
 [SupportedOSPlatform("windows")]
-public class WindowsOverlayCoordinator : IOverlayCoordinator
+public class WindowsOverlayCoordinator : OverlayCoordinatorBase
 {
-    private readonly IOverlaySessionFactory _sessionFactory;
-    private readonly IOverlayWindowFactory _windowFactory;
     private readonly IScreenCaptureStrategy? _captureStrategy;
-    private readonly IScreenCoordinateMapper _coordinateMapper;
     private readonly IClipboardStrategy? _clipboardStrategy;
 
-    private IOverlaySession? _currentSession;
+    protected override string PlatformName => "WindowsCoordinator";
 
     public WindowsOverlayCoordinator(
         IOverlaySessionFactory sessionFactory,
@@ -32,99 +29,71 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
+        : base(sessionFactory, windowFactory, coordinateMapper)
     {
-        _sessionFactory = sessionFactory;
-        _windowFactory = windowFactory;
         _captureStrategy = captureStrategy;
-        _coordinateMapper = coordinateMapper;
         _clipboardStrategy = clipboardStrategy;
     }
 
-    public bool HasActiveSession => _currentSession != null;
-
-    public Task<IOverlaySession> CreateAndShowSessionAsync()
+    /// <summary>
+    /// Windows-specific: Create single window covering virtual desktop
+    /// </summary>
+    protected override Task CreateAndConfigureWindowsAsync(IOverlaySession session)
     {
-        try
+        // Get virtual desktop bounds (Windows-specific: all screens combined)
+        var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
+        Log.Debug("[{Platform}] Virtual desktop bounds: {Bounds}", PlatformName, virtualBounds);
+
+        // Create window immediately for instant display
+        var window = _windowFactory.Create();
+        window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
+        window.Width = virtualBounds.Width;
+        window.Height = virtualBounds.Height;
+
+        // Associate window with session
+        window.SetSession(session);
+        window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
+
+        // Subscribe to events
+        window.RegionSelected += OnRegionSelected;
+        window.Cancelled += OnCancelled;
+
+        // Add window to session
+        session.AddWindow(window);
+
+        // Asynchronously load background in parallel (non-blocking)
+        _ = Task.Run(async () =>
         {
-            Log.Information("[WindowsCoordinator] Creating new screenshot session");
-            
-            // Close any existing session
-            CloseCurrentSession();
-
-            // 1. Create session
-            var session = _sessionFactory.CreateSession();
-
-            // 2. Initialize screen information for this session
-            _coordinateMapper.InitializeScreens();
-            Log.Debug("[WindowsCoordinator] Initialized {Count} screen(s) for session", _coordinateMapper.Screens.Count);
-
-            // 3. Get virtual desktop bounds (Windows-specific)
-            var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
-            Log.Debug("[WindowsCoordinator] Virtual desktop bounds: {Bounds}", virtualBounds);
-
-            // 4. Create window immediately for instant display
-            var window = _windowFactory.Create();
-            window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
-            window.Width = virtualBounds.Width;
-            window.Height = virtualBounds.Height;
-
-            // 5. Associate window with session
-            window.SetSession(session);
-            window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
-
-            // 6. Subscribe to events
-            window.RegionSelected += OnRegionSelected;
-            window.Cancelled += OnCancelled;
-
-            // 7. Add window to session
-            session.AddWindow(window);
-
-            // 8. Show window immediately (without waiting for background)
-            session.ShowAll();
-
-            // 9. Asynchronously load background in parallel (non-blocking)
-            _ = Task.Run(async () =>
+            try
             {
-                try
+                var background = await PrecaptureBackgroundAsync(virtualBounds);
+                if (background != null)
                 {
-                    var background = await PrecaptureBackgroundAsync(virtualBounds);
-                    if (background != null)
+                    // Update background on UI thread
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        // Update background on UI thread
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            window.SetPrecapturedAvaloniaBitmap(background);
-                            Log.Debug("[WindowsCoordinator] Background loaded and set");
-                        });
-                    }
+                        window.SetPrecapturedAvaloniaBitmap(background);
+                        Log.Debug("[{Platform}] Background loaded and set", PlatformName);
+                    });
                 }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "[WindowsCoordinator] Failed to load background asynchronously");
-                }
-            });
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[{Platform}] Failed to load background asynchronously", PlatformName);
+            }
+        });
 
-            _currentSession = session;
-            Log.Information("[WindowsCoordinator] Session created and shown successfully");
-
-            return Task.FromResult<IOverlaySession>(session);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "[WindowsCoordinator] Failed to create session");
-            CloseCurrentSession();
-            throw;
-        }
+        return Task.CompletedTask;
     }
 
-    public void CloseCurrentSession()
+    public override void CloseCurrentSession()
     {
         if (_currentSession == null)
             return;
 
         try
         {
-            Log.Information("[WindowsCoordinator] Closing current session");
+            Log.Information("[{Platform}] Closing current session", PlatformName);
 
             // Unsubscribe from all windows
             foreach (var window in _currentSession.Windows)
@@ -140,11 +109,11 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
             _currentSession.Dispose();
             _currentSession = null;
 
-            Log.Debug("[WindowsCoordinator] Session closed");
+            Log.Debug("[{Platform}] Session closed", PlatformName);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[WindowsCoordinator] Error closing session");
+            Log.Error(ex, "[{Platform}] Error closing session", PlatformName);
             _currentSession = null;
         }
     }
@@ -153,19 +122,19 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
     {
         if (_captureStrategy == null)
         {
-            Log.Warning("[WindowsCoordinator] No capture strategy available for pre-capture");
+            Log.Warning("[{Platform}] No capture strategy available for pre-capture", PlatformName);
             return null;
         }
 
         try
         {
             var physicalBounds = _coordinateMapper.MapToPhysicalRect(virtualBounds);
-            Log.Debug("[WindowsCoordinator] Pre-capturing virtual desktop: {PhysicalBounds}", physicalBounds);
+            Log.Debug("[{Platform}] Pre-capturing virtual desktop: {PhysicalBounds}", PlatformName, physicalBounds);
 
             var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);
             if (skBitmap == null)
             {
-                Log.Warning("[WindowsCoordinator] Screen capture returned null");
+                Log.Warning("[{Platform}] Screen capture returned null", PlatformName);
                 return null;
             }
 
@@ -173,7 +142,7 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "[WindowsCoordinator] Failed to pre-capture background");
+            Log.Warning(ex, "[{Platform}] Failed to pre-capture background", PlatformName);
             return null;
         }
     }
@@ -185,14 +154,14 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
             // If this is an editable selection (for annotation), don't close the session
             if (e.IsEditableSelection)
             {
-                Log.Debug("[WindowsCoordinator] Editable selection created, keeping session open for annotation");
+                Log.Debug("[{Platform}] Editable selection created, keeping session open for annotation", PlatformName);
                 return;
             }
 
             // Only process final image (from double-click or export)
             if (e.FinalImage != null)
             {
-                Log.Information("[WindowsCoordinator] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
+                Log.Information("[{Platform}] Region selected: {Region}, copying to clipboard", PlatformName, e.SelectedRegion);
 
                 // Convert Avalonia Bitmap to SKBitmap
                 var skBitmap = BitmapConverter.ConvertToSKBitmap(e.FinalImage);
@@ -204,23 +173,23 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
                         var success = await _clipboardStrategy.SetImageAsync(skBitmap);
                         if (success)
                         {
-                            Log.Information("[WindowsCoordinator] Image copied to clipboard successfully");
+                            Log.Information("[{Platform}] Image copied to clipboard successfully", PlatformName);
                         }
                         else
                         {
-                            Log.Warning("[WindowsCoordinator] Failed to copy image to clipboard");
+                            Log.Warning("[{Platform}] Failed to copy image to clipboard", PlatformName);
                         }
                     }
                     else
                     {
-                        Log.Warning("[WindowsCoordinator] Clipboard strategy not available");
+                        Log.Warning("[{Platform}] Clipboard strategy not available", PlatformName);
                     }
 
                     skBitmap.Dispose();
                 }
                 else
                 {
-                    Log.Warning("[WindowsCoordinator] Failed to convert image for clipboard");
+                    Log.Warning("[{Platform}] Failed to convert image for clipboard", PlatformName);
                 }
             }
 
@@ -229,13 +198,13 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[WindowsCoordinator] Error handling region selection");
+            Log.Error(ex, "[{Platform}] Error handling region selection", PlatformName);
         }
     }
 
     private void OnCancelled(object? sender, OverlayCancelledEventArgs e)
     {
-        Log.Information("[WindowsCoordinator] Screenshot cancelled");
+        Log.Information("[{Platform}] Screenshot cancelled", PlatformName);
         CloseCurrentSession();
     }
 }
