@@ -233,9 +233,21 @@ public class ExportService : IExportService
             // Apply scale transform for high-DPI rendering
             canvas.RenderTransform = new ScaleTransform(scaleX, scaleY);
 
+            // Use higher DPI for better rendering quality (especially for anti-aliasing)
+            // Calculate effective DPI based on scale factor to maintain visual quality
+            var effectiveDpiX = Math.Max(96, 96 * scaleX);
+            var effectiveDpiY = Math.Max(96, 96 * scaleY);
+            
+            // Cap DPI to reasonable limit (300 DPI) to avoid excessive memory usage
+            effectiveDpiX = Math.Min(300, effectiveDpiX);
+            effectiveDpiY = Math.Min(300, effectiveDpiY);
+            
+            Log.Debug("Rendering annotations at {DpiX}x{DpiY} DPI for better quality (scale: {ScaleX}x{ScaleY})",
+                effectiveDpiX, effectiveDpiY, scaleX, scaleY);
+
             var annotationBitmap = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(96, 96));
+                new Vector(effectiveDpiX, effectiveDpiY));
 
             // Clear with transparent background before rendering
             using (var clearCtx = annotationBitmap.CreateDrawingContext())
@@ -246,14 +258,14 @@ public class ExportService : IExportService
             annotationBitmap.Render(canvas);
             canvas.RenderTransform = null;
 
-            // Create final composite
+            // Create final composite with high DPI for maximum quality
             var composite = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(96, 96));
+                new Vector(effectiveDpiX, effectiveDpiY));
 
             using var context = composite.CreateDrawingContext();
 
-            // Draw screenshot
+            // Draw screenshot with high-quality interpolation
             context.DrawImage(screenshot, 
                 new Rect(0, 0, pixelWidth, pixelHeight), 
                 new Rect(0, 0, pixelWidth, pixelHeight));
@@ -264,6 +276,10 @@ public class ExportService : IExportService
                 context.DrawImage(annotationBitmap, 
                     new Rect(0, 0, pixelWidth, pixelHeight));
             }
+            
+            Log.Debug("Composite image created at {Width}x{Height} with {DpiX}x{DpiY} DPI",
+                pixelWidth, pixelHeight, effectiveDpiX, effectiveDpiY);
+                
             return Task.FromResult<Bitmap>(composite);
         }
         catch (Exception ex)
