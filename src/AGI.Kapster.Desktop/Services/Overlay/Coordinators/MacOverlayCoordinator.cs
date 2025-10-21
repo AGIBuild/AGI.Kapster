@@ -120,7 +120,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
         }
     }
 
-    private async Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen)
+    private Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen)
     {
         try
         {
@@ -133,10 +133,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             Log.Debug("[MacCoordinator] Creating window for screen at {Position}, size {Size}",
                 screenBounds.Position, screenBounds.Size);
 
-            // Pre-capture background for this screen
-            var background = await PrecaptureScreenBackgroundAsync(screen);
-
-            // Create window
+            // Create window immediately for instant display
             var window = _windowFactory.Create();
             window.Position = new Avalonia.PixelPoint((int)screenBounds.X, (int)screenBounds.Y);
             window.Width = screenBounds.Width;
@@ -146,11 +143,6 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             window.SetSession(session);
             window.SetMaskSize(screenBounds.Width, screenBounds.Height);
 
-            if (background != null)
-            {
-                window.SetPrecapturedAvaloniaBitmap(background);
-            }
-
             // Subscribe to events
             window.RegionSelected += OnRegionSelected;
             window.Cancelled += OnCancelled;
@@ -158,7 +150,31 @@ public class MacOverlayCoordinator : IOverlayCoordinator
             // Add window to session
             session.AddWindow(window);
 
+            // Asynchronously load background in parallel (non-blocking)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var background = await PrecaptureScreenBackgroundAsync(screen);
+                    if (background != null)
+                    {
+                        // Update background on UI thread
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            window.SetPrecapturedAvaloniaBitmap(background);
+                            Log.Debug("[MacCoordinator] Background loaded for screen at {Position}", screenBounds.Position);
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "[MacCoordinator] Failed to load background asynchronously for screen");
+                }
+            });
+
             Log.Debug("[MacCoordinator] Window created for screen at {Position}", screenBounds.Position);
+
+            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
@@ -205,6 +221,14 @@ public class MacOverlayCoordinator : IOverlayCoordinator
     {
         try
         {
+            // If this is an editable selection (for annotation), don't close the session
+            if (e.IsEditableSelection)
+            {
+                Log.Debug("[MacCoordinator] Editable selection created, keeping session open for annotation");
+                return;
+            }
+
+            // Only process final image (from double-click or export)
             if (e.FinalImage != null)
             {
                 Log.Information("[MacCoordinator] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
@@ -239,7 +263,7 @@ public class MacOverlayCoordinator : IOverlayCoordinator
                 }
             }
 
-            // Close session after successful selection
+            // Close session after final image processing
             CloseCurrentSession();
         }
         catch (Exception ex)

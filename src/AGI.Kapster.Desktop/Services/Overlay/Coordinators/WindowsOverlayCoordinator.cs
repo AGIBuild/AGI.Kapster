@@ -42,7 +42,7 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
 
     public bool HasActiveSession => _currentSession != null;
 
-    public async Task<IOverlaySession> CreateAndShowSessionAsync()
+    public Task<IOverlaySession> CreateAndShowSessionAsync()
     {
         try
         {
@@ -58,38 +58,52 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
             var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
             Log.Debug("[WindowsCoordinator] Virtual desktop bounds: {Bounds}", virtualBounds);
 
-            // 3. Pre-capture background for instant display
-            var background = await PrecaptureBackgroundAsync(virtualBounds);
-
-            // 4. Create window
+            // 3. Create window immediately for instant display
             var window = _windowFactory.Create();
             window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
             window.Width = virtualBounds.Width;
             window.Height = virtualBounds.Height;
 
-            // 5. Associate window with session
+            // 4. Associate window with session
             window.SetSession(session);
             window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
 
-            if (background != null)
-            {
-                window.SetPrecapturedAvaloniaBitmap(background);
-            }
-
-            // 6. Subscribe to events
+            // 5. Subscribe to events
             window.RegionSelected += OnRegionSelected;
             window.Cancelled += OnCancelled;
 
-            // 7. Add window to session
+            // 6. Add window to session
             session.AddWindow(window);
 
-            // 8. Show all windows in session
+            // 7. Show window immediately (without waiting for background)
             session.ShowAll();
+
+            // 8. Asynchronously load background in parallel (non-blocking)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var background = await PrecaptureBackgroundAsync(virtualBounds);
+                    if (background != null)
+                    {
+                        // Update background on UI thread
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            window.SetPrecapturedAvaloniaBitmap(background);
+                            Log.Debug("[WindowsCoordinator] Background loaded and set");
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "[WindowsCoordinator] Failed to load background asynchronously");
+                }
+            });
 
             _currentSession = session;
             Log.Information("[WindowsCoordinator] Session created and shown successfully");
 
-            return session;
+            return Task.FromResult<IOverlaySession>(session);
         }
         catch (Exception ex)
         {
@@ -164,6 +178,14 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
     {
         try
         {
+            // If this is an editable selection (for annotation), don't close the session
+            if (e.IsEditableSelection)
+            {
+                Log.Debug("[WindowsCoordinator] Editable selection created, keeping session open for annotation");
+                return;
+            }
+
+            // Only process final image (from double-click or export)
             if (e.FinalImage != null)
             {
                 Log.Information("[WindowsCoordinator] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
@@ -198,7 +220,7 @@ public class WindowsOverlayCoordinator : IOverlayCoordinator
                 }
             }
 
-            // Close session after successful selection
+            // Close session after final image processing
             CloseCurrentSession();
         }
         catch (Exception ex)
