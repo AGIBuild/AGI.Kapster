@@ -25,28 +25,28 @@ public static class CaptureServiceExtensions
 #pragma warning disable CA1416 // Platform compatibility checked by RuntimeInformation.IsOSPlatform
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            services.AddTransient<IElementDetector, WindowsElementDetector>();
-            services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
-            services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: screen info changes dynamically
+            services.AddSingleton<IElementDetector, WindowsElementDetector>(); // Singleton: maintains detection mode state
+            services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>(); // Singleton: stateless, reusable
+            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>(); // Transient: mutable Theme per render
+            services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>(); // Singleton: stateless Win32 wrapper
+            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: fresh screen info per screenshot
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            services.AddTransient<IElementDetector, NullElementDetector>();
-            services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
-            services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>(); // Reuse Windows renderer
-            services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
-            services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>(); // Transient: screen info changes dynamically
+            services.AddSingleton<IElementDetector, NullElementDetector>(); // Singleton: no state needed
+            services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>(); // Singleton: stateless, reusable
+            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>(); // Transient: mutable Theme per render
+            services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>(); // Singleton: stateless API wrapper
+            services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>(); // Transient: fresh screen info per screenshot
         }
         else
         {
             // Default to Windows implementations for other platforms
-            services.AddTransient<IElementDetector, WindowsElementDetector>();
-            services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            services.AddSingleton<IOverlayRenderer, WindowsOverlayRenderer>();
-            services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
-            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: screen info changes dynamically
+            services.AddSingleton<IElementDetector, WindowsElementDetector>(); // Singleton: maintains detection mode state
+            services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>(); // Singleton: stateless, reusable
+            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>(); // Transient: mutable Theme per render
+            services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>(); // Singleton: stateless Win32 wrapper
+            services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>(); // Transient: fresh screen info per screenshot
         }
 #pragma warning restore CA1416
 
