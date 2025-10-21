@@ -11,6 +11,7 @@ using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Serilog;
+using SkiaSharp;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.Controllers;
 
@@ -23,17 +24,24 @@ public class WindowsOverlayController : IOverlayController
     private readonly IScreenCaptureStrategy? _captureStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
     private readonly IOverlayWindowFactory _windowFactory;
+    private readonly IClipboardStrategy? _clipboardStrategy;
+    private readonly IOverlaySessionFactory _sessionFactory;
     
     private OverlayWindow? _currentWindow;
+    private IOverlaySession? _currentSession;
 
     public WindowsOverlayController(
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
-        IOverlayWindowFactory windowFactory)
+        IOverlayWindowFactory windowFactory,
+        IOverlaySessionFactory sessionFactory,
+        IClipboardStrategy? clipboardStrategy = null)
     {
         _captureStrategy = captureStrategy;
         _coordinateMapper = coordinateMapper;
         _windowFactory = windowFactory;
+        _sessionFactory = sessionFactory;
+        _clipboardStrategy = clipboardStrategy;
     }
 
     public bool IsActive => _currentWindow != null;
@@ -44,6 +52,10 @@ public class WindowsOverlayController : IOverlayController
         {
             Log.Information("[Windows] Showing single overlay window covering virtual desktop");
             CloseAll();
+            
+            // Create new session for this screenshot operation
+            _currentSession = _sessionFactory.CreateSession();
+            Log.Debug("[Windows] Created new overlay session");
 
             var virtualBounds = _coordinateMapper.GetVirtualDesktopBounds();
             Log.Debug("[Windows] Virtual desktop bounds: {Bounds}", virtualBounds);
@@ -63,6 +75,9 @@ public class WindowsOverlayController : IOverlayController
             _currentWindow.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
             _currentWindow.Width = virtualBounds.Width;
             _currentWindow.Height = virtualBounds.Height;
+            
+            // Associate window with session
+            _currentWindow.SetSession(_currentSession);
 
             // Set mask size for the virtual desktop (important for multi-monitor with negative coordinates)
             // Mask always starts at (0,0) in window coordinates, but covers the full virtual desktop
@@ -79,8 +94,8 @@ public class WindowsOverlayController : IOverlayController
             _currentWindow.Cancelled += OnCancelled;
             _currentWindow.Closed += OnWindowClosed;
 
-            // Register and show
-            OverlayState.RegisterWindow(_currentWindow);
+            // Register window in session
+            _currentSession.RegisterWindow(_currentWindow);
             _currentWindow.Show();
             
             Log.Information("[Windows] Overlay window shown successfully");
@@ -95,27 +110,38 @@ public class WindowsOverlayController : IOverlayController
 
     public void CloseAll()
     {
-        if (_currentWindow == null)
-            return;
-
         try
         {
-            Log.Information("[Windows] Closing overlay window");
-            
-            // Unsubscribe events
-            _currentWindow.RegionSelected -= OnRegionSelected;
-            _currentWindow.Cancelled -= OnCancelled;
-            _currentWindow.Closed -= OnWindowClosed;
+            if (_currentWindow != null)
+            {
+                Log.Information("[Windows] Closing overlay window");
+                
+                // Unsubscribe events
+                _currentWindow.RegionSelected -= OnRegionSelected;
+                _currentWindow.Cancelled -= OnCancelled;
+                _currentWindow.Closed -= OnWindowClosed;
 
-            // Unregister and close
-            OverlayState.UnregisterWindow(_currentWindow);
-            _currentWindow.Close();
-            _currentWindow = null;
+                // Unregister from session
+                _currentSession?.UnregisterWindow(_currentWindow);
+                
+                _currentWindow.Close();
+                _currentWindow = null;
+            }
+            
+            // Dispose session (automatic cleanup)
+            if (_currentSession != null)
+            {
+                _currentSession.Dispose();
+                _currentSession = null;
+                Log.Debug("[Windows] Session disposed");
+            }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "[Windows] Error closing overlay window");
             _currentWindow = null;
+            _currentSession?.Dispose();
+            _currentSession = null;
         }
     }
 
@@ -142,14 +168,42 @@ public class WindowsOverlayController : IOverlayController
         }
     }
 
-    private void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
+    private async void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
     {
         try
         {
             if (e.FinalImage != null)
             {
-                Log.Information("[Windows] Region selected: {Region}", e.SelectedRegion);
-                // Note: Clipboard operations are handled by external services
+                Log.Information("[Windows] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
+                
+                // Convert Avalonia Bitmap to SKBitmap
+                var skBitmap = BitmapConverter.ConvertToSKBitmap(e.FinalImage);
+                if (skBitmap != null)
+                {
+                    // Copy to clipboard
+                    if (_clipboardStrategy != null)
+                    {
+                        var success = await _clipboardStrategy.SetImageAsync(skBitmap);
+                        if (success)
+                        {
+                            Log.Information("[Windows] Image copied to clipboard successfully");
+                        }
+                        else
+                        {
+                            Log.Warning("[Windows] Failed to copy image to clipboard");
+                        }
+                    }
+                    else
+                    {
+                        Log.Warning("[Windows] Clipboard strategy not available");
+                    }
+                    
+                    skBitmap.Dispose();
+                }
+                else
+                {
+                    Log.Warning("[Windows] Failed to convert image for clipboard");
+                }
             }
         }
         catch (Exception ex)

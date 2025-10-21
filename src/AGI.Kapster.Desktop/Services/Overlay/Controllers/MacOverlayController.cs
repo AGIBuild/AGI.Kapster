@@ -13,6 +13,7 @@ using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Serilog;
+using SkiaSharp;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.Controllers;
 
@@ -25,17 +26,24 @@ public class MacOverlayController : IOverlayController
     private readonly IScreenCaptureStrategy? _captureStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
     private readonly IOverlayWindowFactory _windowFactory;
+    private readonly IClipboardStrategy? _clipboardStrategy;
+    private readonly IOverlaySessionFactory _sessionFactory;
     
     private readonly List<OverlayWindow> _windows = new();
+    private IOverlaySession? _currentSession;
 
     public MacOverlayController(
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
-        IOverlayWindowFactory windowFactory)
+        IOverlayWindowFactory windowFactory,
+        IOverlaySessionFactory sessionFactory,
+        IClipboardStrategy? clipboardStrategy = null)
     {
         _captureStrategy = captureStrategy;
         _coordinateMapper = coordinateMapper;
         _windowFactory = windowFactory;
+        _sessionFactory = sessionFactory;
+        _clipboardStrategy = clipboardStrategy;
     }
 
     public bool IsActive => _windows.Count > 0;
@@ -46,6 +54,10 @@ public class MacOverlayController : IOverlayController
         {
             Log.Information("[macOS] Showing per-screen overlay windows");
             CloseAll();
+            
+            // Create new session for this screenshot operation
+            _currentSession = _sessionFactory.CreateSession();
+            Log.Debug("[macOS] Created new overlay session");
 
             var screens = _coordinateMapper.GetAllScreens();
             if (screens.Count == 0)
@@ -95,6 +107,9 @@ public class MacOverlayController : IOverlayController
             window.Position = new Avalonia.PixelPoint(screenBounds.X, screenBounds.Y);
             window.Width = screenBounds.Width;
             window.Height = screenBounds.Height;
+            
+            // Associate window with session
+            window.SetSession(_currentSession);
 
             // Set mask size for this screen (each screen has independent coordinate system on macOS)
             // This handles Retina displays correctly (logical vs physical pixels)
@@ -111,8 +126,16 @@ public class MacOverlayController : IOverlayController
             window.Cancelled += OnCancelled;
             window.Closed += OnWindowClosed;
 
-            // Register and show
-            OverlayState.RegisterWindow(window);
+            // Register window in session (should always exist at this point)
+            if (_currentSession != null)
+            {
+                _currentSession.RegisterWindow(window);
+            }
+            else
+            {
+                Log.Warning("[macOS] Session is null when registering window");
+            }
+            
             window.Show();
             _windows.Add(window);
 
@@ -127,31 +150,50 @@ public class MacOverlayController : IOverlayController
 
     public void CloseAll()
     {
-        if (_windows.Count == 0)
-            return;
-
-        Log.Information("[macOS] Closing {Count} overlay window(s)", _windows.Count);
-
-        foreach (var window in _windows.ToList())
+        try
         {
-            try
+            if (_windows.Count > 0)
             {
-                // Unsubscribe events
-                window.RegionSelected -= OnRegionSelected;
-                window.Cancelled -= OnCancelled;
-                window.Closed -= OnWindowClosed;
+                Log.Information("[macOS] Closing {Count} overlay window(s)", _windows.Count);
 
-                // Unregister and close
-                OverlayState.UnregisterWindow(window);
-                window.Close();
+                foreach (var window in _windows.ToList())
+                {
+                    try
+                    {
+                        // Unsubscribe events
+                        window.RegionSelected -= OnRegionSelected;
+                        window.Cancelled -= OnCancelled;
+                        window.Closed -= OnWindowClosed;
+
+                        // Unregister from session
+                        _currentSession?.UnregisterWindow(window);
+                        
+                        window.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[macOS] Error closing overlay window");
+                    }
+                }
+
+                _windows.Clear();
             }
-            catch (Exception ex)
+            
+            // Dispose session (automatic cleanup)
+            if (_currentSession != null)
             {
-                Log.Error(ex, "[macOS] Error closing overlay window");
+                _currentSession.Dispose();
+                _currentSession = null;
+                Log.Debug("[macOS] Session disposed");
             }
         }
-
-        _windows.Clear();
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[macOS] Error in CloseAll");
+            _windows.Clear();
+            _currentSession?.Dispose();
+            _currentSession = null;
+        }
     }
 
     private async Task<SkiaSharp.SKBitmap?> PrecaptureScreenBackgroundAsync(Screen screen)
@@ -176,14 +218,42 @@ public class MacOverlayController : IOverlayController
         }
     }
 
-    private void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
+    private async void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
     {
         try
         {
             if (e.FinalImage != null)
             {
-                Log.Information("[macOS] Region selected: {Region}", e.SelectedRegion);
-                // Note: Clipboard operations are handled by external services
+                Log.Information("[macOS] Region selected: {Region}, copying to clipboard", e.SelectedRegion);
+                
+                // Convert Avalonia Bitmap to SKBitmap
+                var skBitmap = BitmapConverter.ConvertToSKBitmap(e.FinalImage);
+                if (skBitmap != null)
+                {
+                    // Copy to clipboard
+                    if (_clipboardStrategy != null)
+                    {
+                        var success = await _clipboardStrategy.SetImageAsync(skBitmap);
+                        if (success)
+                        {
+                            Log.Information("[macOS] Image copied to clipboard successfully");
+                        }
+                        else
+                        {
+                            Log.Warning("[macOS] Failed to copy image to clipboard");
+                        }
+                    }
+                    else
+                    {
+                        Log.Warning("[macOS] Clipboard strategy not available");
+                    }
+                    
+                    skBitmap.Dispose();
+                }
+                else
+                {
+                    Log.Warning("[macOS] Failed to convert image for clipboard");
+                }
             }
 
             // Close all windows after successful selection

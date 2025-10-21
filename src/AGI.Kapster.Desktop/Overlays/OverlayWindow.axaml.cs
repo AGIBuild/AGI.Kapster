@@ -6,6 +6,7 @@ using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Services.Export;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Settings;
 using Avalonia;
 using Avalonia.Controls;
@@ -39,6 +40,9 @@ public partial class OverlayWindow : Window
 
     // Mask size is set by overlay controller based on platform strategy
     private Size _maskSize;
+    
+    // Session for this overlay (scoped state management)
+    private IOverlaySession? _session;
 
     // Throttling for element detection to prevent excessive updates
     private PixelPoint _lastDetectionPos;
@@ -203,6 +207,20 @@ public partial class OverlayWindow : Window
         _maskSize = new Size(width, height);
         Log.Debug("Mask size set to: {Width}x{Height}", width, height);
     }
+    
+    /// <summary>
+    /// Set the overlay session for this window (called by controller before Show())
+    /// </summary>
+    public void SetSession(IOverlaySession? session)
+    {
+        _session = session;
+        Log.Debug("Overlay session set");
+    }
+    
+    /// <summary>
+    /// Get the current overlay session
+    /// </summary>
+    internal IOverlaySession? GetSession() => _session;
 
     private async Task InitializeFrozenBackgroundAsync()
     {

@@ -8,6 +8,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using Serilog;
 using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.State;
 
 namespace AGI.Kapster.Desktop.Overlays;
 
@@ -56,14 +57,42 @@ public sealed class SelectionOverlay : Canvas
         _infoOverlay = new SelectionInfoOverlay();
         Children.Add(_infoOverlay);
 
-        // Subscribe to global selection state changes
-        GlobalSelectionState.SelectionStateChanged += OnGlobalSelectionStateChanged;
+        // Subscribe to session selection state changes (will be wired up when session is set)
+    }
+    
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        
+        // Wire up to session when attached to window
+        var parentWindow = this.FindAncestorOfType<OverlayWindow>();
+        var session = parentWindow?.GetSession();
+        if (session != null)
+        {
+            session.SelectionStateChanged += OnSessionSelectionStateChanged;
+            Log.Debug("SelectionOverlay attached to session");
+        }
+    }
+    
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        
+        // Unsubscribe from session when detached
+        var parentWindow = this.FindAncestorOfType<OverlayWindow>();
+        var session = parentWindow?.GetSession();
+        if (session != null)
+        {
+            session.SelectionStateChanged -= OnSessionSelectionStateChanged;
+            Log.Debug("SelectionOverlay detached from session");
+        }
     }
 
-    private void OnGlobalSelectionStateChanged(bool hasSelection)
+    private void OnSessionSelectionStateChanged(bool hasSelection)
     {
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var isActiveWindow = GlobalSelectionState.ActiveSelectionWindow == parentWindow;
+        var session = parentWindow?.GetSession();
+        var isActiveWindow = session?.ActiveSelectionWindow == parentWindow;
 
         // Update cursor based on selection state
         if (hasSelection && !isActiveWindow)
@@ -89,7 +118,8 @@ public sealed class SelectionOverlay : Canvas
 
         // Check if another overlay window already has a selection
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        if (parentWindow != null && !GlobalSelectionState.CanStartSelection(parentWindow))
+        var session = parentWindow?.GetSession();
+        if (parentWindow != null && session != null && !session.CanStartSelection(parentWindow))
         {
             Log.Information("SelectionOverlay: Cannot start selection, another window has active selection");
             e.Handled = true;
@@ -174,11 +204,12 @@ public sealed class SelectionOverlay : Canvas
             SelectionRect = new Rect(0, 0, Bounds.Width, Bounds.Height);
             UpdateVisuals();
 
-            // Set global selection state
+            // Set selection state in session
             var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-            if (parentWindow != null)
+            var session = parentWindow?.GetSession();
+            if (parentWindow != null && session != null)
             {
-                GlobalSelectionState.SetSelection(parentWindow);
+                session.SetSelection(parentWindow);
             }
 
             // Show info overlay
@@ -277,11 +308,12 @@ public sealed class SelectionOverlay : Canvas
         SelectionRect = rect;
         UpdateVisuals(); // Force update for programmatic changes
 
-        // Set global selection state
+        // Set selection state in session
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        if (parentWindow != null)
+        var session = parentWindow?.GetSession();
+        if (parentWindow != null && session != null)
         {
-            GlobalSelectionState.SetSelection(parentWindow);
+            session.SetSelection(parentWindow);
         }
 
         // Fire events
@@ -405,11 +437,12 @@ public sealed class SelectionOverlay : Canvas
         _isDraggingCreate = true;
         SelectionRect = new Rect(_dragStart, _dragStart);
 
-        // Set global selection state when drag starts
+        // Set selection state in session when drag starts
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        if (parentWindow != null)
+        var session = parentWindow?.GetSession();
+        if (parentWindow != null && session != null)
         {
-            GlobalSelectionState.SetSelection(parentWindow);
+            session.SetSelection(parentWindow);
             Log.Information("SelectionOverlay: Started selection on window");
         }
     }
