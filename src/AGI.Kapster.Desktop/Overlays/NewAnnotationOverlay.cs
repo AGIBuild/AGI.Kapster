@@ -45,7 +45,10 @@ public sealed class NewAnnotationOverlay : Canvas
     /// <summary>
     /// Get all annotation items (public for use by OverlayWindow)
     /// </summary>
-    public IEnumerable<IAnnotationItem>? GetAnnotations() => _annotationService?.Manager?.Items;
+    public IEnumerable<IAnnotationItem> GetAnnotations()
+    {
+        return _annotationService?.Manager?.Items ?? Enumerable.Empty<IAnnotationItem>();
+    }
     private IAnnotationItem? _creatingItem;
     private bool _isCreating;
 
