@@ -80,6 +80,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
     {
         return Task.Run(() =>
         {
+            var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 // Convert window coordinates to screen coordinates
@@ -110,11 +111,16 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                     Log.Debug("CaptureWindowRegion: DIP rect {WindowRect}, Screen scaling {Scaling}, Physical rect {ScreenRect}", 
                         windowRect, scaling, screenRect);
 
+                    var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
                     var bitmap = CaptureRegion(screenRect);
+                    captureStopwatch.Stop();
+                    
+                    totalStopwatch.Stop();
                     
                     if (bitmap != null)
                     {
-                        Log.Debug("Captured bitmap: {W}x{H} pixels", bitmap.Width, bitmap.Height);
+                        Log.Debug("Captured bitmap: {W}x{H} pixels (capture={CaptureMs}ms, total={TotalMs}ms)", 
+                            bitmap.Width, bitmap.Height, captureStopwatch.ElapsedMilliseconds, totalStopwatch.ElapsedMilliseconds);
                     }
                     
                     return bitmap;
@@ -127,7 +133,8 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to capture window region");
+                totalStopwatch.Stop();
+                Log.Error(ex, "Failed to capture window region (elapsed: {Ms}ms)", totalStopwatch.ElapsedMilliseconds);
                 return null;
             }
         });
@@ -135,27 +142,45 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
 
     private SKBitmap? CaptureRegion(PixelRect region)
     {
+        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
+            // Step 1: Setup GDI resources
+            var setupStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var hdcSrc = GetDC(nint.Zero);
             var hdcDest = CreateCompatibleDC(hdcSrc);
             var hBitmap = CreateCompatibleBitmap(hdcSrc, region.Width, region.Height);
             var hOld = SelectObject(hdcDest, hBitmap);
+            setupStopwatch.Stop();
 
+            // Step 2: BitBlt (actual screen capture)
+            var bitbltStopwatch = System.Diagnostics.Stopwatch.StartNew();
             BitBlt(hdcDest, 0, 0, region.Width, region.Height, hdcSrc, region.X, region.Y, SRCCOPY);
+            bitbltStopwatch.Stop();
 
+            // Step 3: Cleanup GDI handles
             SelectObject(hdcDest, hOld);
             DeleteDC(hdcDest);
             ReleaseDC(nint.Zero, hdcSrc);
 
+            // Step 4: Convert HBITMAP to SKBitmap
+            var conversionStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var bitmap = ConvertHBitmapToSKBitmap(hBitmap);
+            conversionStopwatch.Stop();
+            
             DeleteObject(hBitmap);
+
+            totalStopwatch.Stop();
+            Log.Debug("CaptureRegion {Region}: setup={SetupMs}ms, BitBlt={BitBltMs}ms, HBITMAP→SKBitmap={ConversionMs}ms, total={TotalMs}ms",
+                region, setupStopwatch.ElapsedMilliseconds, bitbltStopwatch.ElapsedMilliseconds, 
+                conversionStopwatch.ElapsedMilliseconds, totalStopwatch.ElapsedMilliseconds);
 
             return bitmap;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to capture region {Region}", region);
+            totalStopwatch.Stop();
+            Log.Error(ex, "Failed to capture region {Region} (elapsed: {Ms}ms)", region, totalStopwatch.ElapsedMilliseconds);
             return null;
         }
     }

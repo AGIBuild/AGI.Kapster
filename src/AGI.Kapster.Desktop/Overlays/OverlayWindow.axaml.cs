@@ -103,31 +103,30 @@ public partial class OverlayWindow : Window, IOverlayWindow
         this.PointerPressed += OnOverlayPointerPressed;
         this.PointerMoved += OnOverlayPointerMoved;
 
-		// Opened event: display background immediately, then initialize heavy components
+		// Opened event: initialize UI components
+		// Note: Background is set asynchronously by SetPrecapturedAvaloniaBitmap when ready
 		this.Opened += async (_, __) =>
 		{
-		    // Display pre-captured background immediately if available
+		    // Check if pre-captured background already available (fast path)
 		    if (_precapturedBackground != null && _backgroundImage != null)
 		    {
 		        _backgroundImage.Source = _precapturedBackground;
 		        _frozenBackground = _precapturedBackground;
+		        Log.Debug("Pre-captured background displayed immediately (ready before Opened)");
 		    }
 		    else
 		    {
-		        // Fallback: async capture if no pre-captured background
-		        await InitializeFrozenBackgroundAsync();
+		        Log.Debug("Waiting for pre-captured background to load asynchronously...");
+		        // Background will be set by SetPrecapturedAvaloniaBitmap when ready
+		        // No fallback capture - coordinator's pre-capture is fast enough (150-200ms)
 		    }
 		    
 		    UpdateMaskForSelection(default);
 		    
-		    // Initialize heavy components asynchronously after background is visible
-		    _ = Task.Run(async () =>
+		    // Initialize heavy components immediately
+		    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
 		    {
-		        await Task.Delay(OverlayConstants.ShortUiUpdateDelay);
-		        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-		        {
-		            InitializeHeavyComponents();
-		        });
+		        InitializeHeavyComponents();
 		    });
 		};
 
@@ -206,11 +205,24 @@ public partial class OverlayWindow : Window, IOverlayWindow
     }
 
     /// <summary>
-    /// Set pre-captured Avalonia bitmap for instant display (called before Show())
+    /// Set pre-captured Avalonia bitmap and apply to UI if window is already initialized
+    /// Can be called before or after Show() - will update UI automatically
     /// </summary>
     public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
     {
         _precapturedBackground = bitmap;
+        
+        // If window is already shown and controls are initialized, apply background immediately
+        // This handles the case where pre-capture completes after Opened event
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (bitmap != null && _backgroundImage != null)
+            {
+                _backgroundImage.Source = bitmap;
+                _frozenBackground = bitmap;
+                Log.Debug("Pre-captured background applied to UI (async)");
+            }
+        }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -255,19 +267,29 @@ public partial class OverlayWindow : Window, IOverlayWindow
         if (_screenCaptureStrategy == null)
             return;
 
+        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             // Temporarily make window transparent to avoid capturing the overlay itself
             var originalOpacity = this.Opacity;
             this.Opacity = OverlayConstants.TransparentOpacity;
+            
+            var delayStopwatch = System.Diagnostics.Stopwatch.StartNew();
             await Task.Delay(OverlayConstants.FrameDelay);
+            delayStopwatch.Stop();
 
             var rect = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
+            
+            var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
+            captureStopwatch.Stop();
 
             this.Opacity = originalOpacity;
 
-            var bitmap = BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+            var conversionStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var bitmap = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
+            conversionStopwatch.Stop();
+            
             if (bitmap != null)
             {
                 _frozenBackground = bitmap;
@@ -275,17 +297,25 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 {
                     _backgroundImage.Source = _frozenBackground;
                 }
-                Log.Information("Frozen background initialized: {W}x{H} pixels for window bounds {Bounds}", 
-                    bitmap.PixelSize.Width, bitmap.PixelSize.Height, this.Bounds);
+                
+                totalStopwatch.Stop();
+                Log.Information("Frozen background initialized: {W}x{H} pixels, total={TotalMs}ms (delay={DelayMs}ms, capture={CaptureMs}ms, conversion={ConversionMs}ms)", 
+                    bitmap.PixelSize.Width, bitmap.PixelSize.Height,
+                    totalStopwatch.ElapsedMilliseconds,
+                    delayStopwatch.ElapsedMilliseconds,
+                    captureStopwatch.ElapsedMilliseconds,
+                    conversionStopwatch.ElapsedMilliseconds);
             }
             else
             {
-                Log.Warning("Failed to create frozen background bitmap");
+                totalStopwatch.Stop();
+                Log.Warning("Failed to create frozen background bitmap (elapsed: {Ms}ms)", totalStopwatch.ElapsedMilliseconds);
             }
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to initialize frozen background - falling back to live capture");
+            totalStopwatch.Stop();
+            Log.Warning(ex, "Failed to initialize frozen background (elapsed: {Ms}ms)", totalStopwatch.ElapsedMilliseconds);
             this.Opacity = OverlayConstants.OpaqueOpacity;
         }
     }
