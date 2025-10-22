@@ -20,11 +20,7 @@ public static class CoreServiceExtensions
     {
         services.AddSingleton<ISystemTrayService, SystemTrayService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
-        services.AddSingleton<ISettingsService>(provider =>
-            new SettingsService(
-                provider.GetRequiredService<IFileSystemService>(),
-                provider.GetRequiredService<IConfiguration>()
-            ));
+        services.AddSingleton<ISettingsService, SettingsService>();
         
         services.AddSingleton<IApplicationController, ApplicationController>();
         services.AddSingleton<INotificationService, NotificationService>();
