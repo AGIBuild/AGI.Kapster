@@ -1447,6 +1447,12 @@ public sealed class NewAnnotationOverlay : Canvas
             // If already editing other text, end editing first
             EndTextEditing();
 
+            // Enable IME for text input
+            if (this.GetVisualRoot() is OverlayWindow overlayWindow)
+            {
+                overlayWindow.EnableImeForTextEditing();
+            }
+
             _editingTextItem = textItem;
 
             // CRITICAL FIX: Force remove existing text render before entering edit mode
@@ -1568,6 +1574,12 @@ public sealed class NewAnnotationOverlay : Canvas
 
         try
         {
+            // Disable IME after text editing
+            if (this.GetVisualRoot() is OverlayWindow overlayWindow)
+            {
+                overlayWindow.DisableImeAfterTextEditing();
+            }
+
             // Update text content
             var finalText = _editingTextBox.Text ?? string.Empty;
             _editingTextItem.Text = finalText;

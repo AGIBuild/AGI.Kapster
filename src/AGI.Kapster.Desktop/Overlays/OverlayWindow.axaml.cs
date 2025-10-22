@@ -5,6 +5,7 @@ using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Services.Export;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Screenshot;
@@ -32,6 +33,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private readonly IScreenCoordinateMapper? _coordinateMapper;
     private readonly IToolbarPositionCalculator _toolbarPositionCalculator;
     private readonly ISettingsService _settingsService;
+    private readonly IImeController _imeController;
     private ElementHighlightOverlay? _elementHighlight;
     private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
@@ -74,12 +76,14 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     public OverlayWindow(
         ISettingsService settingsService,
+        IImeController imeController,
         IElementDetector? elementDetector = null, 
         IScreenCaptureStrategy? screenCaptureStrategy = null, 
         IScreenCoordinateMapper? coordinateMapper = null,
         IToolbarPositionCalculator? toolbarPositionCalculator = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _imeController = imeController ?? throw new ArgumentNullException(nameof(imeController));
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
         _coordinateMapper = coordinateMapper;
@@ -196,6 +200,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
             this.Focus();
             Log.Debug("Focus also set to overlay window");
         }
+
+        // Disable IME to prevent input method interference with keyboard shortcuts
+        DisableImeForOverlay();
     }
 
     /// <summary>
@@ -399,6 +406,10 @@ public partial class OverlayWindow : Window, IOverlayWindow
         this.Closing += (sender, e) =>
         {
             Log.Information("OverlayWindow: Window closing, cleaning up resources");
+            
+            // Restore IME state before closing
+            EnableImeForOverlay();
+            
             try
             {
                 if (_frozenBackground != null)
@@ -1247,6 +1258,72 @@ public partial class OverlayWindow : Window, IOverlayWindow
             ExportFormat.GIF => "GIF Image",
             _ => "Image File"
         };
+    }
+
+    #endregion
+
+    #region IME Control
+
+    /// <summary>
+    /// Disable IME for overlay window to prevent input method interference with shortcuts
+    /// </summary>
+    private void DisableImeForOverlay()
+    {
+        if (!_imeController.IsSupported)
+            return;
+
+        try
+        {
+            var handle = TryGetPlatformHandle()?.Handle ?? nint.Zero;
+            if (handle != nint.Zero)
+            {
+                _imeController.DisableIme(handle);
+                Log.Debug("IME disabled for overlay window");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to disable IME for overlay window");
+        }
+    }
+
+    /// <summary>
+    /// Enable IME for overlay window (called when text editing starts or window closes)
+    /// </summary>
+    private void EnableImeForOverlay()
+    {
+        if (!_imeController.IsSupported)
+            return;
+
+        try
+        {
+            var handle = TryGetPlatformHandle()?.Handle ?? nint.Zero;
+            if (handle != nint.Zero)
+            {
+                _imeController.EnableIme(handle);
+                Log.Debug("IME enabled for overlay window");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to enable IME for overlay window");
+        }
+    }
+
+    /// <summary>
+    /// Public method for annotation overlay to enable IME during text editing
+    /// </summary>
+    public void EnableImeForTextEditing()
+    {
+        EnableImeForOverlay();
+    }
+
+    /// <summary>
+    /// Public method for annotation overlay to disable IME after text editing
+    /// </summary>
+    public void DisableImeAfterTextEditing()
+    {
+        DisableImeForOverlay();
     }
 
     #endregion

@@ -2,6 +2,7 @@ using System;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
+using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Settings;
@@ -20,6 +21,7 @@ namespace AGI.Kapster.Tests.Services.Overlay;
 public class OverlayWindowFactoryTests : TestBase
 {
     private readonly ISettingsService _settingsService;
+    private readonly IImeController _imeController;
     private readonly IElementDetector _elementDetector;
     private readonly IScreenCaptureStrategy _captureStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
@@ -28,12 +30,14 @@ public class OverlayWindowFactoryTests : TestBase
     public OverlayWindowFactoryTests(ITestOutputHelper output) : base(output)
     {
         _settingsService = Substitute.For<ISettingsService>();
+        _imeController = Substitute.For<IImeController>();
         _elementDetector = Substitute.For<IElementDetector>();
         _captureStrategy = Substitute.For<IScreenCaptureStrategy>();
         _coordinateMapper = Substitute.For<IScreenCoordinateMapper>();
 
         _factory = new OverlayWindowFactory(
             _settingsService,
+            _imeController,
             _elementDetector,
             _captureStrategy,
             _coordinateMapper);
@@ -50,7 +54,7 @@ public class OverlayWindowFactoryTests : TestBase
     public void Constructor_WithNullRequiredDependencies_ShouldNotThrowButCreateWillThrow()
     {
         // Arrange - Factory allows null but OverlayWindow will throw when Create() is called
-        var factory = new OverlayWindowFactory(null!, null, null, null);
+        var factory = new OverlayWindowFactory(null!, null!, null, null, null);
 
         // Assert - Factory construction succeeds
         factory.Should().NotBeNull();
@@ -72,6 +76,7 @@ public class OverlayWindowFactoryTests : TestBase
         // Arrange & Act
         var factoryWithDeps = new OverlayWindowFactory(
             _settingsService,
+            _imeController,
             _elementDetector,
             _captureStrategy,
             _coordinateMapper);
