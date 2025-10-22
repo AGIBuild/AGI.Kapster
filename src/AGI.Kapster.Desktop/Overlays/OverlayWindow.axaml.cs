@@ -31,6 +31,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private readonly IScreenCaptureStrategy? _screenCaptureStrategy;
     private readonly IScreenCoordinateMapper? _coordinateMapper;
     private readonly IToolbarPositionCalculator _toolbarPositionCalculator;
+    private readonly ISettingsService _settingsService;
+    private readonly IScreenshotService _screenshotService;
     private ElementHighlightOverlay? _elementHighlight;
     private bool _isElementPickerMode = false; // Default to free selection mode
     private bool _hasEditableSelection = false; // Track if there's an editable selection
@@ -73,11 +75,15 @@ public partial class OverlayWindow : Window, IOverlayWindow
     }
 
     public OverlayWindow(
+        ISettingsService settingsService,
+        IScreenshotService screenshotService,
         IElementDetector? elementDetector = null, 
         IScreenCaptureStrategy? screenCaptureStrategy = null, 
         IScreenCoordinateMapper? coordinateMapper = null,
         IToolbarPositionCalculator? toolbarPositionCalculator = null)
     {
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
         _coordinateMapper = coordinateMapper;
@@ -149,12 +155,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     private void InitializeHeavyComponents()
     {
-        // Get singleton settings service from DI container
-        var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService 
-            ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
-
-        // Create annotator with settings service and add to grid
-        _annotator = new NewAnnotationOverlay(settingsService)
+        // Create annotator with injected settings service
+        _annotator = new NewAnnotationOverlay(_settingsService)
         {
             Name = "Annotator"
         };
@@ -422,18 +424,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     private void CloseOverlayWithController(string context)
     {
-        var screenshotService = App.Services?.GetService(typeof(IScreenshotService)) as IScreenshotService;
-        if (screenshotService != null)
-        {
-            screenshotService.Cancel();
-            Log.Information("Screenshot cancelled after {Context}", context);
-        }
-        else
-        {
-            // Fallback: close just this window
-            Close();
-            Log.Warning("Could not get screenshot service, closing only current window after {Context}", context);
-        }
+        _screenshotService.Cancel();
+        Log.Information("Screenshot cancelled after {Context}", context);
     }
 
     private void UpdateMaskForSelection(Rect selection)
