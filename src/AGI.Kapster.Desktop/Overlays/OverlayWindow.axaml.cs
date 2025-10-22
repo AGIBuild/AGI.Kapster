@@ -206,7 +206,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
             {
                 _backgroundImage.Source = bitmap;
                 _frozenBackground = bitmap;
-                Log.Debug("Pre-captured background applied to UI (async)");
             }
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
@@ -253,29 +252,19 @@ public partial class OverlayWindow : Window, IOverlayWindow
         if (_screenCaptureStrategy == null)
             return;
 
-        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             // Temporarily make window transparent to avoid capturing the overlay itself
             var originalOpacity = this.Opacity;
             this.Opacity = OverlayConstants.TransparentOpacity;
-            
-            var delayStopwatch = System.Diagnostics.Stopwatch.StartNew();
             await Task.Delay(OverlayConstants.FrameDelay);
-            delayStopwatch.Stop();
 
             var rect = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
-            
-            var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
-            captureStopwatch.Stop();
 
             this.Opacity = originalOpacity;
 
-            var conversionStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var bitmap = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
-            conversionStopwatch.Stop();
-            
             if (bitmap != null)
             {
                 _frozenBackground = bitmap;
@@ -283,25 +272,17 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 {
                     _backgroundImage.Source = _frozenBackground;
                 }
-                
-                totalStopwatch.Stop();
-                Log.Information("Frozen background initialized: {W}x{H} pixels, total={TotalMs}ms (delay={DelayMs}ms, capture={CaptureMs}ms, conversion={ConversionMs}ms)", 
-                    bitmap.PixelSize.Width, bitmap.PixelSize.Height,
-                    totalStopwatch.ElapsedMilliseconds,
-                    delayStopwatch.ElapsedMilliseconds,
-                    captureStopwatch.ElapsedMilliseconds,
-                    conversionStopwatch.ElapsedMilliseconds);
+                Log.Debug("Frozen background initialized: {W}x{H} pixels", 
+                    bitmap.PixelSize.Width, bitmap.PixelSize.Height);
             }
             else
             {
-                totalStopwatch.Stop();
-                Log.Warning("Failed to create frozen background bitmap (elapsed: {Ms}ms)", totalStopwatch.ElapsedMilliseconds);
+                Log.Warning("Failed to create frozen background bitmap");
             }
         }
         catch (Exception ex)
         {
-            totalStopwatch.Stop();
-            Log.Warning(ex, "Failed to initialize frozen background (elapsed: {Ms}ms)", totalStopwatch.ElapsedMilliseconds);
+            Log.Warning(ex, "Failed to initialize frozen background");
             this.Opacity = OverlayConstants.OpaqueOpacity;
         }
     }

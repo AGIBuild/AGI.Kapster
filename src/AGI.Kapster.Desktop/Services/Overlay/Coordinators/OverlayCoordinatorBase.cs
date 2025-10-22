@@ -328,52 +328,27 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
             return null;
         }
 
-        var totalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            // Step 1: Coordinate mapping
-            var mappingStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var physicalBounds = _coordinateMapper.MapToPhysicalRect(bounds, screen);
-            mappingStopwatch.Stop();
-            
-            Log.Debug("[{Platform}] Pre-capturing region: {PhysicalBounds} (mapping: {MappingMs}ms)", 
-                PlatformName, physicalBounds, mappingStopwatch.ElapsedMilliseconds);
+            Log.Debug("[{Platform}] Pre-capturing region: {PhysicalBounds}", PlatformName, physicalBounds);
 
-            // Step 2: Screen capture (GDI BitBlt)
-            var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);
-            captureStopwatch.Stop();
-            
             if (skBitmap == null)
             {
                 Log.Warning("[{Platform}] Screen capture returned null", PlatformName);
                 return null;
             }
-            
-            Log.Debug("[{Platform}] Screen captured: {Width}x{Height} ({CaptureMs}ms)", 
-                PlatformName, skBitmap.Width, skBitmap.Height, captureStopwatch.ElapsedMilliseconds);
 
-            // Step 3: Bitmap conversion (SKBitmap → Avalonia Bitmap) - using fast path
-            var conversionStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var result = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
-            conversionStopwatch.Stop();
-            
-            totalStopwatch.Stop();
-            
-            Log.Information("[{Platform}] Pre-capture completed: total={TotalMs}ms (capture={CaptureMs}ms, conversion={ConversionMs}ms, size={Width}x{Height})", 
-                PlatformName, 
-                totalStopwatch.ElapsedMilliseconds,
-                captureStopwatch.ElapsedMilliseconds,
-                conversionStopwatch.ElapsedMilliseconds,
-                skBitmap.Width, skBitmap.Height);
+            Log.Debug("[{Platform}] Pre-capture completed: {Width}x{Height}", 
+                PlatformName, skBitmap.Width, skBitmap.Height);
             
             return result;
         }
         catch (Exception ex)
         {
-            totalStopwatch.Stop();
-            Log.Warning(ex, "[{Platform}] Failed to pre-capture background (elapsed: {Ms}ms)", 
-                PlatformName, totalStopwatch.ElapsedMilliseconds);
+            Log.Warning(ex, "[{Platform}] Failed to pre-capture background", PlatformName);
             return null;
         }
     }
