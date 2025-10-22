@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
+using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
@@ -18,6 +19,17 @@ public static class OverlayServiceExtensions
     /// </summary>
     public static IServiceCollection AddOverlayServices(this IServiceCollection services)
     {
+        // Register IME controller (platform-specific)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            services.AddSingleton<IImeController, WindowsImeController>();
+        }
+        else
+        {
+            // macOS and Linux: use no-op implementation for now
+            services.AddSingleton<IImeController, NoOpImeController>();
+        }
+
         // Register UI services
         services.AddSingleton<IToolbarPositionCalculator, ToolbarPositionCalculator>();
         

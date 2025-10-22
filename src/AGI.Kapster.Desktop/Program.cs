@@ -145,7 +145,6 @@ class Program
             .AddStartupServices()
             .AddHotkeyServices()
             .AddCaptureServices()
-            .AddInputServices()
             .AddOverlayServices();
 
         var host = builder.Build();
