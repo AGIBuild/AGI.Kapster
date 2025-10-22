@@ -104,23 +104,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
         this.PointerMoved += OnOverlayPointerMoved;
 
 		// Opened event: initialize UI components
-		// Note: Background is set asynchronously by SetPrecapturedAvaloniaBitmap when ready
+		// Note: Background is set automatically by SetPrecapturedAvaloniaBitmap when ready
 		this.Opened += async (_, __) =>
 		{
-		    // Check if pre-captured background already available (fast path)
-		    if (_precapturedBackground != null && _backgroundImage != null)
-		    {
-		        _backgroundImage.Source = _precapturedBackground;
-		        _frozenBackground = _precapturedBackground;
-		        Log.Debug("Pre-captured background displayed immediately (ready before Opened)");
-		    }
-		    else
-		    {
-		        Log.Debug("Waiting for pre-captured background to load asynchronously...");
-		        // Background will be set by SetPrecapturedAvaloniaBitmap when ready
-		        // No fallback capture - coordinator's pre-capture is fast enough (150-200ms)
-		    }
-		    
 		    UpdateMaskForSelection(default);
 		    
 		    // Initialize heavy components immediately
