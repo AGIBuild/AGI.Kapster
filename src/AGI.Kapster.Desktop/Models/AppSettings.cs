@@ -120,9 +120,13 @@ public class TextStyleSettings
     public int FontSize { get; set; } = 16;
 
     /// <summary>
-    /// Font family name
+    /// Font family name with fallback chain for better cross-platform compatibility
+    /// Consolas: High clarity monospace font for annotations
+    /// Microsoft YaHei UI: Chinese character support
+    /// Arial: Cross-platform fallback
+    /// sans-serif: Final system fallback
     /// </summary>
-    public string FontFamily { get; set; } = "Segoe UI";
+    public string FontFamily { get; set; } = "Consolas, Microsoft YaHei UI, Arial, sans-serif";
 
     /// <summary>
     /// Text color (ARGB format)
