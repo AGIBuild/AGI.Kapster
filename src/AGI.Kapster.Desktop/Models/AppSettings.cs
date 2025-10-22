@@ -126,7 +126,7 @@ public class TextStyleSettings
     /// Arial: Cross-platform fallback
     /// sans-serif: Final system fallback
     /// </summary>
-    public string FontFamily { get; set; } = "Consolas, Microsoft YaHei UI, Arial, sans-serif";
+    public string FontFamily { get; set; } = "Consolas, Noto Sans CJK, SimSun, Microsoft YaHei UI, Arial, sans-serif";
 
     /// <summary>
     /// Text color (ARGB format)
