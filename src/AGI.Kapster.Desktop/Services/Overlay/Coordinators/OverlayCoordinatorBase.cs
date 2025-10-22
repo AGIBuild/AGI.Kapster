@@ -340,7 +340,11 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
                 return null;
             }
 
-            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
+            var result = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
+            Log.Debug("[{Platform}] Pre-capture completed: {Width}x{Height}", 
+                PlatformName, skBitmap.Width, skBitmap.Height);
+            
+            return result;
         }
         catch (Exception ex)
         {

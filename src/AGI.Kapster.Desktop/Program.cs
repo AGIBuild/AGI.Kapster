@@ -144,8 +144,7 @@ class Program
             .AddCoreServices()
             .AddStartupServices()
             .AddHotkeyServices()
-            .AddCaptureServices()
-            .AddOverlayServices();
+            .AddCaptureServices(); // Includes all capture, overlay, and screenshot services
 
         var host = builder.Build();
 

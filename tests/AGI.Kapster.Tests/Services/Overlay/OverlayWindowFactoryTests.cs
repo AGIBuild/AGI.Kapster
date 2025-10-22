@@ -2,8 +2,10 @@ using System;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
+using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
+using AGI.Kapster.Desktop.Services.Settings;
 using FluentAssertions;
 using NSubstitute;
 using Xunit;
@@ -18,6 +20,8 @@ namespace AGI.Kapster.Tests.Services.Overlay;
 /// </summary>
 public class OverlayWindowFactoryTests : TestBase
 {
+    private readonly ISettingsService _settingsService;
+    private readonly IImeController _imeController;
     private readonly IElementDetector _elementDetector;
     private readonly IScreenCaptureStrategy _captureStrategy;
     private readonly IScreenCoordinateMapper _coordinateMapper;
@@ -25,11 +29,18 @@ public class OverlayWindowFactoryTests : TestBase
 
     public OverlayWindowFactoryTests(ITestOutputHelper output) : base(output)
     {
+        _settingsService = Substitute.For<ISettingsService>();
+        _imeController = Substitute.For<IImeController>();
         _elementDetector = Substitute.For<IElementDetector>();
         _captureStrategy = Substitute.For<IScreenCaptureStrategy>();
         _coordinateMapper = Substitute.For<IScreenCoordinateMapper>();
 
-        _factory = new OverlayWindowFactory(_elementDetector, _captureStrategy, _coordinateMapper);
+        _factory = new OverlayWindowFactory(
+            _settingsService,
+            _imeController,
+            _elementDetector,
+            _captureStrategy,
+            _coordinateMapper);
     }
 
     [Fact]
@@ -40,13 +51,16 @@ public class OverlayWindowFactoryTests : TestBase
     }
 
     [Fact]
-    public void Constructor_WithNullDependencies_ShouldNotThrow()
+    public void Constructor_WithNullRequiredDependencies_ShouldNotThrowButCreateWillThrow()
     {
-        // Act
-        var action = () => new OverlayWindowFactory(null, null, null);
+        // Arrange - Factory allows null but OverlayWindow will throw when Create() is called
+        var factory = new OverlayWindowFactory(null!, null!, null, null, null);
 
-        // Assert
-        action.Should().NotThrow();
+        // Assert - Factory construction succeeds
+        factory.Should().NotBeNull();
+        
+        // But Create() will throw because OverlayWindow requires non-null services
+        // (Cannot test Create() here as it requires Avalonia UI platform)
     }
 
     [Fact]
@@ -60,7 +74,12 @@ public class OverlayWindowFactoryTests : TestBase
     public void Factory_WithDependencies_ShouldStoreCorrectly()
     {
         // Arrange & Act
-        var factoryWithDeps = new OverlayWindowFactory(_elementDetector, _captureStrategy, _coordinateMapper);
+        var factoryWithDeps = new OverlayWindowFactory(
+            _settingsService,
+            _imeController,
+            _elementDetector,
+            _captureStrategy,
+            _coordinateMapper);
 
         // Assert - Factory should be created successfully
         factoryWithDeps.Should().NotBeNull();

@@ -425,7 +425,7 @@ public class AnnotationRenderer : IAnnotationRenderer
             Foreground = CreateBrush(text.Style.StrokeColor),
             Background = Brushes.Transparent,
             Opacity = text.Style.Opacity,
-            UseLayoutRounding = false,
+            UseLayoutRounding = true,  // Enable pixel alignment for sharper text
             Name = $"TextAnnotation_{text.Id}"
         };
 

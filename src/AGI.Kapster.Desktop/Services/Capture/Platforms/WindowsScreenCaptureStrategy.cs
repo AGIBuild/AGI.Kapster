@@ -85,7 +85,6 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                 // Convert window coordinates to screen coordinates
                 if (window is Window w)
                 {
-                    // Get the screen this window is on to determine DPI scaling
                     var screen = w.Screens.ScreenFromWindow(w);
                     if (screen == null)
                     {
@@ -93,11 +92,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                         return null;
                     }
 
-                    // Get DPI scaling factor
                     var scaling = screen.Scaling;
-
-                    // PointToScreen in Avalonia should return physical pixel coordinates
-                    // But we need to ensure we're working with the correct coordinate system
                     var topLeft = w.PointToScreen(new Point(windowRect.X, windowRect.Y));
                     var bottomRight = w.PointToScreen(new Point(windowRect.Right, windowRect.Bottom));
 
@@ -110,14 +105,7 @@ public class WindowsScreenCaptureStrategy : IScreenCaptureStrategy
                     Log.Debug("CaptureWindowRegion: DIP rect {WindowRect}, Screen scaling {Scaling}, Physical rect {ScreenRect}", 
                         windowRect, scaling, screenRect);
 
-                    var bitmap = CaptureRegion(screenRect);
-                    
-                    if (bitmap != null)
-                    {
-                        Log.Debug("Captured bitmap: {W}x{H} pixels", bitmap.Width, bitmap.Height);
-                    }
-                    
-                    return bitmap;
+                    return CaptureRegion(screenRect);
                 }
                 else
                 {

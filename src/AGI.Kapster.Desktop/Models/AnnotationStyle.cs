@@ -16,7 +16,7 @@ public class AnnotationStyle : IAnnotationStyle
     public Color FillColor { get; set; } = Colors.Transparent;
     public FillMode FillMode { get; set; } = FillMode.None;
     public double Opacity { get; set; } = 1.0;
-    public string FontFamily { get; set; } = "Segoe UI";
+    public string FontFamily { get; set; } = "Consolas, Microsoft YaHei UI, Arial, sans-serif";
     public double FontSize { get; set; } = 16.0;
     public FontWeight FontWeight { get; set; } = FontWeight.Normal;
     public FontStyle FontStyle { get; set; } = FontStyle.Normal;
