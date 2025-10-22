@@ -4,6 +4,7 @@ using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Screenshot;
+using AGI.Kapster.Desktop.Services.UI;
 
 namespace AGI.Kapster.Desktop.Extensions;
 
@@ -17,6 +18,9 @@ public static class OverlayServiceExtensions
     /// </summary>
     public static IServiceCollection AddOverlayServices(this IServiceCollection services)
     {
+        // Register UI services
+        services.AddSingleton<IToolbarPositionCalculator, ToolbarPositionCalculator>();
+        
         // Register OverlayWindow factory (Singleton factory creates Transient windows)
         services.AddSingleton<IOverlayWindowFactory, OverlayWindowFactory>();
         
