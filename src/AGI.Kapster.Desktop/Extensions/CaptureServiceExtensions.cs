@@ -34,33 +34,33 @@ public static class CaptureServiceExtensions
         
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            services.AddSingleton<IElementDetector, WindowsElementDetector>();
+            services.AddTransient<IElementDetector, WindowsElementDetector>();  // Transient: has mutable state per window
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
             services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>();
-            services.AddSingleton<IImeController, WindowsImeController>();
+            services.AddTransient<IImeController, WindowsImeController>();  // Transient: manages per-window IME context
             services.AddSingleton<IOverlayCoordinator, WindowsOverlayCoordinator>();
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            services.AddSingleton<IElementDetector, NullElementDetector>();
+            services.AddTransient<IElementDetector, NullElementDetector>();  // Transient: consistent with Windows
             services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
             services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>();
-            services.AddSingleton<IImeController, NoOpImeController>();
+            services.AddTransient<IImeController, NoOpImeController>();  // Transient: consistent with Windows
             services.AddSingleton<IOverlayCoordinator, MacOverlayCoordinator>();
         }
         else
         {
             // Default to Windows implementations for other platforms
-            services.AddSingleton<IElementDetector, WindowsElementDetector>();
+            services.AddTransient<IElementDetector, WindowsElementDetector>();  // Transient: has mutable state per window
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
             services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>();
-            services.AddSingleton<IImeController, NoOpImeController>();
+            services.AddTransient<IImeController, NoOpImeController>();  // Transient: consistent with Windows
             services.AddSingleton<IOverlayCoordinator, WindowsOverlayCoordinator>();
         }
 
