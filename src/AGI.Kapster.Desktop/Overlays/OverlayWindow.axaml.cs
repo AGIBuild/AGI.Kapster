@@ -458,41 +458,124 @@ public partial class OverlayWindow : Window, IOverlayWindow
             return;
         }
 
-        // Desired position: slightly outside bottom-right
-        double offset = 8;
-        double desiredX = selection.Right + offset;
-        double desiredY = selection.Bottom + offset;
-
-        // Toolbar size estimation: measure
+        // Measure toolbar size
         _toolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var size = _toolbar.DesiredSize;
+        var toolbarSize = _toolbar.DesiredSize;
+        const double margin = 8;
 
-        // Use mask size set by controller (platform-specific)
-        double maxX = _maskSize.Width > 0 ? _maskSize.Width : this.ClientSize.Width;
-        double maxY = _maskSize.Height > 0 ? _maskSize.Height : this.ClientSize.Height;
+        // Convert selection's bottom-right corner from local to global screen coordinates
+        // Use a point well inside the selection to avoid screen gaps at boundaries
+        // Inset by toolbar height to ensure we're in the same screen as where toolbar will appear
+        var overlayPos = this.Position;
+        var inset = Math.Max(50, (int)toolbarSize.Height);
+        var globalBottomRight = new PixelPoint(
+            overlayPos.X + (int)selection.Right - inset,
+            overlayPos.Y + (int)selection.Bottom - inset);
+        
+        // Get target screen bounds in global coordinates
+        var globalScreenBounds = GetScreenBoundsForPoint(globalBottomRight);
+        
+        // Convert screen bounds to overlay's local coordinate system for position calculations
+        var screenBounds = new Rect(
+            globalScreenBounds.X - overlayPos.X,
+            globalScreenBounds.Y - overlayPos.Y,
+            globalScreenBounds.Width,
+            globalScreenBounds.Height);
+        
+        Log.Debug("Overlay position: {OverlayPos}, Selection BottomRight (local): ({LocalX}, {LocalY}), " +
+                  "Global: {GlobalPoint}, Screen (local): {Screen}",
+            overlayPos, selection.Right, selection.Bottom, globalBottomRight, screenBounds);
 
-        // Auto-flip horizontally if overflowing right; vertically if overflowing bottom
-        if (desiredX + size.Width > maxX)
+        // Calculate available space in vertical direction (now both in local coordinates)
+        var spaceBelow = screenBounds.Bottom - selection.Bottom;
+        var spaceAbove = selection.Top - screenBounds.Top;
+
+        // Determine optimal position with priority: below -> above -> inside
+        Point position;
+        double rightAlign = selection.Right - toolbarSize.Width;
+
+        if (spaceBelow >= toolbarSize.Height + margin)
         {
-            desiredX = selection.X - size.Width - offset; // place to the left outside
-            if (desiredX < 0)
+            // Priority: below selection (outside)
+            position = new Point(rightAlign, selection.Bottom + margin);
+            Log.Debug("Toolbar: below selection (outside), available space: {Space}px", spaceBelow);
+        }
+        else if (spaceAbove >= toolbarSize.Height + margin)
+        {
+            // Fallback: above selection (outside)
+            position = new Point(rightAlign, selection.Top - toolbarSize.Height - margin);
+            Log.Debug("Toolbar: above selection (outside), available space: {Space}px", spaceAbove);
+        }
+        else
+        {
+            // Final fallback: inside selection at bottom-right corner
+            position = new Point(
+                selection.Right - toolbarSize.Width - margin,
+                selection.Bottom - toolbarSize.Height - margin);
+            Log.Debug("Toolbar: inside selection (bottom-right), insufficient outside space");
+        }
+
+        // Clamp to screen bounds to ensure toolbar stays fully visible
+        var finalX = Math.Clamp(position.X, screenBounds.Left, screenBounds.Right - toolbarSize.Width);
+        var finalY = Math.Clamp(position.Y, screenBounds.Top, screenBounds.Bottom - toolbarSize.Height);
+
+        Canvas.SetLeft(_toolbar, finalX);
+        Canvas.SetTop(_toolbar, finalY);
+        
+        Log.Debug("Toolbar final position: ({X}, {Y})", finalX, finalY);
+    }
+
+    /// <summary>
+    /// Get screen bounds for a specific point to ensure screen consistency
+    /// </summary>
+    private Rect GetScreenBoundsForPoint(PixelPoint point)
+    {
+        // Fallback: use full overlay bounds if screen info unavailable
+        if (_screens == null || _screens.Count == 0 || _coordinateMapper == null)
+        {
+            var w = _maskSize.Width > 0 ? _maskSize.Width : ClientSize.Width;
+            var h = _maskSize.Height > 0 ? _maskSize.Height : ClientSize.Height;
+            Log.Debug("No screen info available, using overlay bounds: {Width}x{Height}", w, h);
+            return new Rect(0, 0, w, h);
+        }
+
+        // Log all screen bounds for debugging
+        Log.Debug("Searching for screen containing point {Point} among {Count} screens:", point, _screens.Count);
+        for (int i = 0; i < _screens.Count; i++)
+        {
+            var s = _screens[i];
+            Log.Debug("  Screen {Index}: Bounds=({X},{Y},{W},{H}), WorkingArea=({WAX},{WAY},{WAW},{WAH})",
+                i, s.Bounds.X, s.Bounds.Y, s.Bounds.Width, s.Bounds.Height,
+                s.WorkingArea.X, s.WorkingArea.Y, s.WorkingArea.Width, s.WorkingArea.Height);
+        }
+
+        // Find screen containing the specified point
+        var screen = _coordinateMapper.GetScreenFromPoint(point, _screens);
+        
+        if (screen == null)
+        {
+            Log.Warning("Cannot determine screen for point {Point}, using default bounds", point);
+            return new Rect(0, 0, _maskSize.Width, _maskSize.Height);
+        }
+
+        // Find screen index
+        int screenIndex = -1;
+        for (int i = 0; i < _screens.Count; i++)
+        {
+            if (_screens[i] == screen)
             {
-                // clamp inside selection right-bottom
-                desiredX = Math.Max(selection.Right - size.Width - offset, selection.X + offset);
+                screenIndex = i;
+                break;
             }
         }
-        if (desiredY + size.Height > maxY)
-        {
-            desiredY = selection.Y - size.Height - offset; // place above outside
-            if (desiredY < 0)
-            {
-                // clamp inside selection right-bottom
-                desiredY = Math.Max(selection.Bottom - size.Height - offset, selection.Y + offset);
-            }
-        }
-
-        Canvas.SetLeft(_toolbar, desiredX);
-        Canvas.SetTop(_toolbar, desiredY);
+        
+        // Use WorkingArea (excludes taskbar and system UI)
+        var bounds = screen.WorkingArea;
+        Log.Debug("Point {Point} -> Screen {Index}{Fallback}: WorkingArea=({X},{Y},{W},{H})", 
+            point, screenIndex, screenIndex == 0 ? " (fallback?)" : "", 
+            bounds.X, bounds.Y, bounds.Width, bounds.Height);
+        
+        return new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
