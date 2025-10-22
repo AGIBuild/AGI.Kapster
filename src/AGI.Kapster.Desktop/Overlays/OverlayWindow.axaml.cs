@@ -32,7 +32,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private readonly IScreenCoordinateMapper? _coordinateMapper;
     private readonly IToolbarPositionCalculator _toolbarPositionCalculator;
     private readonly ISettingsService _settingsService;
-    private readonly IScreenshotService _screenshotService;
     private ElementHighlightOverlay? _elementHighlight;
     private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
@@ -75,14 +74,12 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     public OverlayWindow(
         ISettingsService settingsService,
-        IScreenshotService screenshotService,
         IElementDetector? elementDetector = null, 
         IScreenCaptureStrategy? screenCaptureStrategy = null, 
         IScreenCoordinateMapper? coordinateMapper = null,
         IToolbarPositionCalculator? toolbarPositionCalculator = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
         _elementDetector = elementDetector;
         _screenCaptureStrategy = screenCaptureStrategy;
         _coordinateMapper = coordinateMapper;
@@ -422,8 +419,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     private void CloseOverlayWithController(string context)
     {
-        _screenshotService.Cancel();
-        Log.Information("Screenshot cancelled after {Context}", context);
+        // Trigger Cancelled event - let the coordinator handle cancellation
+        Cancelled?.Invoke(this, new OverlayCancelledEventArgs(context));
+        Log.Information("Overlay cancelled after {Context}", context);
     }
 
     private void UpdateMaskForSelection(Rect selection)
