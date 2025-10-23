@@ -26,12 +26,13 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
     protected override string PlatformName => "MacCoordinator";
 
     public MacOverlayCoordinator(
+        IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
         IOverlayWindowFactory windowFactory,
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
-        : base(sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
+        : base(screenMonitor, sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
     {
     }
 

@@ -1,5 +1,8 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update;
@@ -18,6 +21,17 @@ public static class CoreServiceExtensions
     /// </summary>
     public static IServiceCollection AddCoreServices(this IServiceCollection services)
     {
+        // Register screen monitor service (resolved from MainWindow)
+        services.AddSingleton<IScreenMonitorService>(sp =>
+        {
+            var lifetime = (IClassicDesktopStyleApplicationLifetime?)Application.Current?.ApplicationLifetime;
+            if (lifetime?.MainWindow is IScreenMonitorService service)
+            {
+                return service;
+            }
+            throw new InvalidOperationException("MainWindow is not IScreenMonitorService");
+        });
+        
         services.AddSingleton<ISystemTrayService, SystemTrayService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
         services.AddSingleton<ISettingsService, SettingsService>();

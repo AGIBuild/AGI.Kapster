@@ -22,6 +22,7 @@ namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 /// </summary>
 public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 {
+    protected readonly IScreenMonitorService _screenMonitor;
     protected readonly IOverlaySessionFactory _sessionFactory;
     protected readonly IOverlayWindowFactory _windowFactory;
     protected readonly IScreenCoordinateMapper _coordinateMapper;
@@ -31,12 +32,14 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     protected IOverlaySession? _currentSession;
 
     protected OverlayCoordinatorBase(
+        IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
         IOverlayWindowFactory windowFactory,
         IScreenCoordinateMapper coordinateMapper,
         IScreenCaptureStrategy? captureStrategy,
         IClipboardStrategy? clipboardStrategy)
     {
+        _screenMonitor = screenMonitor ?? throw new ArgumentNullException(nameof(screenMonitor));
         _sessionFactory = sessionFactory;
         _windowFactory = windowFactory;
         _coordinateMapper = coordinateMapper;
@@ -126,13 +129,15 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 
     /// <summary>
     /// Get screen information for current session
-    /// Handles screen hot-plug scenarios by fetching latest configuration
-    /// Uses temporary window approach (cross-platform)
+    /// Returns cached screen information from ScreenMonitorService (always up-to-date)
+    /// No delay - screen info is maintained in real-time through event subscription
     /// </summary>
     /// <returns>List of available screens</returns>
-    protected async Task<IReadOnlyList<Screen>> GetScreensAsync()
+    protected Task<IReadOnlyList<Screen>> GetScreensAsync()
     {
-        return await GetScreensUsingTempWindowAsync();
+        var screens = _screenMonitor.GetCurrentScreens();
+        Log.Debug("Retrieved {Count} screen(s) from screen monitor", screens.Count);
+        return Task.FromResult(screens);
     }
 
     /// <summary>
@@ -182,37 +187,6 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     }
 
     // Static helper methods
-
-    /// <summary>
-    /// Get screens using a temporary window (cross-platform approach)
-    /// </summary>
-    protected static async Task<IReadOnlyList<Screen>> GetScreensUsingTempWindowAsync()
-    {
-        try
-        {
-            // Create minimal temporary window to access screen information
-            var tempWindow = new Avalonia.Controls.Window
-            {
-                Width = 1,
-                Height = 1,
-                ShowInTaskbar = false,
-                WindowState = Avalonia.Controls.WindowState.Minimized,
-                SystemDecorations = Avalonia.Controls.SystemDecorations.None,
-                Opacity = 0
-            };
-
-            tempWindow.Show();
-            var screens = tempWindow.Screens?.All?.ToList() ?? new List<Screen>();
-            tempWindow.Close();
-            
-            return await Task.FromResult(screens);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to get screens using temporary window");
-            return Array.Empty<Screen>();
-        }
-    }
 
     /// <summary>
     /// Calculate virtual desktop bounds (bounding box of all screens)

@@ -25,12 +25,13 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
     protected override string PlatformName => "WindowsCoordinator";
 
     public WindowsOverlayCoordinator(
+        IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
         IOverlayWindowFactory windowFactory,
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
-        : base(sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
+        : base(screenMonitor, sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
     {
     }
 
