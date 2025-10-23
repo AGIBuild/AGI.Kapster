@@ -12,6 +12,7 @@ using AGI.Kapster.Desktop.Services.Overlay.Platforms;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.UI;
+using AGI.Kapster.Desktop.Services.Export;
 using AGI.Kapster.Desktop.Rendering.Overlays;
 
 namespace AGI.Kapster.Desktop.Extensions;
@@ -79,6 +80,12 @@ public static class CaptureServiceExtensions
 
         // High-level business logic
         services.AddSingleton<IScreenshotService, ScreenshotService>();
+
+        // Image Capture Service for overlays
+        services.AddTransient<IOverlayImageCaptureService, OverlayImageCaptureService>();
+
+        // Annotation Export Service
+        services.AddTransient<IAnnotationExportService, AnnotationExportService>();
 
         return services;
     }

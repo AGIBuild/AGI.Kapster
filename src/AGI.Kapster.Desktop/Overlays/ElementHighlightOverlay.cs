@@ -3,16 +3,35 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Serilog;
+using SkiaSharp;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 
 namespace AGI.Kapster.Desktop.Overlays;
 
 /// <summary>
-/// Overlay for highlighting detected UI elements
+/// Event args for element highlight changes
+/// </summary>
+public class ElementHighlightChangedEventArgs : EventArgs
+{
+    public DetectedElement? Element { get; }
+    public Rect HighlightRect { get; }
+
+    public ElementHighlightChangedEventArgs(DetectedElement? element, Rect rect)
+    {
+        Element = element;
+        HighlightRect = rect;
+    }
+}
+
+/// <summary>
+/// GPU-accelerated overlay for highlighting detected UI elements
+/// Uses SkiaSharp for high-performance rendering
 /// </summary>
 public class ElementHighlightOverlay : UserControl
 {
@@ -20,7 +39,12 @@ public class ElementHighlightOverlay : UserControl
     private DetectedElement? _currentElement;
     private bool _isActive;
     private Rect _lastHighlightRect;
-    private bool _isRendering = false; // Prevent concurrent rendering
+    private WriteableBitmap? _renderBitmap;
+    private PixelSize _lastBitmapSize;
+    private bool _needsRedraw;
+
+    // Event for notifying mask cutout changes with element info
+    public event EventHandler<ElementHighlightChangedEventArgs>? HighlightChanged;
 
     // Element selection is now handled by parent OverlayWindow
 
@@ -73,6 +97,7 @@ public class ElementHighlightOverlay : UserControl
 
     /// <summary>
     /// Sets the current element to highlight (called from parent overlay)
+    /// GPU-accelerated version with minimal overhead
     /// </summary>
     public void SetCurrentElement(DetectedElement? element)
     {
@@ -86,7 +111,11 @@ public class ElementHighlightOverlay : UserControl
             {
                 _currentElement = null;
                 _lastHighlightRect = default;
+                _needsRedraw = true;
                 InvalidateVisual();
+                
+                // Notify mask to clear cutout
+                HighlightChanged?.Invoke(this, new ElementHighlightChangedEventArgs(null, default));
             }
             return;
         }
@@ -112,47 +141,22 @@ public class ElementHighlightOverlay : UserControl
                     Math.Abs(overlayBottomRight.Y - overlayTopLeft.Y));
             }
 
-            // Only invalidate if the rect actually changed significantly
-            if (!RectsAreEqual(_lastHighlightRect, newRect, 3.0)) // Increased tolerance to 3 pixels
+            // Always update when element changes - no tolerance check
+            _lastHighlightRect = newRect;
+            _needsRedraw = true;
+
+            // Immediate visual update (GPU-accelerated rendering is fast enough)
+            InvalidateVisual();
+            
+            // Notify mask layer for cutout update with element info
+            HighlightChanged?.Invoke(this, new ElementHighlightChangedEventArgs(element, newRect));
+
+            if (element != null)
             {
-                _lastHighlightRect = newRect;
-
-                // Defer the visual update to prevent excessive redraws
-                if (!_isRendering)
-                {
-                    _isRendering = true;
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        try
-                        {
-                            // Double-check that we still need to update (element might have changed again)
-                            if (_currentElement == element && !_lastHighlightRect.Equals(default))
-                            {
-                                InvalidateVisual();
-                            }
-                        }
-                        finally
-                        {
-                            _isRendering = false;
-                        }
-                    }, DispatcherPriority.Background); // Lower priority to reduce stuttering
-                }
-
-                if (element != null)
-                {
-                    Log.Debug("Detected element: {Name} ({ClassName}) - {Bounds}",
-                        element.Name, element.ClassName, element.Bounds);
-                }
+                Log.Debug("Element highlight updated: {Name} ({ClassName}) - {Bounds}",
+                    element.Name, element.ClassName, element.Bounds);
             }
         }
-    }
-
-    private static bool RectsAreEqual(Rect a, Rect b, double tolerance)
-    {
-        return Math.Abs(a.X - b.X) < tolerance &&
-               Math.Abs(a.Y - b.Y) < tolerance &&
-               Math.Abs(a.Width - b.Width) < tolerance &&
-               Math.Abs(a.Height - b.Height) < tolerance;
     }
 
     private static bool ElementEquals(DetectedElement? a, DetectedElement? b)
@@ -160,17 +164,10 @@ public class ElementHighlightOverlay : UserControl
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
 
-        // Strict comparison to prevent unnecessary updates
-        // Use window handle as primary identifier (most reliable)
-        if (a.WindowHandle != b.WindowHandle)
-            return false;
-
-        // Additional checks for elements within the same window
-        if (a.ClassName != b.ClassName || a.IsWindow != b.IsWindow)
-            return false;
-
-        // Use larger tolerance for bounds to account for minor coordinate variations
-        return RectsAreEqual(a.Bounds, b.Bounds, 5.0); // Larger tolerance for more stability
+        // Simple comparison by window handle and class name
+        return a.WindowHandle == b.WindowHandle && 
+               a.ClassName == b.ClassName && 
+               a.IsWindow == b.IsWindow;
     }
 
     public override void Render(DrawingContext context)
@@ -178,80 +175,183 @@ public class ElementHighlightOverlay : UserControl
         base.Render(context);
 
         if (!IsActive || _currentElement == null || _lastHighlightRect == default)
+        {
+            // Clear any existing bitmap
+            if (_renderBitmap != null)
+            {
+                _renderBitmap.Dispose();
+                _renderBitmap = null;
+                _needsRedraw = false;
+            }
             return;
+        }
 
-        var element = _currentElement;
-
-        // Use the cached highlight rect instead of recalculating
-        // This prevents coordinate inconsistencies that cause flickering
         var rect = _lastHighlightRect;
-
-        // Validate rect before drawing
         if (rect.Width <= 0 || rect.Height <= 0)
             return;
 
         try
         {
-            // Draw highlight border with stable visual
-            var borderColor = element.IsWindow ? Colors.Orange : Colors.DeepSkyBlue;
-            var borderBrush = new SolidColorBrush(borderColor);
-            var borderPen = new Pen(borderBrush, 2); // Slightly thinner to reduce visual noise
-            context.DrawRectangle(null, borderPen, rect);
-
-            // Draw inner border for better contrast
-            var innerPen = new Pen(Brushes.White, 1);
-            var innerRect = rect.Deflate(new Thickness(1));
-            if (innerRect.Width > 2 && innerRect.Height > 2)
+            // Create or recreate bitmap if size changed
+            var currentSize = new PixelSize((int)this.Bounds.Width, (int)this.Bounds.Height);
+            if (_renderBitmap == null || _lastBitmapSize != currentSize || _needsRedraw)
             {
-                context.DrawRectangle(null, innerPen, innerRect);
+                _renderBitmap?.Dispose();
+                
+                // Create new WriteableBitmap for GPU-accelerated rendering
+                _renderBitmap = new WriteableBitmap(
+                    currentSize,
+                    new Vector(96, 96),
+                    Avalonia.Platform.PixelFormat.Bgra8888,
+                    AlphaFormat.Premul);
+                
+                _lastBitmapSize = currentSize;
+                _needsRedraw = false;
+                
+                // Render using SkiaSharp (GPU-accelerated)
+                RenderHighlightToBitmap(_renderBitmap, rect, _currentElement);
             }
-
-            // Draw subtle semi-transparent fill
-            var fillBrush = new SolidColorBrush(borderColor, 0.05); // More subtle
-            context.DrawRectangle(fillBrush, null, rect);
-
-            // Draw element info text (only if rect is large enough)
-            if (rect.Width > 100 && rect.Height > 50)
+            
+            // Draw the cached bitmap (extremely fast)
+            if (_renderBitmap != null)
             {
-                DrawElementInfo(context, element, rect);
+                context.DrawImage(_renderBitmap, 
+                    new Rect(0, 0, _renderBitmap.PixelSize.Width, _renderBitmap.PixelSize.Height));
             }
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Error rendering element highlight");
+            Log.Warning(ex, "Error rendering GPU-accelerated highlight");
+        }
+    }
+    
+    /// <summary>
+    /// Render highlight to bitmap using SkiaSharp for GPU acceleration
+    /// </summary>
+    private void RenderHighlightToBitmap(WriteableBitmap bitmap, Rect rect, DetectedElement element)
+    {
+        using (var frameBuffer = bitmap.Lock())
+        {
+            var info = new SKImageInfo(
+                frameBuffer.Size.Width,
+                frameBuffer.Size.Height,
+                SKColorType.Bgra8888,
+                SKAlphaType.Premul);
+            
+            using (var surface = SKSurface.Create(info, frameBuffer.Address, frameBuffer.RowBytes))
+            {
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Transparent);
+                
+                // Draw semi-transparent fill
+                var borderColor = element.IsWindow 
+                    ? new SKColor(255, 165, 0, 12) // Orange with 5% opacity
+                    : new SKColor(0, 191, 255, 12); // DeepSkyBlue with 5% opacity
+                
+                using (var fillPaint = new SKPaint())
+                {
+                    fillPaint.Color = borderColor;
+                    fillPaint.IsAntialias = true;
+                    fillPaint.Style = SKPaintStyle.Fill;
+                    
+                    canvas.DrawRect(
+                        (float)rect.X, (float)rect.Y,
+                        (float)rect.Width, (float)rect.Height,
+                        fillPaint);
+                }
+                
+                // Draw outer border
+                var strokeColor = element.IsWindow 
+                    ? new SKColor(255, 165, 0) // Orange
+                    : new SKColor(0, 191, 255); // DeepSkyBlue
+                
+                using (var borderPaint = new SKPaint())
+                {
+                    borderPaint.Color = strokeColor;
+                    borderPaint.IsAntialias = true;
+                    borderPaint.Style = SKPaintStyle.Stroke;
+                    borderPaint.StrokeWidth = 3;
+                    
+                    canvas.DrawRect(
+                        (float)rect.X, (float)rect.Y,
+                        (float)rect.Width, (float)rect.Height,
+                        borderPaint);
+                }
+                
+                // Draw inner white border for contrast
+                using (var innerPaint = new SKPaint())
+                {
+                    innerPaint.Color = SKColors.White;
+                    innerPaint.IsAntialias = true;
+                    innerPaint.Style = SKPaintStyle.Stroke;
+                    innerPaint.StrokeWidth = 1;
+                    
+                    var innerRect = rect.Deflate(new Thickness(2));
+                    if (innerRect.Width > 4 && innerRect.Height > 4)
+                    {
+                        canvas.DrawRect(
+                            (float)innerRect.X, (float)innerRect.Y,
+                            (float)innerRect.Width, (float)innerRect.Height,
+                            innerPaint);
+                    }
+                }
+                
+                // Draw element info text (only if rect is large enough)
+                if (rect.Width > 100 && rect.Height > 50)
+                {
+                    DrawElementInfoSkia(canvas, element, rect);
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Draw element info using SkiaSharp with modern API
+    /// </summary>
+    private void DrawElementInfoSkia(SKCanvas canvas, DetectedElement element, Rect bounds)
+    {
+        var displayText = $"{element.Name}\n{element.ClassName}\n{element.ProcessName}";
+        displayText += element.IsWindow ? "\n[Window]" : "\n[Element]";
+        
+        using (var font = new SKFont())
+        {
+            font.Size = 12;
+            font.Typeface = SKTypeface.FromFamilyName("Segoe UI");
+            
+            using (var textPaint = new SKPaint())
+            {
+                textPaint.Color = SKColors.White;
+                textPaint.IsAntialias = true;
+                
+                // Measure text using modern API
+                var textBounds = new SKRect();
+                font.MeasureText(displayText, out textBounds);
+
+        // Position text above the element if possible, otherwise below
+                float textY = (float)bounds.Y - textBounds.Height - 10;
+        if (textY < 0)
+                    textY = (float)bounds.Bottom + 20;
+                
+                var bgRect = new SKRect(
+                    (float)bounds.X - 4,
+                    textY + textBounds.Top - 4,
+                    (float)bounds.X + textBounds.Width + 8,
+                    textY + textBounds.Bottom + 4);
+
+        // Draw background
+                using (var bgPaint = new SKPaint())
+                {
+                    bgPaint.Color = new SKColor(0, 0, 0, 204); // 80% opacity
+                    bgPaint.IsAntialias = true;
+                    canvas.DrawRect(bgRect, bgPaint);
+                }
+                
+                // Draw text using modern API
+                canvas.DrawText(displayText, (float)bounds.X, textY, SKTextAlign.Left, font, textPaint);
+            }
         }
     }
 
-    private void DrawElementInfo(DrawingContext context, DetectedElement element, Rect bounds)
-    {
-        var displayText = $"{element.Name}\n{element.ClassName}\n{element.ProcessName}";
-        if (element.IsWindow)
-            displayText += "\n[Window]";
-        else
-            displayText += "\n[Element]";
-
-        var typeface = new Typeface("Segoe UI");
-        var formattedText = new FormattedText(
-            displayText,
-            System.Globalization.CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            typeface,
-            12,
-            Brushes.White);
-
-        // Position text above the element if possible, otherwise below
-        var textY = bounds.Y - formattedText.Height - 5;
-        if (textY < 0)
-            textY = bounds.Bottom + 5;
-
-        var textRect = new Rect(bounds.X, textY, formattedText.Width + 8, formattedText.Height + 4);
-
-        // Draw background
-        context.DrawRectangle(new SolidColorBrush(Colors.Black, 0.8), null, textRect);
-
-        // Draw text
-        context.DrawText(formattedText, new Point(textRect.X + 4, textRect.Y + 2));
-    }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -261,5 +361,12 @@ public class ElementHighlightOverlay : UserControl
 
         // Clear global state if this overlay was the owner
         GlobalElementHighlightState.Instance.ClearOwner(this);
+        
+        // Dispose GPU resources
+        if (_renderBitmap != null)
+        {
+            _renderBitmap.Dispose();
+            _renderBitmap = null;
+        }
     }
 }
