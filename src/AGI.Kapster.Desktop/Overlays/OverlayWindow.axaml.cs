@@ -40,7 +40,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     // Cached control references to avoid FindControl<>() abuse
     private Image? _backgroundImage;
-    private Avalonia.Controls.Shapes.Path? _maskPath;
+    private Image? _blurredBackgroundImage;
+    private Border? _maskBorder;
     private SelectionOverlay? _selector;
     private NewAnnotationToolbar? _toolbar;
     private Canvas? _uiCanvas;
@@ -126,7 +127,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private void CacheControlReferences()
     {
         _backgroundImage = this.FindControl<Image>("BackgroundImage");
-        _maskPath = this.FindControl<Avalonia.Controls.Shapes.Path>("MaskPath");
+        _blurredBackgroundImage = this.FindControl<Image>("BlurredBackgroundImage");
+        _maskBorder = this.FindControl<Border>("MaskBorder");
         _selector = this.FindControl<SelectionOverlay>("Selector");
         _toolbar = this.FindControl<NewAnnotationToolbar>("Toolbar");
         _uiCanvas = this.FindControl<Canvas>("UiCanvas");
@@ -206,6 +208,12 @@ public partial class OverlayWindow : Window, IOverlayWindow
             {
                 _backgroundImage.Source = bitmap;
                 _frozenBackground = bitmap;
+                
+                // Also set blurred background for frosted glass effect
+                if (_blurredBackgroundImage != null)
+                {
+                    _blurredBackgroundImage.Source = bitmap;
+                }
             }
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
@@ -272,6 +280,13 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 {
                     _backgroundImage.Source = _frozenBackground;
                 }
+                
+                // Also set blurred background for frosted glass effect
+                if (_blurredBackgroundImage != null)
+                {
+                    _blurredBackgroundImage.Source = _frozenBackground;
+                }
+                
                 Log.Debug("Frozen background initialized: {W}x{H} pixels", 
                     bitmap.PixelSize.Width, bitmap.PixelSize.Height);
             }
@@ -434,7 +449,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     private void UpdateMaskForSelection(Rect selection)
     {
-        if (_maskPath == null)
+        if (_maskBorder == null)
             return;
 
         // Use mask size set by controller (platform-specific)
@@ -442,11 +457,18 @@ public partial class OverlayWindow : Window, IOverlayWindow
         var maskWidth = _maskSize.Width > 0 ? _maskSize.Width : this.ClientSize.Width;
         var maskHeight = _maskSize.Height > 0 ? _maskSize.Height : this.ClientSize.Height;
 
+        // Create geometry with even-odd fill rule to create a "hole" for the selection
         var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
         group.Children.Add(new RectangleGeometry(new Rect(0, 0, maskWidth, maskHeight)));
         if (selection.Width > 0 && selection.Height > 0)
             group.Children.Add(new RectangleGeometry(selection));
-        _maskPath.Data = group;
+        
+        // Apply clip to both blurred background and mask for frosted glass effect with selection cutout
+        if (_blurredBackgroundImage != null)
+        {
+            _blurredBackgroundImage.Clip = group;
+        }
+        _maskBorder.Clip = group;
     }
 
     private void UpdateToolbarPosition(Rect selection)
