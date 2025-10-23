@@ -14,11 +14,11 @@
         <!-- Blurred background layer for frosted glass effect -->
         <Image x:Name="BlurredBackgroundImage" Stretch="Fill" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality">
             <Image.Effect>
-                <BlurEffect Radius="15"/>
+                <BlurEffect Radius="8"/>
             </Image.Effect>
         </Image>
         <!-- Semi-transparent overlay mask with selection cutout -->
-        <Border x:Name="MaskBorder" Background="#30000000" IsHitTestVisible="False"/>
+        <Border x:Name="MaskBorder" Background="#20000000" IsHitTestVisible="False"/>
         <local:SelectionOverlay x:Name="Selector"/>
         <!-- Annotator is created in code-behind with DI-resolved settings service -->
         <Canvas x:Name="UiCanvas">
