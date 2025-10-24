@@ -1,3 +1,5 @@
+using System;
+using Avalonia;
 using Avalonia.Input;
 
 namespace AGI.Kapster.Desktop.Overlays.Layers;
@@ -69,5 +71,51 @@ public interface IOverlayLayerManager
     /// Get current overlay mode
     /// </summary>
     OverlayMode CurrentMode { get; }
+    
+    /// <summary>
+    /// Register and attach a layer with visual to the host
+    /// Combines RegisterLayer + AttachTo for cleaner API
+    /// </summary>
+    void RegisterAndAttachLayer(string layerId, IOverlayLayer layer, ILayerHost host, IOverlayContext context);
+    
+    /// <summary>
+    /// Unregister and detach a layer from the host
+    /// Combines Detach + UnregisterLayer for cleanup
+    /// </summary>
+    void UnregisterAndDetachLayer(string layerId);
+    
+    // === State Management (Phase 1) ===
+    
+    /// <summary>
+    /// Current selection rectangle (single source of truth)
+    /// </summary>
+    Rect CurrentSelection { get; }
+    
+    /// <summary>
+    /// Check if current selection is valid for annotation (width and height > 2px)
+    /// </summary>
+    bool HasValidSelection { get; }
+    
+    /// <summary>
+    /// Set current selection rectangle
+    /// Replaces event-based data passing with centralized state management
+    /// </summary>
+    void SetSelection(Rect selection);
+    
+    /// <summary>
+    /// Clear current selection
+    /// </summary>
+    void ClearSelection();
+    
+    /// <summary>
+    /// Event raised when selection changes (no data - pull from CurrentSelection)
+    /// Layers should subscribe to this and query CurrentSelection when notified
+    /// </summary>
+    event EventHandler? SelectionChanged;
+    
+    /// <summary>
+    /// Event raised when mode changes (no data - pull from CurrentMode)
+    /// </summary>
+    event EventHandler? ModeChanged;
 }
 

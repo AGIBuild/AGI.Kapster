@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia;
 using Avalonia.Controls;
@@ -14,52 +17,66 @@ using Avalonia.Platform;
 using Serilog;
 using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
+namespace AGI.Kapster.Desktop.Services.Screenshot;
 
 /// <summary>
-/// Abstract base class for overlay coordinators using Template Method pattern
+/// Abstract base class for screenshot services using Template Method pattern
 /// Defines common session lifecycle while allowing platform-specific window creation
 /// </summary>
-public abstract class OverlayCoordinatorBase : IOverlayCoordinator
+public abstract class ScreenshotServiceBase : IScreenshotService
 {
     protected readonly IScreenMonitorService _screenMonitor;
     protected readonly IOverlaySessionFactory _sessionFactory;
-    protected readonly IOverlayWindowFactory _windowFactory;
     protected readonly IScreenCoordinateMapper _coordinateMapper;
     protected readonly IScreenCaptureStrategy? _captureStrategy;
     protected readonly IClipboardStrategy? _clipboardStrategy;
     
     protected IOverlaySession? _currentSession;
+    
+    // Synchronization: Prevent concurrent session creation
+    private readonly SemaphoreSlim _sessionLock = new SemaphoreSlim(1, 1);
+    
+    // Track if we're in the middle of an async cleanup operation
+    private volatile bool _isDisposing = false;
 
-    protected OverlayCoordinatorBase(
+    protected ScreenshotServiceBase(
         IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
-        IOverlayWindowFactory windowFactory,
         IScreenCoordinateMapper coordinateMapper,
         IScreenCaptureStrategy? captureStrategy,
         IClipboardStrategy? clipboardStrategy)
     {
         _screenMonitor = screenMonitor ?? throw new ArgumentNullException(nameof(screenMonitor));
         _sessionFactory = sessionFactory;
-        _windowFactory = windowFactory;
         _coordinateMapper = coordinateMapper;
         _captureStrategy = captureStrategy;
         _clipboardStrategy = clipboardStrategy;
     }
 
-    public bool HasActiveSession => _currentSession != null;
+    public bool IsActive => _currentSession != null && !_isDisposing;
 
     /// <summary>
-    /// Template method: defines the overall session creation flow
+    /// Template method: defines the overall screenshot session creation flow
+    /// Uses semaphore to prevent concurrent session creation
     /// </summary>
-    public async Task<IOverlaySession> StartSessionAsync()
+    public async Task TakeScreenshotAsync()
     {
+        // Wait for any ongoing session cleanup to complete
+        // Timeout after 5 seconds to prevent indefinite blocking
+        if (!await _sessionLock.WaitAsync(TimeSpan.FromSeconds(5)))
+        {
+            Log.Warning("[{Platform}] Failed to acquire session lock within timeout, forcing cleanup", PlatformName);
+            // Force cleanup if lock can't be acquired
+            ForceCleanup();
+            return;
+        }
+
         try
         {
             LogSessionStart();
             
-            // Step 1: Close any existing session
-            CloseCurrentSession();
+            // Step 1: Close any existing session (synchronous, within lock)
+            Cancel();
 
             // Step 2: Create new session
             var session = _sessionFactory.CreateSession();
@@ -77,54 +94,93 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
             // Step 6: Show all windows
             session.ShowAll();
 
-            // Step 7: Store current session
+            // Step 7: Subscribe to session-level events (unified for all windows)
+            session.RegionSelected += OnRegionSelected;
+            session.Closed += OnSessionClosed;
+            
+            // Step 8: Store current session
             _currentSession = session;
             
             LogSessionCreated(session.Windows.Count);
-            return session;
         }
         catch (Exception ex)
         {
             LogSessionError(ex);
-            CloseCurrentSession();
+            Cancel();
             throw;
+        }
+        finally
+        {
+            _sessionLock.Release();
         }
     }
 
     /// <summary>
-    /// Close the current session if active
-    /// Unsubscribes from events and disposes the session
+    /// Cancel the current screenshot operation
+    /// Thread-safe and idempotent - safe to call multiple times
     /// </summary>
-    public virtual void CloseCurrentSession()
+    public virtual void Cancel()
     {
-        if (_currentSession == null)
+        // Atomically check and mark as disposing
+        if (_currentSession == null || _isDisposing)
             return;
+
+        _isDisposing = true;
 
         try
         {
-            Log.Information("[{Platform}] Closing current session", PlatformName);
+            Log.Information("[{Platform}] Cancelling screenshot session", PlatformName);
 
-            // Unsubscribe from all windows
-            foreach (var window in _currentSession.Windows)
+            // Capture session reference before nulling
+            var sessionToDispose = _currentSession;
+            
+            // Null out immediately to prevent race conditions
+            _currentSession = null;
+
+            if (sessionToDispose != null)
             {
-                if (window is IOverlayWindow overlayWindow)
+                // Unsubscribe from session-level events
+                try
                 {
-                    overlayWindow.RegionSelected -= OnRegionSelected;
-                    overlayWindow.Cancelled -= OnCancelled;
+                    sessionToDispose.RegionSelected -= OnRegionSelected;
+                    sessionToDispose.Closed -= OnSessionClosed;
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[{Platform}] Error unsubscribing from session events", PlatformName);
+                }
+
+                // Dispose session (will close all windows automatically)
+                try
+                {
+                    sessionToDispose.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "[{Platform}] Error disposing session", PlatformName);
                 }
             }
 
-            // Dispose session (will close all windows automatically)
-            _currentSession.Dispose();
-            _currentSession = null;
-
-            Log.Debug("[{Platform}] Session closed", PlatformName);
+            Log.Debug("[{Platform}] Session cancelled and closed", PlatformName);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "[{Platform}] Error closing session", PlatformName);
-            _currentSession = null;
+            Log.Error(ex, "[{Platform}] Error in Cancel()", PlatformName);
         }
+        finally
+        {
+            _isDisposing = false;
+        }
+    }
+
+    /// <summary>
+    /// Force cleanup when normal cancellation fails (emergency recovery)
+    /// </summary>
+    private void ForceCleanup()
+    {
+        Log.Warning("[{Platform}] Force cleanup triggered", PlatformName);
+        _isDisposing = false;
+        _currentSession = null;
     }
 
     /// <summary>
@@ -221,9 +277,13 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 
     /// <summary>
     /// Handle region selection event from overlay window
+    /// Uses fire-and-forget async pattern with proper exception handling
     /// </summary>
     protected async void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
     {
+        // Track if we need to cleanup (for finally block)
+        bool shouldCleanup = false;
+        
         try
         {
             // If this is an editable selection (for annotation), don't close the session
@@ -233,19 +293,48 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
                 return;
             }
 
+            // Mark that we should cleanup after processing
+            shouldCleanup = true;
+
             // Only process final image (from double-click or export)
             if (e.FinalImage != null)
             {
                 Log.Information("[{Platform}] Region selected: {Region}, copying to clipboard", PlatformName, e.SelectedRegion);
-                await CopyImageToClipboardAsync(e.FinalImage);
+                
+                // Add timeout to prevent indefinite blocking
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                try
+                {
+                    await CopyImageToClipboardAsync(e.FinalImage).WaitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Warning("[{Platform}] Clipboard operation timed out after 10 seconds", PlatformName);
+                }
             }
-
-            // Close session after final image processing
-            CloseCurrentSession();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "[{Platform}] Error handling region selection", PlatformName);
+            // Always cleanup on error
+            shouldCleanup = true;
+        }
+        finally
+        {
+            // Ensure cleanup always happens for non-editable selections
+            if (shouldCleanup)
+            {
+                try
+                {
+                    Cancel();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "[{Platform}] Error during cleanup in OnRegionSelected", PlatformName);
+                    // Last resort: force cleanup
+                    ForceCleanup();
+                }
+            }
         }
     }
 
@@ -255,7 +344,39 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     protected void OnCancelled(object? sender, OverlayCancelledEventArgs e)
     {
         Log.Information("[{Platform}] Screenshot cancelled", PlatformName);
-        CloseCurrentSession();
+        Cancel();
+    }
+    
+    /// <summary>
+    /// Handle session closed event
+    /// This is the key cleanup point that ensures _currentSession is cleared
+    /// Triggered when any window closes (which closes the entire session)
+    /// </summary>
+    private void OnSessionClosed()
+    {
+        Log.Debug("[{Platform}] Session closed, cleaning up", PlatformName);
+        
+        // Clear _currentSession to allow new sessions
+        var sessionToDispose = Interlocked.Exchange(ref _currentSession, null);
+        
+        if (sessionToDispose != null)
+        {
+            try
+            {
+                // Unsubscribe to prevent memory leak
+                sessionToDispose.RegionSelected -= OnRegionSelected;
+                sessionToDispose.Closed -= OnSessionClosed;
+                
+                // Dispose session
+                sessionToDispose.Dispose();
+                
+                Log.Debug("[{Platform}] Session cleaned up successfully", PlatformName);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[{Platform}] Error disposing session in OnSessionClosed", PlatformName);
+            }
+        }
     }
 
     /// <summary>

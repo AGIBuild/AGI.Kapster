@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Input;
+using Avalonia;
+using AGI.Kapster.Desktop.Overlays.Layers.Selection;
+using AGI.Kapster.Desktop.Services.Annotation;
 using Serilog;
 using AGI.Kapster.Desktop.Overlays.Events;
 
@@ -16,9 +19,41 @@ public class OverlayLayerManager : IOverlayLayerManager
     private readonly Dictionary<string, IOverlayLayer> _layers = new();
     private readonly IOverlayEventBus _eventBus;
     private string? _activeLayerId;
-    private OverlayMode _currentMode = OverlayMode.FreeSelection;
-
+    private OverlayMode _currentMode = OverlayMode.None; // Start with None to ensure first SwitchMode() activates layers
+    
+    // State Management (Phase 1)
+    private Rect _currentSelection = default;
+    private readonly object _stateLock = new(); // Thread-safe state access
+    
     public OverlayMode CurrentMode => _currentMode;
+    
+    // State Management Events
+    public event EventHandler? SelectionChanged;
+    public event EventHandler? ModeChanged;
+    
+    // State Management Properties
+    public Rect CurrentSelection
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _currentSelection;
+            }
+        }
+    }
+    
+    public bool HasValidSelection
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                // P3 Fix: Use unified validation logic
+                return SelectionValidator.IsValid(_currentSelection);
+            }
+        }
+    }
 
     public OverlayLayerManager(IOverlayEventBus eventBus)
     {
@@ -163,6 +198,139 @@ public class OverlayLayerManager : IOverlayLayerManager
 
     public bool RouteKeyEvent(KeyEventArgs e)
     {
+        // Only handle global semantics on KeyDown to avoid double firing on KeyUp
+        if (e.RoutedEvent == InputElement.KeyDownEvent)
+        {
+            // ESC: cancel
+            if (e.Key == Key.Escape)
+            {
+                _eventBus.Publish(new CancelRequestedEvent("User pressed ESC"));
+                return true;
+            }
+            // Ctrl+S: export
+            if (e.Key == Key.S && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                if (_layers.TryGetValue(LayerIds.Selection, out var layer) && layer is ISelectionLayer selection)
+                {
+                    var selectionRect = selection.GetCurrentSelection();
+                    if (selectionRect.HasValue)
+                    {
+                        _eventBus.Publish(new ExportRequestedEvent(selectionRect.Value));
+                        return true;
+                    }
+                }
+            }
+            // Enter: confirm
+            if (e.Key == Key.Enter)
+            {
+                if (_layers.TryGetValue(LayerIds.Selection, out var layer) && layer is ISelectionLayer selection)
+                {
+                    var selectionRect = selection.GetCurrentSelection();
+                    if (selectionRect.HasValue && selectionRect.Value.Width > 0 && selectionRect.Value.Height > 0)
+                    {
+                        _eventBus.Publish(new ConfirmRequestedEvent(selectionRect.Value));
+                        return true;
+                    }
+                }
+            }
+
+            // Ctrl+Shift+Delete: clear all annotations
+            if (e.Key == Key.Delete && e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                _eventBus.Publish(new ClearAnnotationsRequestedEvent());
+                return true;
+            }
+
+            // Tool hotkeys (annotation): A/R/E/T/F/M without modifiers
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+                !e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&
+                !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                AnnotationToolType? tool = e.Key switch
+                {
+                    Key.A => AnnotationToolType.Arrow,
+                    Key.R => AnnotationToolType.Rectangle,
+                    Key.E => AnnotationToolType.Ellipse,
+                    Key.T => AnnotationToolType.Text,
+                    Key.F => AnnotationToolType.Freehand,
+                    Key.M => AnnotationToolType.Mosaic,
+                    _ => null
+                };
+                if (tool.HasValue)
+                {
+                    _eventBus.Publish(new ToolChangeRequestedEvent(tool.Value));
+                    return true;
+                }
+                // C: Color picker
+                if (e.Key == Key.C)
+                {
+                    _eventBus.Publish(new ColorPickerRequestedEvent());
+                    return true;
+                }
+                // Delete key: delete selection
+                if (e.Key == Key.Delete)
+                {
+                    _eventBus.Publish(new DeleteRequestedEvent());
+                    return true;
+                }
+            }
+
+            // Ctrl+Z / Ctrl+Y: undo/redo
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Z)
+            {
+                _eventBus.Publish(new UndoRequestedEvent());
+                return true;
+            }
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Y)
+            {
+                _eventBus.Publish(new RedoRequestedEvent());
+                return true;
+            }
+
+            // Select All: Ctrl+A
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.A)
+            {
+                _eventBus.Publish(new SelectAllRequestedEvent());
+                return true;
+            }
+            // Copy/Paste/Duplicate: Ctrl+C / Ctrl+V / Ctrl+D
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.C)
+            {
+                _eventBus.Publish(new CopyRequestedEvent());
+                return true;
+            }
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.V)
+            {
+                _eventBus.Publish(new PasteRequestedEvent());
+                return true;
+            }
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.D)
+            {
+                _eventBus.Publish(new DuplicateRequestedEvent());
+                return true;
+            }
+
+            // Nudge (arrow keys without modifiers)
+            if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+                !e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&
+                !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                Vector? delta = e.Key switch
+                {
+                    Key.Left => new Vector(-1, 0),
+                    Key.Right => new Vector(1, 0),
+                    Key.Up => new Vector(0, -1),
+                    Key.Down => new Vector(0, 1),
+                    _ => null
+                };
+                if (delta.HasValue)
+                {
+                    _eventBus.Publish(new NudgeRequestedEvent(delta.Value));
+                    return true;
+                }
+            }
+        }
+
         // Route to active layer first
         if (_activeLayerId != null && _layers.TryGetValue(_activeLayerId, out var activeLayer))
         {
@@ -195,21 +363,33 @@ public class OverlayLayerManager : IOverlayLayerManager
     public void SwitchMode(OverlayMode mode)
     {
         if (_currentMode == mode)
+        {
+            Log.Debug("LayerManager: Already in mode {Mode}, skipping switch", mode);
             return;
+        }
+
+        // P2 Fix: Remove centralized validation - let layers decide if they can activate
+        // Each layer validates state in OnActivate() according to single responsibility principle
+        // This prevents mode manager from becoming a bottleneck and coupling to layer internals
 
         var oldMode = _currentMode;
         _currentMode = mode;
 
         // Activate/deactivate layers based on mode
-        foreach (var layer in _layers.Values)
+        
+        foreach (var kvp in _layers)
         {
-            if (layer.CanHandle(mode))
+            var layerId = kvp.Key;
+            var layer = kvp.Value;
+            var canHandle = layer.CanHandle(mode);
+            
+            if (canHandle)
             {
-                if (!layer.IsVisible)
-                {
-                    layer.IsVisible = true;
-                    layer.OnActivate();
-                }
+                // Always call OnActivate() - let the layer handle idempotency
+                // Don't rely on IsVisible alone, as it may be set during initialization
+                // but OnActivate() logic (e.g., strategy activation) may not have run
+                layer.IsVisible = true;
+                layer.OnActivate();
             }
             else
             {
@@ -221,10 +401,91 @@ public class OverlayLayerManager : IOverlayLayerManager
             }
         }
 
-        // Publish mode changed event
+        // Phase 1: Notify subscribers
+        ModeChanged?.Invoke(this, EventArgs.Empty);
+        
+        // Publish mode changed event to EventBus (backward compatibility)
         _eventBus.Publish(new ModeChangedEvent(oldMode, mode));
 
-        Log.Debug("Overlay mode switched: {OldMode} -> {NewMode}", oldMode, mode);
+        Log.Debug("LayerManager: Mode switched {OldMode} -> {NewMode}", oldMode, mode);
+    }
+    
+    // === Plan A: Unified Layer Visual Management ===
+    
+    public void RegisterAndAttachLayer(string layerId, IOverlayLayer layer, ILayerHost host, IOverlayContext context)
+    {
+        if (string.IsNullOrEmpty(layerId))
+            throw new ArgumentException("Layer ID cannot be null or empty", nameof(layerId));
+        
+        if (layer == null)
+            throw new ArgumentNullException(nameof(layer));
+        
+        if (host == null)
+            throw new ArgumentNullException(nameof(host));
+        
+        if (context == null)
+            throw new ArgumentNullException(nameof(context));
+        
+        // Register the layer
+        RegisterLayer(layerId, layer);
+        
+        // Attach visual if layer implements IOverlayVisual
+        if (layer is IOverlayVisual visual)
+        {
+            visual.AttachTo(host, context);
+            Log.Debug("Layer {LayerId} attached to host", layerId);
+        }
+    }
+    
+    public void UnregisterAndDetachLayer(string layerId)
+    {
+        if (_layers.TryGetValue(layerId, out var layer))
+        {
+            // Detach visual if layer implements IOverlayVisual
+            if (layer is IOverlayVisual visual)
+            {
+                visual.Detach();
+                Log.Debug("Layer {LayerId} detached from host", layerId);
+            }
+            
+            // Unregister the layer
+            UnregisterLayer(layerId);
+        }
+    }
+    
+    // === State Management Methods (Phase 1) ===
+    
+    public void SetSelection(Rect selection)
+    {
+        bool changed = false;
+        Rect oldSelection = default;
+        
+        lock (_stateLock)
+        {
+            if (_currentSelection != selection)
+            {
+                oldSelection = _currentSelection;
+                _currentSelection = selection;
+                changed = true;
+            }
+        }
+        
+        if (changed)
+        {
+            Log.Debug("LayerManager: Selection changed from {Old} to {New}", oldSelection, selection);
+            
+            // Notify subscribers (no data - they should pull from CurrentSelection)
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            
+            // Also publish to EventBus for backward compatibility (with data)
+            // TODO Phase 4: Remove Rect parameter from event
+            _eventBus.Publish(new SelectionChangedEvent(selection));
+        }
+    }
+    
+    public void ClearSelection()
+    {
+        SetSelection(default);
     }
 }
 

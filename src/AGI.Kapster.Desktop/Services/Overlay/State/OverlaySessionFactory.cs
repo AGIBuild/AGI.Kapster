@@ -1,3 +1,5 @@
+using System;
+
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
 
 /// <summary>
@@ -5,9 +7,16 @@ namespace AGI.Kapster.Desktop.Services.Overlay.State;
 /// </summary>
 public class OverlaySessionFactory : IOverlaySessionFactory
 {
+    private readonly IServiceProvider _serviceProvider;
+
+    public OverlaySessionFactory(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    }
+
     public IOverlaySession CreateSession()
     {
-        return new OverlaySession();
+        return new OverlaySession(_serviceProvider);
     }
 }
 

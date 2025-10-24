@@ -63,6 +63,11 @@ public interface IOverlayLayer
 public enum OverlayMode
 {
     /// <summary>
+    /// Initial/uninitialized state, no mode active
+    /// </summary>
+    None,
+    
+    /// <summary>
     /// Free-form drag selection mode
     /// </summary>
     FreeSelection,

@@ -19,27 +19,14 @@ public interface IScreenshotService
 }
 ```
 
-**Implementation**: `ScreenshotService` → delegates to `IOverlayCoordinator`
-
-### 2. Coordinator Layer
-
-#### IOverlayCoordinator
-Orchestrates platform-specific overlay session creation:
-```csharp
-public interface IOverlayCoordinator
-{
-    Task<IOverlaySession> StartSessionAsync();
-    void CloseCurrentSession();
-    bool HasActiveSession { get; }
-}
-```
+**Implementation**: Platform-specific services implementing full session lifecycle
 
 **Implementations**:
-- `WindowsOverlayCoordinator` - Single window covering virtual desktop
-- `MacOverlayCoordinator` - Per-screen windows for Retina/permission handling
+- `WindowsScreenshotService` - Single window covering virtual desktop
+- `MacScreenshotService` - Per-screen windows for Retina/permission handling
 
 #### Template Method Pattern
-`OverlayCoordinatorBase` standardizes session creation:
+`ScreenshotServiceBase` standardizes session creation:
 1. Get screens (`GetScreensAsync`)
 2. Calculate target regions (`CalculateTargetRegions`)
 3. Create windows (`CreateAndConfigureWindowsAsync`)
@@ -71,8 +58,32 @@ public interface IOverlaySession : IDisposable
 
 ### 4. Window Layer
 
+#### IOverlayOrchestrator
+Facade that manages overlay subsystems (layers, input routing, context, coordination):
+```csharp
+public interface IOverlayOrchestrator : IDisposable
+{
+    void Initialize(TopLevel window, ILayerHost host, Size maskSize);
+    void BuildLayers();
+    void PublishContextChanged(Size overlaySize, PixelPoint overlayPosition, IReadOnlyList<Screen>? screens);
+    bool RouteKeyEvent(KeyEventArgs e);
+    bool RoutePointerEvent(PointerEventArgs e);
+    void SetFrozenBackground(Bitmap? background);
+    void SetScreens(IReadOnlyList<Screen>? screens);
+    Task<Bitmap?> GetFullScreenScreenshotAsync(Size bounds);
+    event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+}
+```
+
+**Implementation**: `OverlayOrchestrator` encapsulates:
+- `OverlayContextProvider` - Builds/updates `IOverlayContext` from window state
+- `InputRouter` - Routes keyboard/pointer events through `IOverlayLayerManager`
+- `OverlayEventCoordinator` - Subscribes to `IOverlayEventBus` and coordinates high-level actions
+- `IOverlayActionHandler` - Centralizes Confirm/Export/Cancel actions
+- Layer creation (Mask/Selection/Annotation/Toolbar)
+
 #### IOverlayWindow
-Interface for overlay windows (enables DI and testing):
+Simplified interface for overlay windows:
 ```csharp
 public interface IOverlayWindow
 {
@@ -98,6 +109,8 @@ public interface IOverlayWindow
     Window AsWindow();
 }
 ```
+
+**Dependencies**: `OverlayWindow` depends only on `IOverlayOrchestrator` and `IImeController`, delegating all overlay logic to the orchestrator.
 
 **Implementation**: `OverlayWindow` (Avalonia Window + annotation canvas)
 
@@ -175,36 +188,34 @@ public interface IScreenCaptureStrategy
 sequenceDiagram
     participant User
     participant Service as IScreenshotService
-    participant Coord as IOverlayCoordinator
     participant Session as IOverlaySession
     participant Window as IOverlayWindow
     
     User->>Service: TakeScreenshotAsync()
-    Service->>Coord: StartSessionAsync()
-    Coord->>Session: Create()
-    Coord->>Window: Create and configure
-    Window-->>Coord: RegionSelected event
-    Coord->>Session: CloseAll()
+    Service->>Session: Create()
+    Service->>Window: Create and configure
+    Window-->>Service: RegionSelected event
+    Service->>Session: CloseAll()
     Session->>Window: Close()
 ```
 
 ## Service Registration
 
 ```csharp
-// High-level API
-services.AddSingleton<IScreenshotService, ScreenshotService>();
-
-// Coordinator (platform-specific)
+// Platform-specific screenshot service (implements full session lifecycle)
 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-    services.AddSingleton<IOverlayCoordinator, WindowsOverlayCoordinator>();
+    services.AddSingleton<IScreenshotService, WindowsScreenshotService>();
 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-    services.AddSingleton<IOverlayCoordinator, MacOverlayCoordinator>();
+    services.AddSingleton<IScreenshotService, MacScreenshotService>();
 
 // Session factory
 services.AddSingleton<IOverlaySessionFactory, OverlaySessionFactory>();
 
 // Window factory
 services.AddSingleton<IOverlayWindowFactory, OverlayWindowFactory>();
+
+// Overlay subsystems (via extension method)
+services.AddOverlayServices(); // Registers EventBus, LayerManager, Orchestrator
 
 // Platform services (Transient)
 services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>();
@@ -213,25 +224,31 @@ services.AddTransient<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
 
 ## Key Design Decisions
 
-### 1. Why Coordinator Pattern?
-- **Platform isolation**: Windows vs macOS require fundamentally different approaches
-- **Testability**: Easy to mock `IOverlayCoordinator` without creating actual windows
-- **Extensibility**: Add new platform without touching core logic
+### 1. Why Direct Service Implementation?
+- **Simplified architecture**: Removed unnecessary abstraction layer (`IOverlayCoordinator`)
+- **Platform isolation**: Windows vs macOS implementations as separate services
+- **Testability**: Easy to mock `IScreenshotService` without creating actual windows
+- **Naming clarity**: `WindowsScreenshotService` vs `WindowsOverlayCoordinator` better reflects responsibility
 
 ### 2. Why IOverlayWindow Interface?
 - **DI support**: Factory pattern for window creation
 - **Testability**: Cannot mock `Avalonia.Controls.Window` (requires UI platform)
 - **Type safety**: `AsWindow()` method for explicit conversion to base `Window` type
 
-### 3. Why Template Method in Coordinator?
-- **Code reuse**: Shared session creation flow across platforms
+### 3. Why Template Method in Screenshot Service?
+- **Code reuse**: Shared session creation flow across platforms via `ScreenshotServiceBase`
 - **Flexibility**: Platform-specific logic in `CalculateTargetRegions` and `CreateAndConfigureWindowsAsync`
 - **Maintainability**: Single source of truth for session lifecycle
 
 ### 4. Why Transient IScreenCoordinateMapper?
 - **Fresh state**: Screen configuration can change (hot-plug monitors)
 - **Session-scoped**: Each screenshot session gets current screen info
-- **No caching**: Avoids stale screen data
+
+### 5. Why IOverlayOrchestrator Facade?
+- **Separation of Concerns**: `OverlayWindow` focuses on UI lifecycle, not overlay subsystems
+- **Single Responsibility**: Orchestrator owns layer creation, input routing, context management
+- **Simplified DI**: `OverlayWindow` constructor takes only 2 dependencies instead of 9+
+- **Testability**: Mock orchestrator to test window behavior without layer complexity
 
 ## Testing Strategy
 

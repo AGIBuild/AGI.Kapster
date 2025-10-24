@@ -134,18 +134,8 @@ public partial class NewAnnotationToolbar : UserControl
         InvalidateArrange();
         InvalidateMeasure();
 
-        // Use dispatcher to ensure layout is updated before repositioning
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            // Find parent overlay window and trigger toolbar repositioning
-            if (this.FindAncestorOfType<OverlayWindow>() is { } overlayWindow && Target != null)
-            {
-                // Use the correct Target annotator instance instead of FindControl
-                overlayWindow.GetType()
-                    .GetMethod("UpdateToolbarPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                    .Invoke(overlayWindow, new object[] { Target.SelectionRect });
-            }
-        }, Avalonia.Threading.DispatcherPriority.Background);
+            // Dispatcher used only to let layout settle; positioning handled by ToolbarLayer
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     private void SetupColorPicker()
@@ -703,25 +693,8 @@ public partial class NewAnnotationToolbar : UserControl
             InvalidateArrange();
             InvalidateMeasure();
 
-            // Use dispatcher to ensure layout is updated before repositioning
-            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                // Find parent overlay window and trigger toolbar repositioning
-                if (this.FindAncestorOfType<OverlayWindow>() is { } overlayWindow && Target != null)
-                {
-                    // Use the correct Target annotator instance instead of FindControl
-                    // Use dynamic to avoid AOT reflection warnings
-                    dynamic dynamicOverlay = overlayWindow;
-                    try
-                    {
-                        dynamicOverlay.UpdateToolbarPosition(Target.SelectionRect);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "Failed to update toolbar position");
-                    }
-                }
-            }, Avalonia.Threading.DispatcherPriority.Background);
+            // Dispatcher used only to let layout settle; positioning handled by ToolbarLayer
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Background);
         }
     }
 }

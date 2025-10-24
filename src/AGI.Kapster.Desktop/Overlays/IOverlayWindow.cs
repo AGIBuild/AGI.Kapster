@@ -84,11 +84,6 @@ public interface IOverlayWindow
     /// </summary>
     event EventHandler<RegionSelectedEventArgs>? RegionSelected;
     
-    /// <summary>
-    /// Raised when user cancels the overlay (Escape key)
-    /// </summary>
-    event EventHandler<OverlayCancelledEventArgs>? Cancelled;
-    
     // --- Window as base type (for IOverlaySession compatibility) ---
     
     /// <summary>

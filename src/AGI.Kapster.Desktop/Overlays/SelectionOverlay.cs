@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
@@ -29,6 +30,12 @@ public sealed class SelectionOverlay : Canvas
     private const double HandleHit = 10;
 
     private enum HandleKind { None, N, S, E, W, NE, NW, SE, SW }
+    
+    // Phase 2: LayerManager integration (property injection for backward compatibility)
+    internal AGI.Kapster.Desktop.Overlays.Layers.IOverlayLayerManager? LayerManager { get; set; }
+    
+    // Track if we've already sized to avoid repeated updates
+    private bool _isSized = false;
 
     public Rect SelectionRect
     {
@@ -45,6 +52,8 @@ public sealed class SelectionOverlay : Canvas
         Cursor = new Cursor(StandardCursorType.Cross);
         Focusable = true;
         Background = Brushes.Transparent;
+        HorizontalAlignment = HorizontalAlignment.Stretch;
+        VerticalAlignment = VerticalAlignment.Stretch;
         _rectBorder = new Border
         {
             BorderBrush = Brushes.DeepSkyBlue,
@@ -72,6 +81,11 @@ public sealed class SelectionOverlay : Canvas
             session.SelectionStateChanged += OnSessionSelectionStateChanged;
             Log.Debug("SelectionOverlay attached to session");
         }
+        
+        // Subscribe to LayoutUpdated to ensure sizing after layout is complete
+        // This is more reliable than OnAttachedToVisualTree as parent Bounds may still be 0
+        _isSized = false;
+        this.LayoutUpdated += OnLayoutUpdated;
     }
     
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -85,6 +99,35 @@ public sealed class SelectionOverlay : Canvas
         {
             session.SelectionStateChanged -= OnSessionSelectionStateChanged;
             Log.Debug("SelectionOverlay detached from session");
+        }
+        
+        // Unsubscribe from layout updates
+        this.LayoutUpdated -= OnLayoutUpdated;
+        _isSized = false;
+    }
+    
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        // Only run once after layout is complete
+        if (_isSized)
+            return;
+        
+        // Canvas children don't auto-fill even with Stretch alignment
+        // We must explicitly set Width/Height after parent layout is complete
+        var parent = this.Parent as Canvas;
+        if (parent != null && parent.Bounds.Width > 0 && parent.Bounds.Height > 0)
+        {
+            this.Width = parent.Bounds.Width;
+            this.Height = parent.Bounds.Height;
+            Canvas.SetLeft(this, 0);
+            Canvas.SetTop(this, 0);
+            
+            _isSized = true;
+            
+            // Unsubscribe after sizing to avoid repeated updates
+            this.LayoutUpdated -= OnLayoutUpdated;
+            
+            Log.Debug("SelectionOverlay sized to parent: {Width}x{Height}", this.Width, this.Height);
         }
     }
 
@@ -113,7 +156,7 @@ public sealed class SelectionOverlay : Canvas
     {
         base.OnPointerPressed(e);
         var p = e.GetPosition(this);
-        Log.Information("SelectionOverlay PointerPressed at {X},{Y}", p.X, p.Y);
+        Log.Debug("SelectionOverlay.OnPointerPressed: Position=({X},{Y})", p.X, p.Y);
         Focus();
 
         // Check if another overlay window already has a selection
@@ -192,6 +235,9 @@ public sealed class SelectionOverlay : Canvas
         base.OnPointerReleased(e);
         var p = e.GetPosition(this);
 
+        Log.Debug("SelectionOverlay.OnPointerReleased: IsDragging={IsDraggingCreate}, SelectionRect={SelectionRect}", 
+            _isDraggingCreate, SelectionRect);
+
         // Check if this was a click (not a drag) for fullscreen selection
         // If _pendingCreate is true but _isDraggingCreate is false, it means the pointer
         // never moved enough to trigger drag creation - this is a click
@@ -224,8 +270,12 @@ public sealed class SelectionOverlay : Canvas
             e.Pointer.Capture(null);
             e.Handled = true;
 
-            // Fire selection finished event
+            // Phase 2: Write to LayerManager (state management)
+            LayerManager?.SetSelection(SelectionRect);
+            
+            // Fire selection events (backward compatibility)
             SelectionFinished?.Invoke(SelectionRect);
+            SelectionChanged?.Invoke(SelectionRect);
             return; // Early return to avoid duplicate processing
         }
 
@@ -243,7 +293,12 @@ public sealed class SelectionOverlay : Canvas
             _infoOverlay.Show();
             UpdateInfoOverlay(e.GetPosition(this));
 
+            // Phase 2: Write to LayerManager (state management)
+            LayerManager?.SetSelection(SelectionRect);
+            
+            // Fire selection events (backward compatibility)
             SelectionFinished?.Invoke(SelectionRect);
+            SelectionChanged?.Invoke(SelectionRect);
         }
         else
         {
@@ -267,6 +322,11 @@ public sealed class SelectionOverlay : Canvas
         {
             _rectBorder.IsVisible = false;
         }
+        
+        // Phase 2: Write to LayerManager during drag (real-time updates)
+        LayerManager?.SetSelection(SelectionRect);
+        
+        // Fire event (backward compatibility)
         SelectionChanged?.Invoke(SelectionRect);
     }
 

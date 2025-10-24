@@ -6,33 +6,30 @@ using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
-using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Serilog;
-using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
+namespace AGI.Kapster.Desktop.Services.Screenshot;
 
 /// <summary>
-/// macOS-specific overlay coordinator: per-screen overlay windows (handles Retina scaling)
+/// macOS-specific screenshot service: per-screen overlay windows (handles Retina scaling)
 /// </summary>
 [SupportedOSPlatform("macos")]
-public class MacOverlayCoordinator : OverlayCoordinatorBase
+public class MacScreenshotService : ScreenshotServiceBase
 {
-    protected override string PlatformName => "MacCoordinator";
+    protected override string PlatformName => "MacScreenshot";
 
-    public MacOverlayCoordinator(
+    public MacScreenshotService(
         IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
-        IOverlayWindowFactory windowFactory,
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
-        : base(screenMonitor, sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
+        : base(screenMonitor, sessionFactory, coordinateMapper, captureStrategy, clipboardStrategy)
     {
     }
 
@@ -85,23 +82,12 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             Log.Debug("[{Platform}] Creating window for screen at {Position}, size {Size}", PlatformName,
                 screenBounds.Position, screenBounds.Size);
 
-            // Create window immediately for instant display
-            var window = _windowFactory.Create();
-            window.Position = new Avalonia.PixelPoint((int)screenBounds.X, (int)screenBounds.Y);
-            window.Width = screenBounds.Width;
-            window.Height = screenBounds.Height;
-
-            // Associate window with session
-            window.SetSession(session);
-            window.SetScreens(new[] { screen }); // Single screen for this window
-            window.SetMaskSize(screenBounds.Width, screenBounds.Height);
-
-            // Subscribe to events
-            window.RegionSelected += OnRegionSelected;
-            window.Cancelled += OnCancelled;
-
-            // Add window to session (convert to Window)
-            session.AddWindow(window.AsWindow());
+            // Create and configure window using builder (unified setup)
+            // Events automatically forwarded to session
+            var window = session.CreateWindowBuilder()
+                .WithBounds(screenBounds)
+                .WithScreens(new[] { screen })
+                .Build();
 
             // Asynchronously load background in parallel (non-blocking)
             _ = Task.Run(async () =>

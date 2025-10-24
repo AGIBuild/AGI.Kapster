@@ -8,12 +8,10 @@ using AGI.Kapster.Desktop.Services.ElementDetection;
 using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
-using AGI.Kapster.Desktop.Services.Overlay.Platforms;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.UI;
 using AGI.Kapster.Desktop.Services.Export;
-using AGI.Kapster.Desktop.Rendering.Overlays;
 
 namespace AGI.Kapster.Desktop.Extensions;
 
@@ -37,32 +35,29 @@ public static class CaptureServiceExtensions
         {
             services.AddTransient<IElementDetector, WindowsElementDetector>();  // Transient: has mutable state per window
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>();
             services.AddTransient<IImeController, WindowsImeController>();  // Transient: manages per-window IME context
-            services.AddSingleton<IOverlayCoordinator, WindowsOverlayCoordinator>();
+            services.AddSingleton<IScreenshotService, WindowsScreenshotService>();
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             services.AddTransient<IElementDetector, NullElementDetector>();  // Transient: consistent with Windows
             services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
-            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>();
             services.AddTransient<IImeController, NoOpImeController>();  // Transient: consistent with Windows
-            services.AddSingleton<IOverlayCoordinator, MacOverlayCoordinator>();
+            services.AddSingleton<IScreenshotService, MacScreenshotService>();
         }
         else
         {
             // Default to Windows implementations for other platforms
             services.AddTransient<IElementDetector, WindowsElementDetector>();  // Transient: has mutable state per window
             services.AddSingleton<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
-            services.AddTransient<IOverlayRenderer, WindowsOverlayRenderer>();
             services.AddSingleton<IClipboardStrategy, WindowsClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, WindowsCoordinateMapper>();
             services.AddTransient<IImeController, NoOpImeController>();  // Transient: consistent with Windows
-            services.AddSingleton<IOverlayCoordinator, WindowsOverlayCoordinator>();
+            services.AddSingleton<IScreenshotService, WindowsScreenshotService>();
         }
 
 #pragma warning restore CA1416
@@ -74,12 +69,8 @@ public static class CaptureServiceExtensions
         // UI services
         services.AddSingleton<IToolbarPositionCalculator, ToolbarPositionCalculator>();
         
-        // Factory services (Singleton factories create Transient instances)
-        services.AddSingleton<IOverlayWindowFactory, OverlayWindowFactory>();
+        // Factory services (Singleton factory creates Transient instances)
         services.AddSingleton<IOverlaySessionFactory, OverlaySessionFactory>();
-
-        // High-level business logic
-        services.AddSingleton<IScreenshotService, ScreenshotService>();
 
         // Image Capture Service for overlays
         services.AddTransient<IOverlayImageCaptureService, OverlayImageCaptureService>();

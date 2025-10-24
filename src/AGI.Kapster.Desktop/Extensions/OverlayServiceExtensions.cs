@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using AGI.Kapster.Desktop.Overlays.Events;
 using AGI.Kapster.Desktop.Overlays.Layers;
+using AGI.Kapster.Desktop.Services.Overlay;
 
 namespace AGI.Kapster.Desktop.Extensions;
 
@@ -17,9 +18,12 @@ public static class OverlayServiceExtensions
         // Layer manager - singleton as there's typically one overlay at a time
         services.AddSingleton<IOverlayLayerManager, OverlayLayerManager>();
         
+        // Register orchestrator infrastructure (transient per overlay window)
+        services.AddOverlayOrchestrator();
+        
+        // Note: OverlayWindowBuilder is created by Session.CreateWindowBuilder(), not through DI
         // Note: Individual layers (MaskLayer, SelectionLayer, etc.) will be created
-        // per-overlay-instance within the OverlayWindow constructor, not through DI
-        // This is because layers need specific XAML control references (Path, Canvas, etc.)
+        // per-overlay-instance within the OverlayOrchestrator, not through DI
         
         return services;
     }

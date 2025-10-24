@@ -42,7 +42,12 @@ public interface ISelectionStrategy
     event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
     
     /// <summary>
-    /// Event raised when selection is confirmed
+    /// Event raised when selection is finished (user finished dragging, entering editable state)
+    /// </summary>
+    event EventHandler<SelectionFinishedEventArgs>? SelectionFinished;
+    
+    /// <summary>
+    /// Event raised when selection is confirmed (final confirmation like double-click or Enter)
     /// </summary>
     event EventHandler<SelectionConfirmedEventArgs>? SelectionConfirmed;
 }
@@ -57,6 +62,21 @@ public class SelectionChangedEventArgs : EventArgs
     public SelectionChangedEventArgs(Rect selection)
     {
         Selection = selection;
+    }
+}
+
+/// <summary>
+/// Event args for selection finished (entering editable state)
+/// </summary>
+public class SelectionFinishedEventArgs : EventArgs
+{
+    public Rect Selection { get; }
+    public bool IsEditableSelection { get; }
+    
+    public SelectionFinishedEventArgs(Rect selection, bool isEditableSelection = true)
+    {
+        Selection = selection;
+        IsEditableSelection = isEditableSelection;
     }
 }
 

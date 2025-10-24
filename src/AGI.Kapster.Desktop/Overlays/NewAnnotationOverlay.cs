@@ -14,6 +14,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace AGI.Kapster.Desktop.Overlays;
 
@@ -42,6 +43,11 @@ public sealed class NewAnnotationOverlay : Canvas
     private readonly IAnnotationRenderer _renderer;
     private readonly CommandManager _commandManager;
     private IAnnotationItem? _creatingItem;
+    
+    /// <summary>
+    /// EventBus for publishing overlay events (set by AnnotationLayer)
+    /// </summary>
+    internal AGI.Kapster.Desktop.Overlays.Events.IOverlayEventBus? EventBus { get; set; }
 
     /// <summary>
     /// Get all annotation items (public for use by OverlayWindow)
@@ -49,6 +55,17 @@ public sealed class NewAnnotationOverlay : Canvas
     public IEnumerable<IAnnotationItem> GetAnnotations()
     {
         return _annotationService?.Manager?.Items ?? Enumerable.Empty<IAnnotationItem>();
+    }
+    
+    /// <summary>
+    /// Clear all annotations (public for use by AnnotationLayer)
+    /// </summary>
+    public void ClearAnnotations()
+    {
+        _annotationService?.Manager?.Clear();
+        _commandManager?.Clear();
+        InvalidateVisual();
+        Log.Debug("All annotations cleared");
     }
     private bool _isCreating;
 
@@ -107,13 +124,143 @@ public sealed class NewAnnotationOverlay : Canvas
     {
     }
 
+    // === Annotation operations for Layer/Coordinator ===
+    private static List<Dictionary<string, object>>? _internalAnnotationClipboard;
+
+    public void SelectAllAnnotations()
+    {
+        _annotationService.Manager.SelectAll();
+        InvalidateVisual();
+        Log.Debug("SelectAllAnnotations executed");
+    }
+
+    public bool NudgeSelected(Vector delta)
+    {
+        if (!_annotationService.Manager.HasSelection)
+            return false;
+
+        var selected = _annotationService.Manager.SelectedItems;
+        var prevUnion = ComputeUnionBounds(selected.Select(i => i.Bounds));
+        foreach (var item in selected)
+        {
+            item.Move(delta);
+        }
+        var newUnion = ComputeUnionBounds(selected.Select(i => i.Bounds));
+        var dirty = Union(prevUnion, newUnion).Inflate(DirtyPadding);
+        _renderer.RenderChanged(this, _annotationService.Manager.Items, dirty);
+        Log.Debug("NudgeSelected by {Delta}", delta);
+        return true;
+    }
+
+    public bool CopySelectedInternal()
+    {
+        if (!_annotationService.Manager.HasSelection)
+            return false;
+        _internalAnnotationClipboard = _annotationService.Manager.SelectedItems
+            .Select(item => item.Serialize())
+            .ToList();
+        Log.Debug("CopySelectedInternal: {Count} items", _internalAnnotationClipboard.Count);
+        return _internalAnnotationClipboard.Count > 0;
+    }
+
+    public bool PasteFromInternalClipboard()
+    {
+        if (_internalAnnotationClipboard == null || _internalAnnotationClipboard.Count == 0)
+            return false;
+
+        // Create items from clipboard data with offset
+        const double offset = 10;
+        var created = new List<IAnnotationItem>();
+        foreach (var data in _internalAnnotationClipboard)
+        {
+            var item = AnnotationFactory.CreateFromData(data);
+            if (item != null)
+            {
+                item.Move(new Vector(offset, offset));
+                _annotationService.Manager.AddItem(item);
+                created.Add(item);
+            }
+        }
+        if (created.Count == 0) return false;
+
+        _annotationService.Manager.SelectItems(created);
+        InvalidateVisual();
+        Log.Debug("PasteFromInternalClipboard: {Count} items", created.Count);
+        return true;
+    }
+
+    public bool DuplicateSelectedInternal()
+    {
+        if (!_annotationService.Manager.HasSelection)
+            return false;
+        var clones = _annotationService.Manager.CloneSelected();
+        if (clones.Count == 0) return false;
+        const double offset = 10;
+        foreach (var item in clones)
+        {
+            item.Move(new Vector(offset, offset));
+            _annotationService.Manager.AddItem(item);
+        }
+        _annotationService.Manager.SelectItems(clones);
+        InvalidateVisual();
+        Log.Debug("DuplicateSelectedInternal: {Count} items", clones.Count);
+        return true;
+    }
+
+    public string? SerializeSelectedToJson()
+    {
+        if (!_annotationService.Manager.HasSelection) return null;
+        var data = _annotationService.Manager.SelectedItems
+            .Select(item => item.Serialize())
+            .ToList();
+        if (data.Count == 0) return null;
+        var json = JsonSerializer.Serialize(data);
+        return json;
+    }
+
+    public bool PasteFromJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return false;
+        try
+        {
+            var data = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
+            if (data == null || data.Count == 0) return false;
+            const double offset = 10;
+            var created = new List<IAnnotationItem>();
+            foreach (var itemData in data)
+            {
+                var item = AnnotationFactory.CreateFromData(itemData);
+                if (item != null)
+                {
+                    item.Move(new Vector(offset, offset));
+                    _annotationService.Manager.AddItem(item);
+                    created.Add(item);
+                }
+            }
+            if (created.Count == 0) return false;
+            _annotationService.Manager.SelectItems(created);
+            InvalidateVisual();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "PasteFromJson failed");
+            return false;
+        }
+    }
+
+    // Track if we've already sized to avoid repeated updates
+    private bool _isSized = false;
+
     public NewAnnotationOverlay(ISettingsService? settingsService)
     {
         _annotationService = new AnnotationService(settingsService);
         _renderer = new AnnotationRenderer();
         _commandManager = new CommandManager();
 
-        Background = Brushes.Transparent;
+        // CRITICAL: Use semi-transparent background (1% opacity) to enable hit-testing
+        // Pure Transparent background does NOT trigger hit-test in Avalonia
+        Background = new SolidColorBrush(Colors.Transparent, 0.01);
         IsHitTestVisible = false; // Start as non-interactive
 
         // Subscribe to annotation events
@@ -124,6 +271,50 @@ public sealed class NewAnnotationOverlay : Canvas
 
         // Enable keyboard focus for shortcuts
         Focusable = true;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        
+        // Subscribe to LayoutUpdated to ensure sizing after layout is complete
+        // This is critical for Canvas to receive mouse events - it needs explicit Width/Height
+        _isSized = false;
+        this.LayoutUpdated += OnLayoutUpdated;
+    }
+    
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        
+        // Unsubscribe from layout updates
+        this.LayoutUpdated -= OnLayoutUpdated;
+        _isSized = false;
+    }
+    
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        // Only run once after layout is complete
+        if (_isSized)
+            return;
+        
+        // Canvas children don't auto-fill even with Stretch alignment
+        // We must explicitly set Width/Height after parent layout is complete
+        var parent = this.Parent as Canvas;
+        if (parent != null && parent.Bounds.Width > 0 && parent.Bounds.Height > 0)
+        {
+            this.Width = parent.Bounds.Width;
+            this.Height = parent.Bounds.Height;
+            Canvas.SetLeft(this, 0);
+            Canvas.SetTop(this, 0);
+            
+            _isSized = true;
+            
+            // Unsubscribe after sizing to avoid repeated updates
+            this.LayoutUpdated -= OnLayoutUpdated;
+            
+            Log.Debug("NewAnnotationOverlay sized to parent: {Width}x{Height}", this.Width, this.Height);
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -1448,10 +1639,7 @@ public sealed class NewAnnotationOverlay : Canvas
             EndTextEditing();
 
             // Enable IME for text input
-            if (this.GetVisualRoot() is OverlayWindow overlayWindow)
-            {
-                overlayWindow.EnableImeForTextEditing();
-            }
+            EventBus?.Publish(new AGI.Kapster.Desktop.Overlays.Events.ImeChangeRequestedEvent(true));
 
             _editingTextItem = textItem;
 
@@ -1575,10 +1763,7 @@ public sealed class NewAnnotationOverlay : Canvas
         try
         {
             // Disable IME after text editing
-            if (this.GetVisualRoot() is OverlayWindow overlayWindow)
-            {
-                overlayWindow.DisableImeAfterTextEditing();
-            }
+            EventBus?.Publish(new AGI.Kapster.Desktop.Overlays.Events.ImeChangeRequestedEvent(false));
 
             // Update text content
             var finalText = _editingTextBox.Text ?? string.Empty;

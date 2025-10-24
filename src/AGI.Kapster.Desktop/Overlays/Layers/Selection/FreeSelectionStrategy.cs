@@ -15,6 +15,7 @@ public class FreeSelectionStrategy : ISelectionStrategy
     private readonly SelectionOverlay _selectionOverlay;
     
     public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
+    public event EventHandler<SelectionFinishedEventArgs>? SelectionFinished;
     public event EventHandler<SelectionConfirmedEventArgs>? SelectionConfirmed;
 
     public FreeSelectionStrategy(SelectionOverlay selectionOverlay)
@@ -24,6 +25,7 @@ public class FreeSelectionStrategy : ISelectionStrategy
         // Wire up events from SelectionOverlay
         _selectionOverlay.SelectionChanged += OnSelectionOverlayChanged;
         _selectionOverlay.SelectionFinished += OnSelectionOverlayFinished;
+        _selectionOverlay.ConfirmRequested += OnSelectionOverlayConfirmed;
     }
 
     public void Activate()
@@ -68,6 +70,13 @@ public class FreeSelectionStrategy : ISelectionStrategy
 
     private void OnSelectionOverlayFinished(Rect rect)
     {
+        // SelectionFinished = user finished dragging, entering editable state
+        SelectionFinished?.Invoke(this, new SelectionFinishedEventArgs(rect, isEditableSelection: true));
+    }
+    
+    private void OnSelectionOverlayConfirmed(Rect rect)
+    {
+        // ConfirmRequested = user double-clicked or pressed Enter to finalize
         SelectionConfirmed?.Invoke(this, new SelectionConfirmedEventArgs(rect));
     }
 }

@@ -6,32 +6,30 @@ using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
-using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Serilog;
-using SkiaSharp;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Coordinators;
+namespace AGI.Kapster.Desktop.Services.Screenshot;
 
 /// <summary>
-/// Windows-specific overlay coordinator: single window covering virtual desktop
+/// Windows-specific screenshot service: single window covering virtual desktop
 /// </summary>
 [SupportedOSPlatform("windows")]
-public class WindowsOverlayCoordinator : OverlayCoordinatorBase
+public class WindowsScreenshotService : ScreenshotServiceBase
 {
-    protected override string PlatformName => "WindowsCoordinator";
+    protected override string PlatformName => "WindowsScreenshot";
 
-    public WindowsOverlayCoordinator(
+    public WindowsScreenshotService(
         IScreenMonitorService screenMonitor,
         IOverlaySessionFactory sessionFactory,
-        IOverlayWindowFactory windowFactory,
         IScreenCaptureStrategy? captureStrategy,
         IScreenCoordinateMapper coordinateMapper,
         IClipboardStrategy? clipboardStrategy = null)
-        : base(screenMonitor, sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
+        : base(screenMonitor, sessionFactory, coordinateMapper, captureStrategy, clipboardStrategy)
     {
     }
 
@@ -55,23 +53,12 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
     {
         var virtualBounds = targetRegions.First(); // Single region for Windows
 
-        // Create window immediately for instant display
-        var window = _windowFactory.Create();
-        window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
-        window.Width = virtualBounds.Width;
-        window.Height = virtualBounds.Height;
-
-        // Associate window with session
-        window.SetSession(session);
-        window.SetScreens(screens);
-        window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
-
-        // Subscribe to events
-        window.RegionSelected += OnRegionSelected;
-        window.Cancelled += OnCancelled;
-
-        // Add window to session (convert to Window)
-        session.AddWindow(window.AsWindow());
+        // Create and configure window using builder (unified setup)
+        // Events automatically forwarded to session
+        var window = session.CreateWindowBuilder()
+            .WithBounds(virtualBounds)
+            .WithScreens(screens)
+            .Build();
 
         // Asynchronously load background in parallel (non-blocking)
         var primaryScreen = screens.FirstOrDefault();

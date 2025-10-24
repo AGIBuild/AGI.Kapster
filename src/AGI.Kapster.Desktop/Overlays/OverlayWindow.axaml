@@ -11,12 +11,7 @@
         WindowStartupLocation="Manual">
     <Grid Focusable="True" Background="Transparent">
         <Image x:Name="BackgroundImage" Stretch="Fill" IsHitTestVisible="False" RenderOptions.BitmapInterpolationMode="HighQuality"/>
-        <!-- Light semi-transparent overlay mask with selection cutout -->
-        <Path x:Name="MaskPath" Fill="#40FFFFFF" IsHitTestVisible="False"/>
-        <local:SelectionOverlay x:Name="Selector"/>
-        <!-- Annotator is created in code-behind with DI-resolved settings service -->
-        <Canvas x:Name="UiCanvas">
-            <local:NewAnnotationToolbar x:Name="Toolbar"/>
-        </Canvas>
+        <!-- LayerHost: All overlay layers attach their visuals here -->
+        <local:LayerHost x:Name="LayerHost"/>
     </Grid>
 </Window>

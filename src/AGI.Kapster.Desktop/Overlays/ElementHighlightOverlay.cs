@@ -10,6 +10,7 @@ using Avalonia.VisualTree;
 using Serilog;
 using SkiaSharp;
 using AGI.Kapster.Desktop.Services.Overlay;
+using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Services.ElementDetection;
 
 namespace AGI.Kapster.Desktop.Overlays;
@@ -36,6 +37,7 @@ public class ElementHighlightChangedEventArgs : EventArgs
 public class ElementHighlightOverlay : UserControl
 {
     private readonly IElementDetector _elementDetector;
+    private IOverlaySession? _session; // Session-scoped coordination (replaces GlobalElementHighlightState)
     private DetectedElement? _currentElement;
     private bool _isActive;
     private Rect _lastHighlightRect;
@@ -59,6 +61,16 @@ public class ElementHighlightOverlay : UserControl
         _elementDetector.DetectionModeChanged += OnDetectionModeChanged;
 
         // Timer removed - all detection is now handled by OverlayWindow mouse events
+    }
+    
+    /// <summary>
+    /// Sets the session for this highlight overlay (called during initialization)
+    /// Replaces global singleton with session-scoped coordination
+    /// </summary>
+    public void SetSession(IOverlaySession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        Log.Debug("ElementHighlightOverlay: Session reference set");
     }
 
     public bool IsActive
@@ -98,11 +110,18 @@ public class ElementHighlightOverlay : UserControl
     /// <summary>
     /// Sets the current element to highlight (called from parent overlay)
     /// GPU-accelerated version with minimal overhead
+    /// Uses session-scoped coordination instead of global singleton
     /// </summary>
     public void SetCurrentElement(DetectedElement? element)
     {
-        // Use global state to prevent multiple highlights across screens
-        bool shouldShow = GlobalElementHighlightState.Instance.SetCurrentElement(element, this);
+        // Use session state to prevent multiple highlights across screens
+        if (_session == null)
+        {
+            Log.Error("ElementHighlightOverlay: Session not set, cannot highlight element. Call SetSession() first.");
+            return;
+        }
+        
+        bool shouldShow = _session.SetHighlightedElement(element, this);
 
         if (!shouldShow)
         {
@@ -359,8 +378,8 @@ public class ElementHighlightOverlay : UserControl
 
         _elementDetector.DetectionModeChanged -= OnDetectionModeChanged;
 
-        // Clear global state if this overlay was the owner
-        GlobalElementHighlightState.Instance.ClearOwner(this);
+        // Clear session state if this overlay was the owner
+        _session?.ClearHighlightOwner(this);
         
         // Dispose GPU resources
         if (_renderBitmap != null)

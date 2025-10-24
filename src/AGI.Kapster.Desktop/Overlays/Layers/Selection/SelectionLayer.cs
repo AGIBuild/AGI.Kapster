@@ -3,25 +3,43 @@ using Avalonia;
 using Avalonia.Input;
 using Serilog;
 using AGI.Kapster.Desktop.Services.ElementDetection;
+using AGI.Kapster.Desktop.Services.Overlay.State;
 using AGI.Kapster.Desktop.Overlays.Events;
 
 namespace AGI.Kapster.Desktop.Overlays.Layers.Selection;
 
 /// <summary>
 /// Selection layer that manages both free and element selection strategies
+/// Plan A: Now self-owns SelectionOverlay and ElementHighlightOverlay visuals and creates strategies internally
 /// </summary>
-public class SelectionLayer : ISelectionLayer
+public class SelectionLayer : ISelectionLayer, IOverlayVisual
 {
+    private readonly SelectionOverlay _selectionOverlay;
+    private readonly ElementHighlightOverlay? _highlightOverlay;
     private readonly IFreeSelectionStrategy _freeStrategy;
-    private readonly IElementSelectionStrategy _elementStrategy;
+    private readonly IElementSelectionStrategy? _elementStrategy;
     private readonly IOverlayEventBus _eventBus;
     
+    private ILayerHost? _host;
+    private IOverlayContext? _context;
+    private IOverlaySession? _session; // Session for mode coordination
     private ISelectionStrategy _currentStrategy;
     private SelectionMode _currentMode = SelectionMode.Free;
     
-    public string LayerId => "Selection";
+    public string LayerId => LayerIds.Selection;
     public int ZIndex { get; set; } = 10; // Above mask layer
-    public bool IsVisible { get; set; } = true;
+    
+    public bool IsVisible 
+    { 
+        get => _selectionOverlay.IsVisible; 
+        set 
+        {
+            _selectionOverlay.IsVisible = value;
+            if (_highlightOverlay != null)
+                _highlightOverlay.IsVisible = value;
+        }
+    }
+    
     public bool IsInteractive { get; set; } = true;
     
     public SelectionMode CurrentMode => _currentMode;
@@ -29,23 +47,100 @@ public class SelectionLayer : ISelectionLayer
     public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
     public event EventHandler<SelectionConfirmedEventArgs>? SelectionConfirmed;
 
+    /// <summary>
+    /// Constructor for SelectionLayer with element detection support
+    /// </summary>
     public SelectionLayer(
-        IFreeSelectionStrategy freeStrategy,
-        IElementSelectionStrategy elementStrategy,
+        IElementDetector elementDetector,
+        IMaskLayer maskLayer,
+        Avalonia.Controls.Window overlayWindow,
         IOverlayEventBus eventBus)
+        : this(eventBus)
     {
-        _freeStrategy = freeStrategy ?? throw new ArgumentNullException(nameof(freeStrategy));
-        _elementStrategy = elementStrategy ?? throw new ArgumentNullException(nameof(elementStrategy));
+        // Create ElementHighlightOverlay and ElementSelectionStrategy
+        _highlightOverlay = new ElementHighlightOverlay(elementDetector);
+        _elementStrategy = new ElementSelectionStrategyAdapter(
+            elementDetector,
+            _highlightOverlay,
+            maskLayer,
+            overlayWindow,
+            eventBus);
+        
+        // Wire up element strategy events
+        _elementStrategy.SelectionChanged += OnStrategySelectionChanged;
+        _elementStrategy.SelectionFinished += OnStrategySelectionFinished;
+        _elementStrategy.SelectionConfirmed += OnStrategySelectionConfirmed;
+        
+        Log.Debug("SelectionLayer created with element detection support");
+    }
+
+    /// <summary>
+    /// Constructor for SelectionLayer with only free selection (no element detection)
+    /// </summary>
+    public SelectionLayer(IOverlayEventBus eventBus)
+    {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        
+        // Create own SelectionOverlay visual
+        _selectionOverlay = new SelectionOverlay();
+        
+        // Create FreeSelectionStrategy
+        _freeStrategy = new FreeSelectionStrategyAdapter(_selectionOverlay);
         
         // Start with free selection
         _currentStrategy = _freeStrategy;
         
-        // Wire up strategy events
+        // Wire up free strategy events
         _freeStrategy.SelectionChanged += OnStrategySelectionChanged;
+        _freeStrategy.SelectionFinished += OnStrategySelectionFinished;
         _freeStrategy.SelectionConfirmed += OnStrategySelectionConfirmed;
-        _elementStrategy.SelectionChanged += OnStrategySelectionChanged;
-        _elementStrategy.SelectionConfirmed += OnStrategySelectionConfirmed;
+        
+        Log.Debug("SelectionLayer created with free selection only");
+    }
+    
+    /// <summary>
+    /// Phase 2: Set LayerManager reference for state management integration
+    /// Internal method called by Orchestrator after layer creation
+    /// </summary>
+    internal void SetLayerManager(IOverlayLayerManager layerManager)
+    {
+        _selectionOverlay.LayerManager = layerManager;
+        Log.Debug("SelectionLayer: LayerManager reference set for state management");
+    }
+    
+    /// <summary>
+    /// Set Session reference for element highlight coordination and mode synchronization
+    /// Replaces GlobalElementHighlightState singleton with session-scoped coordination
+    /// Internal method called by Orchestrator after layer creation
+    /// </summary>
+    internal void SetSession(IOverlaySession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        
+        // Pass session to ElementHighlightOverlay for highlight coordination
+        if (_highlightOverlay != null)
+        {
+            _highlightOverlay.SetSession(session);
+            Log.Debug("SelectionLayer: Session reference passed to ElementHighlightOverlay");
+        }
+        
+        // Subscribe to session's SelectionMode changes for synchronized mode switching
+        _session.SelectionModeChanged += OnSessionSelectionModeChanged;
+        
+        // Sync current mode from session
+        var sessionMode = _session.CurrentSelectionMode;
+        if (sessionMode != _currentMode)
+        {
+            SwitchMode(sessionMode);
+        }
+        
+        Log.Debug("SelectionLayer: Session reference set, mode synchronized to {Mode}", _currentMode);
+    }
+    
+    private void OnSessionSelectionModeChanged(SelectionMode newMode)
+    {
+        Log.Debug("SelectionLayer: Received session mode change event: {NewMode}", newMode);
+        SwitchMode(newMode);
     }
 
     public void SwitchMode(SelectionMode mode)
@@ -56,26 +151,31 @@ public class SelectionLayer : ISelectionLayer
         var oldMode = _currentMode;
         
         // Deactivate current strategy
-        _currentStrategy.Deactivate();
+        _currentStrategy?.Deactivate();
         
         // Switch to new strategy
         _currentMode = mode;
         _currentStrategy = mode switch
         {
             SelectionMode.Free => _freeStrategy,
-            SelectionMode.Element => _elementStrategy,
+            SelectionMode.Element => (_elementStrategy as ISelectionStrategy) ?? _freeStrategy,
             _ => _freeStrategy
         };
         
         // Activate new strategy
-        _currentStrategy.Activate();
+        _currentStrategy?.Activate();
         
         Log.Debug("Selection mode switched: {OldMode} -> {NewMode}", oldMode, mode);
     }
 
     public Rect? GetCurrentSelection()
     {
-        return _currentStrategy.GetSelection();
+        var rect = _currentStrategy?.GetSelection();
+        if (rect.HasValue && (rect.Value.Width <= 0 || rect.Value.Height <= 0))
+        {
+            return null;
+        }
+        return rect;
     }
 
     public DetectedElement? GetSelectedElement()
@@ -87,9 +187,10 @@ public class SelectionLayer : ISelectionLayer
     {
         IsVisible = true;
         IsInteractive = true;
-        _currentStrategy.Activate();
         
-        Log.Debug("Selection layer activated with mode: {Mode}", _currentMode);
+        _currentStrategy?.Activate();
+        
+        Log.Debug("SelectionLayer activated: Mode={Mode}", _currentMode);
     }
 
     public void OnDeactivate()
@@ -111,8 +212,51 @@ public class SelectionLayer : ISelectionLayer
 
     public bool HandleKeyEvent(KeyEventArgs e)
     {
-        // Selection layer doesn't handle keyboard events directly
-        // Mode switching is handled by OverlayWindow
+        // Handle Ctrl press/release to toggle element selection mode
+        // Update session's CurrentSelectionMode to synchronize across all windows
+        if (e.RoutedEvent == InputElement.KeyDownEvent)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                if (_currentMode == SelectionMode.Free)
+                {
+                    if (_session != null)
+                    {
+                        // Update session mode - will trigger OnSessionSelectionModeChanged
+                        _session.CurrentSelectionMode = SelectionMode.Element;
+                    }
+                    else
+                    {
+                        // Fallback if session not set
+                        SwitchMode(SelectionMode.Element);
+                    }
+                    Log.Debug("SelectionLayer: Entered element selection mode via Ctrl down");
+                    return true;
+                }
+            }
+        }
+        else if (e.RoutedEvent == InputElement.KeyUpEvent)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                if (_currentMode == SelectionMode.Element)
+                {
+                    if (_session != null)
+                    {
+                        // Update session mode - will trigger OnSessionSelectionModeChanged
+                        _session.CurrentSelectionMode = SelectionMode.Free;
+                    }
+                    else
+                    {
+                        // Fallback if session not set
+                        SwitchMode(SelectionMode.Free);
+                    }
+                    Log.Debug("SelectionLayer: Returned to free selection mode via Ctrl up");
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -130,6 +274,14 @@ public class SelectionLayer : ISelectionLayer
         // Publish to event bus
         _eventBus.Publish(new SelectionChangedEvent(e.Selection));
     }
+    
+    private void OnStrategySelectionFinished(object? sender, SelectionFinishedEventArgs e)
+    {
+        // Publish to event bus
+        _eventBus.Publish(new SelectionFinishedEvent(e.Selection, e.IsEditableSelection));
+        
+        Log.Debug("SelectionLayer: Selection finished, isEditable={IsEditable}", e.IsEditableSelection);
+    }
 
     private void OnStrategySelectionConfirmed(object? sender, SelectionConfirmedEventArgs e)
     {
@@ -138,6 +290,42 @@ public class SelectionLayer : ISelectionLayer
         
         // Publish to event bus
         _eventBus.Publish(new SelectionConfirmedEvent(e.Selection, e.Element));
+    }
+    
+    // === IOverlayVisual Implementation (Plan A) ===
+    
+    public void AttachTo(ILayerHost host, IOverlayContext context)
+    {
+        _host = host ?? throw new ArgumentNullException(nameof(host));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        
+        // Attach SelectionOverlay to host
+        host.Attach(_selectionOverlay, this.ZIndex);
+        
+        // Attach ElementHighlightOverlay if available (with higher Z-index for visibility)
+        if (_highlightOverlay != null)
+        {
+            host.Attach(_highlightOverlay, this.ZIndex + 1);
+        }
+        
+        Log.Debug("SelectionLayer attached to host");
+    }
+    
+    public void Detach()
+    {
+        if (_host != null)
+        {
+            _host.Detach(_selectionOverlay);
+            
+            if (_highlightOverlay != null)
+            {
+                _host.Detach(_highlightOverlay);
+            }
+            
+            _host = null;
+            _context = null;
+            Log.Debug("SelectionLayer detached from host");
+        }
     }
 }
 

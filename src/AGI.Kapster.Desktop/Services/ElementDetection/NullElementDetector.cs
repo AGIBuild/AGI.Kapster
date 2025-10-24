@@ -1,9 +1,7 @@
 using System;
-using AGI.Kapster.Desktop.Services.ElementDetection;
-using Avalonia;
 using Serilog;
 
-namespace AGI.Kapster.Desktop.Services.Overlay.Platforms;
+namespace AGI.Kapster.Desktop.Services.ElementDetection;
 
 /// <summary>
 /// Null implementation of IElementDetector for platforms that don't support element detection
@@ -38,3 +36,4 @@ public class NullElementDetector : IElementDetector
         // No-op
     }
 }
+

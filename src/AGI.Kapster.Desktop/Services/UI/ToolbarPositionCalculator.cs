@@ -54,9 +54,12 @@ public class ToolbarPositionCalculator : IToolbarPositionCalculator
             Log.Debug("Toolbar: inside selection (bottom-right)");
         }
 
-        // Clamp to screen bounds
-        var finalX = Math.Clamp(position.X, screenBounds.Left, screenBounds.Right - context.ToolbarSize.Width);
-        var finalY = Math.Clamp(position.Y, screenBounds.Top, screenBounds.Bottom - context.ToolbarSize.Height);
+        // Clamp to screen bounds (ensure max >= min to avoid ArgumentException)
+        var maxX = Math.Max(screenBounds.Left, screenBounds.Right - context.ToolbarSize.Width);
+        var maxY = Math.Max(screenBounds.Top, screenBounds.Bottom - context.ToolbarSize.Height);
+        
+        var finalX = Math.Clamp(position.X, screenBounds.Left, maxX);
+        var finalY = Math.Clamp(position.Y, screenBounds.Top, maxY);
 
         Log.Debug("Toolbar final position: ({X}, {Y})", finalX, finalY);
         return new Point(finalX, finalY);

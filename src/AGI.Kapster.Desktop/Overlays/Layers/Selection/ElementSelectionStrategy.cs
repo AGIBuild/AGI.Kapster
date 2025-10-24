@@ -25,6 +25,7 @@ public class ElementSelectionStrategy : ISelectionStrategy
     private Rect _currentHighlightRect;
     
     public event EventHandler<SelectionChangedEventArgs>? SelectionChanged;
+    public event EventHandler<SelectionFinishedEventArgs>? SelectionFinished;
     public event EventHandler<SelectionConfirmedEventArgs>? SelectionConfirmed;
 
     public ElementSelectionStrategy(
@@ -129,7 +130,11 @@ public class ElementSelectionStrategy : ISelectionStrategy
     {
         if (_currentElement != null && _currentHighlightRect != default)
         {
-            // Confirm selection with cached element and rect
+            // Selection finished (entering editable annotation state)
+            SelectionFinished?.Invoke(this, 
+                new SelectionFinishedEventArgs(_currentHighlightRect, isEditableSelection: false));
+            
+            // Also raise SelectionConfirmed for element selection (immediate confirmation)
             SelectionConfirmed?.Invoke(this, 
                 new SelectionConfirmedEventArgs(_currentHighlightRect, _currentElement));
             
