@@ -17,20 +17,16 @@ namespace AGI.Kapster.Desktop.Overlays.Infrastructure;
 public interface IOverlayOrchestrator : IDisposable
 {
     /// <summary>
-    /// Initialize the orchestrator with window and host references
+    /// Initialize the orchestrator with window, host, and session references
+    /// Session is needed for element highlight coordination and selection mode sync
     /// </summary>
-    void Initialize(TopLevel window, ILayerHost host, Size maskSize);
+    void Initialize(TopLevel window, ILayerHost host, Size maskSize, IOverlaySession session, IReadOnlyList<Screen>? screens = null);
 
     /// <summary>
     /// Build and register all overlay layers (Mask, Selection, Annotation, Toolbar)
+    /// Must be called by Session after Initialize()
     /// </summary>
     void BuildLayers();
-
-    /// <summary>
-    /// Set the overlay session for coordination state (must be called before BuildLayers)
-    /// Enables session-scoped element highlighting and selection mode management
-    /// </summary>
-    void SetSession(IOverlaySession session);
 
     /// <summary>
     /// Update overlay context when window size/position/screens change
@@ -71,10 +67,17 @@ public interface IOverlayOrchestrator : IDisposable
     /// Disable IME after text editing (called by annotation layer)
     /// </summary>
     void DisableImeAfterTextEditing();
-
+    
     /// <summary>
-    /// Expose RegionSelected event for backward compatibility with window consumers
+    /// Callback invoked when region is selected (replaces event to avoid reverse dependency on Session)
+    /// Session sets this callback to receive notifications from Orchestrator
     /// </summary>
-    event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+    Action<object?, RegionSelectedEventArgs>? OnRegionSelected { get; set; }
+    
+    /// <summary>
+    /// Callback invoked when overlay is cancelled (replaces event to avoid reverse dependency on Session)
+    /// Session sets this callback to receive cancel notifications from Orchestrator
+    /// </summary>
+    Action<string>? OnCancelled { get; set; }
 }
 

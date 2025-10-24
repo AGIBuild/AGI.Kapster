@@ -75,45 +75,17 @@ public class MacScreenshotService : ScreenshotServiceBase
         }
     }
 
-    private Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen, Rect screenBounds)
+    private async Task CreateWindowForScreenAsync(IOverlaySession session, Screen screen, Rect screenBounds)
     {
         try
         {
             Log.Debug("[{Platform}] Creating window for screen at {Position}, size {Size}", PlatformName,
                 screenBounds.Position, screenBounds.Size);
 
-            // Create and configure window using builder (unified setup)
-            // Events automatically forwarded to session
-            var window = session.CreateWindowBuilder()
-                .WithBounds(screenBounds)
-                .WithScreens(new[] { screen })
-                .Build();
-
-            // Asynchronously load background in parallel (non-blocking)
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var background = await PrecaptureBackgroundAsync(screenBounds, screen);
-                    if (background != null)
-                    {
-                        // Update background on UI thread
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            window.SetPrecapturedAvaloniaBitmap(background);
-                            Log.Debug("[{Platform}] Background loaded for screen at {Position}", PlatformName, screenBounds.Position);
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "[{Platform}] Failed to load background asynchronously for screen", PlatformName);
-                }
-            });
+            // Session handles the entire process: Capture → Create → Set
+            await session.CreateWindowWithBackgroundAsync(screenBounds, new[] { screen });
 
             Log.Debug("[{Platform}] Window created for screen at {Position}", PlatformName, screenBounds.Position);
-
-            return Task.CompletedTask;
         }
         catch (Exception ex)
         {

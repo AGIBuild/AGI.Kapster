@@ -44,12 +44,15 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _positionCalculator = positionCalculator ?? throw new ArgumentNullException(nameof(positionCalculator));
         
-        // Create own NewAnnotationToolbar visual
-        _toolbar = new NewAnnotationToolbar();
-        _toolbar.SizeChanged += (_, __) => UpdatePositionFromContext();
+        // Create toolbar - let it measure naturally with XAML constraints
+        _toolbar = new NewAnnotationToolbar
+        {
+            // Use Canvas positioning instead of margin hack
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+        };
         
-        // Subscribe to EventBus events for backward compatibility
-        _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChangedFromBus);
+        // Subscribe to EventBus events
         _eventBus.Subscribe<SelectionFinishedEvent>(OnSelectionFinished);
         _eventBus.Subscribe<OverlayContextChangedEvent>(OnOverlayContextChanged);
         _eventBus.Subscribe<ToolChangedEvent>(OnToolChanged);
@@ -59,48 +62,31 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
     }
     
     /// <summary>
-    /// Phase 3: Set LayerManager reference for state management integration
+    /// Set LayerManager reference for state management integration
     /// Called by Orchestrator after layer creation
+    /// Performance optimization: Does not subscribe to SelectionChanged
+    /// Toolbar will only update when selection is finished (via SelectionFinished event)
     /// </summary>
     internal void SetLayerManager(IOverlayLayerManager layerManager)
     {
         _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
         
-        // Subscribe to LayerManager.SelectionChanged (primary data source)
-        _layerManager.SelectionChanged += OnSelectionChangedFromManager;
+        // Performance optimization: Do NOT subscribe to SelectionChanged
+        // Toolbar will position itself only when selection is finished
+        // This eliminates 60-240 unnecessary updates during selection dragging
         
-        // Initialize with current selection
-        var currentSelection = _layerManager.CurrentSelection;
-        if (_layerManager.HasValidSelection)
-        {
-            _currentSelection = currentSelection;
-            UpdatePositionFromContext();
-            Log.Debug("ToolbarLayer: Initialized with current selection from LayerManager");
-        }
-        
-        Log.Debug("ToolbarLayer: LayerManager reference set for state management");
+        Log.Debug("ToolbarLayer: LayerManager reference set (deferred positioning until SelectionFinished)");
     }
     
     public void OnActivate()
     {
-        IsVisible = true;
+        // Performance optimization: Keep toolbar hidden until selection is finished
+        // This eliminates immediate positioning calculation on activation
+        IsVisible = false;
+        HideToolbar();
         
-        // P1 Fix: Immediately position toolbar when activated
-        // Ensure toolbar moves from off-screen position to visible position
-        if (_layerManager?.HasValidSelection == true)
-        {
-            _currentSelection = _layerManager.CurrentSelection;
-            UpdatePositionFromContext(); // Calculate and apply position immediately
-            Log.Debug("ToolbarLayer activated with selection: {Selection}", _currentSelection);
-        }
-        else
-        {
-            // No valid selection - keep toolbar off-screen but don't fail activation
-            HideToolbar();
-            Log.Debug("ToolbarLayer activated but no valid selection, toolbar hidden");
-        }
-        
-        Log.Debug("ToolbarLayer activated");
+        // Toolbar will be shown and positioned when SelectionFinished event fires
+        Log.Debug("ToolbarLayer activated (hidden until selection finished)");
     }
     
     public void OnDeactivate()
@@ -137,26 +123,30 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
             return;
         }
         
-        // Measure toolbar if needed
-        if (_toolbar.DesiredSize.Width == 0 || _toolbar.DesiredSize.Height == 0)
+        // Force measurement if toolbar hasn't been measured yet
+        if ((_toolbar.Bounds.Width == 0 || _toolbar.Bounds.Height == 0) && 
+            (_toolbar.DesiredSize.Width == 0 || _toolbar.DesiredSize.Height == 0))
         {
-            _toolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            // Force measure to get actual toolbar size
+            _toolbar.Measure(canvasSize);
         }
+        
+        // Get toolbar's actual size (prefer Bounds, fallback to DesiredSize)
+        var toolbarSize = _toolbar.Bounds.Width > 0 && _toolbar.Bounds.Height > 0
+            ? _toolbar.Bounds.Size 
+            : _toolbar.DesiredSize;
         
         var context = new ToolbarPositionContext(
             Selection: selection,
-            ToolbarSize: _toolbar.DesiredSize,
+            ToolbarSize: toolbarSize,
             OverlayPosition: windowPosition,
-            Screens: null); // Screens parameter is not used in current implementation
+            Screens: screens);
         
         var position = _positionCalculator.CalculatePosition(context);
         
-        // Use Margin for positioning (works without Canvas parent)
-        _toolbar.Margin = new Thickness(position.X, position.Y, 0, 0);
-        _toolbar.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
-        _toolbar.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
-        
-        Log.Debug("ToolbarLayer position updated: {Position}", position);
+        // Use Canvas absolute positioning
+        Canvas.SetLeft(_toolbar, position.X);
+        Canvas.SetTop(_toolbar, position.Y);
     }
     
     public void ShowColorPicker()
@@ -192,38 +182,24 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
     
     private void HideToolbar()
     {
-        _toolbar.Margin = new Thickness(-10000, -10000, 0, 0);
-        Log.Debug("ToolbarLayer hidden");
+        // Move toolbar off-screen
+        Canvas.SetLeft(_toolbar, -10000);
+        Canvas.SetTop(_toolbar, -10000);
     }
     
     // === Event Handlers ===
     
-    private void OnSelectionChangedFromManager(object? sender, EventArgs e)
-    {
-        // Phase 3: Primary handler - pull data from LayerManager
-        var selection = _layerManager?.CurrentSelection ?? default;
-        _currentSelection = selection;
-        UpdatePositionFromContext();
-        Log.Debug("ToolbarLayer: Updated position from LayerManager selection: {Selection}", selection);
-    }
-    
-    private void OnSelectionChangedFromBus(SelectionChangedEvent e)
-    {
-        // Backward compatibility: Update position from EventBus if LayerManager not set
-        if (_layerManager == null)
-        {
-            _currentSelection = e.Selection;
-            UpdatePositionFromContext();
-            Log.Debug("ToolbarLayer: Updated position from EventBus (fallback): {Selection}", e.Selection);
-        }
-        // If LayerManager is set, ignore EventBus (already handled by manager)
-    }
+    // OnSelectionChangedFromManager and OnSelectionChangedFromBus removed
+    // Performance optimization: Toolbar no longer updates during selection dragging
+    // Only updates once when selection is complete (OnSelectionFinished)
     
     private void OnSelectionFinished(SelectionFinishedEvent e)
     {
-        // Keep for additional coordination logic (not for data)
-        // Position update is already handled by OnSelectionChangedFromManager
-        Log.Debug("ToolbarLayer: SelectionFinished event received");
+        // Performance optimization: This is the ONLY place toolbar updates position
+        // Selection is complete, now show and position toolbar once
+        _currentSelection = e.Selection;
+        IsVisible = true;
+        UpdatePositionFromContext();
     }
     
     private void OnToolChanged(ToolChangedEvent e)
@@ -276,15 +252,14 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
 
     private void OnOverlayContextChanged(OverlayContextChangedEvent e)
     {
-        // Recompute toolbar position when window size/position/screens change
-        if (_currentSelection != default)
+        // Only update position if toolbar is visible and selection is valid
+        if (!IsVisible || !SelectionValidator.IsValid(_currentSelection))
         {
-            UpdatePosition(
-                _currentSelection,
-                e.OverlaySize,
-                e.OverlayPosition,
-                e.Screens);
+            return;
         }
+        
+        // Recompute toolbar position when window size/position/screens change
+        UpdatePosition(_currentSelection, e.OverlaySize, e.OverlayPosition, e.Screens);
     }
     
     // === IOverlayVisual Implementation (Plan A) ===
@@ -299,8 +274,6 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
         
         // Initialize as hidden
         HideToolbar();
-        
-        Log.Debug("ToolbarLayer attached to host");
     }
     
     public void Detach()
@@ -310,7 +283,6 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
             _host.Detach(_toolbar);
             _host = null;
             _context = null;
-            Log.Debug("ToolbarLayer detached from host");
         }
     }
 }

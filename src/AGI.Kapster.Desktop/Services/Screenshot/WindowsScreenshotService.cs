@@ -45,48 +45,17 @@ public class WindowsScreenshotService : ScreenshotServiceBase
 
     /// <summary>
     /// Windows-specific: Create single window covering virtual desktop
+    /// Session handles capture, creation, and background setting
     /// </summary>
-    protected override Task CreateAndConfigureWindowsAsync(
+    protected override async Task CreateAndConfigureWindowsAsync(
         IOverlaySession session, 
         IReadOnlyList<Screen> screens,
         IEnumerable<Rect> targetRegions)
     {
         var virtualBounds = targetRegions.First(); // Single region for Windows
 
-        // Create and configure window using builder (unified setup)
-        // Events automatically forwarded to session
-        var window = session.CreateWindowBuilder()
-            .WithBounds(virtualBounds)
-            .WithScreens(screens)
-            .Build();
-
-        // Asynchronously load background in parallel (non-blocking)
-        var primaryScreen = screens.FirstOrDefault();
-        if (primaryScreen != null)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var background = await PrecaptureBackgroundAsync(virtualBounds, primaryScreen);
-                    if (background != null)
-                    {
-                        // Update background on UI thread
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            window.SetPrecapturedAvaloniaBitmap(background);
-                            Log.Debug("[{Platform}] Background loaded and set", PlatformName);
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "[{Platform}] Failed to load background asynchronously", PlatformName);
-                }
-            });
-        }
-
-        return Task.CompletedTask;
+        // Session handles the entire process: Capture → Create → Set
+        await session.CreateWindowWithBackgroundAsync(virtualBounds, screens);
     }
 }
 

@@ -117,6 +117,9 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         
+        // Pass session to SelectionOverlay for selection state coordination
+        _selectionOverlay.SetSession(session);
+        
         // Pass session to ElementHighlightOverlay for highlight coordination
         if (_highlightOverlay != null)
         {
@@ -134,7 +137,7 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
             SwitchMode(sessionMode);
         }
         
-        Log.Debug("SelectionLayer: Session reference set, mode synchronized to {Mode}", _currentMode);
+        Log.Debug("SelectionLayer: Session reference set and passed to overlays, mode synchronized to {Mode}", _currentMode);
     }
     
     private void OnSessionSelectionModeChanged(SelectionMode newMode)

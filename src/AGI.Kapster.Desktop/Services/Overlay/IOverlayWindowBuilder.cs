@@ -26,13 +26,8 @@ public interface IOverlayWindowBuilder
     IOverlayWindowBuilder WithScreens(IReadOnlyList<Screen> screens);
     
     /// <summary>
-    /// Enable element detection mode (optional)
-    /// </summary>
-    IOverlayWindowBuilder EnableElementDetection(bool enable = true);
-    
-    /// <summary>
     /// Build and return configured window
-    /// Automatically adds window to session and wires events
+    /// Automatically adds window to session
     /// </summary>
     IOverlayWindow Build();
 }

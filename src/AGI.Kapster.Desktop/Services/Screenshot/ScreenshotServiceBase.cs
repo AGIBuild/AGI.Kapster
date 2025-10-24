@@ -27,8 +27,6 @@ public abstract class ScreenshotServiceBase : IScreenshotService
 {
     protected readonly IScreenMonitorService _screenMonitor;
     protected readonly IOverlaySessionFactory _sessionFactory;
-    protected readonly IScreenCoordinateMapper _coordinateMapper;
-    protected readonly IScreenCaptureStrategy? _captureStrategy;
     protected readonly IClipboardStrategy? _clipboardStrategy;
     
     protected IOverlaySession? _currentSession;
@@ -48,9 +46,10 @@ public abstract class ScreenshotServiceBase : IScreenshotService
     {
         _screenMonitor = screenMonitor ?? throw new ArgumentNullException(nameof(screenMonitor));
         _sessionFactory = sessionFactory;
-        _coordinateMapper = coordinateMapper;
-        _captureStrategy = captureStrategy;
         _clipboardStrategy = clipboardStrategy;
+        
+        // Note: coordinateMapper and captureStrategy are now injected into Session via Factory
+        // We keep the parameters for backward compatibility during migration
     }
 
     public bool IsActive => _currentSession != null && !_isDisposing;
@@ -412,40 +411,7 @@ public abstract class ScreenshotServiceBase : IScreenshotService
         }
     }
 
-    /// <summary>
-    /// Pre-capture background for a region
-    /// </summary>
-    protected async Task<Bitmap?> PrecaptureBackgroundAsync(Rect bounds, Screen screen)
-    {
-        if (_captureStrategy == null)
-        {
-            Log.Warning("[{Platform}] No capture strategy available for pre-capture", PlatformName);
-            return null;
-        }
-
-        try
-        {
-            var physicalBounds = _coordinateMapper.MapToPhysicalRect(bounds, screen);
-            Log.Debug("[{Platform}] Pre-capturing region: {PhysicalBounds}", PlatformName, physicalBounds);
-
-            var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);
-            if (skBitmap == null)
-            {
-                Log.Warning("[{Platform}] Screen capture returned null", PlatformName);
-                return null;
-            }
-
-            var result = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
-            Log.Debug("[{Platform}] Pre-capture completed: {Width}x{Height}", 
-                PlatformName, skBitmap.Width, skBitmap.Height);
-            
-            return result;
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[{Platform}] Failed to pre-capture background", PlatformName);
-            return null;
-        }
-    }
+    // PrecaptureBackgroundAsync has been moved to OverlaySession.CaptureBackgroundAsync
+    // Session now owns the capture logic as part of its responsibilities
 }
 

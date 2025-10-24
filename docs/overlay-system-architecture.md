@@ -32,48 +32,81 @@ public interface IScreenshotService
 3. Create windows (`CreateAndConfigureWindowsAsync`)
 4. Show session
 
-### 3. Session Management
+### 3. Session Management (Core Coordinator)
 
 #### IOverlaySession
-Manages lifecycle of a single screenshot operation:
+**Central coordinator** for a complete screenshot operation session. All operations start from Session and end at Session.
+
 ```csharp
 public interface IOverlaySession : IDisposable
 {
+    // Window lifecycle
+    IOverlayWindowBuilder CreateWindowBuilder();
+    void AddWindow(Window window);
     IReadOnlyList<Window> Windows { get; }
     void ShowAll();
-    void CloseAll();
+    void Close();
     
-    // Selection state
+    // Input routing (from Window to Orchestrator)
+    void RoutePointerEvent(PointerEventArgs e);
+    void RouteKeyEvent(KeyEventArgs e);
+    
+    // Window lifecycle notifications
+    void NotifyWindowReady(IOverlayWindow window);
+    
+    // Selection state coordination
     bool CanStartSelection(object window);
     void SetSelection(object window);
     void ClearSelection(object? window = null);
     bool HasSelection { get; }
-}
-```
-
-**Features**:
-- Transient per screenshot
-- Automatic cleanup on disposal
-- Centralized selection state management
-
-### 4. Window Layer
-
-#### IOverlayOrchestrator
-Facade that manages overlay subsystems (layers, input routing, context, coordination):
-```csharp
-public interface IOverlayOrchestrator : IDisposable
-{
-    void Initialize(TopLevel window, ILayerHost host, Size maskSize);
-    void BuildLayers();
-    void PublishContextChanged(Size overlaySize, PixelPoint overlayPosition, IReadOnlyList<Screen>? screens);
-    bool RouteKeyEvent(KeyEventArgs e);
-    bool RoutePointerEvent(PointerEventArgs e);
-    void SetFrozenBackground(Bitmap? background);
-    void SetScreens(IReadOnlyList<Screen>? screens);
-    Task<Bitmap?> GetFullScreenScreenshotAsync(Size bounds);
+    
+    // Event notifications
+    void NotifyRegionSelected(object? sender, RegionSelectedEventArgs e);
     event EventHandler<RegionSelectedEventArgs>? RegionSelected;
 }
 ```
+
+**Key Responsibilities**:
+1. **Orchestrator ownership**: Creates and holds `IOverlayOrchestrator` instance
+2. **Window management**: Creates, initializes, and manages `IOverlayWindow` instances
+3. **Input routing**: Routes all UI events from Window to Orchestrator
+4. **Business coordination**: Handles high-level screenshot workflow logic
+5. **State management**: Centralized selection state and element highlighting
+
+**Architecture Pattern**: Session → Orchestrator → Layers (unidirectional dependency)
+
+### 4. Orchestrator Layer (Layer Coordinator)
+
+#### IOverlayOrchestrator
+**Layer management facade** - owned by Session, manages drawing layers and coordinates events.
+
+```csharp
+public interface IOverlayOrchestrator : IDisposable
+{
+    // Initialization
+    void Initialize(TopLevel window, ILayerHost host, Size maskSize);
+    void BuildLayers();
+    void PublishContextChanged(Size overlaySize, PixelPoint overlayPosition, IReadOnlyList<Screen>? screens);
+    
+    // Input routing (called by Session)
+    bool RouteKeyEvent(KeyEventArgs e);
+    bool RoutePointerEvent(PointerEventArgs e);
+    
+    // Background management
+    void SetFrozenBackground(Bitmap? background);
+    void SetScreens(IReadOnlyList<Screen>? screens);
+    Task<Bitmap?> GetFullScreenScreenshotAsync(Size bounds);
+    
+    // Callback-based notifications (no reverse dependency on Session)
+    Action<object?, RegionSelectedEventArgs>? OnRegionSelected { get; set; }
+    Action<string>? OnCancelled { get; set; }
+}
+```
+
+**Key Changes from Previous Architecture**:
+- ❌ Removed `event EventHandler<RegionSelectedEventArgs>? RegionSelected` (replaced with callback)
+- ❌ Removed `SetSession(IOverlaySession session)` (no reverse dependency)
+- ✅ Added callback properties for notifying Session without coupling
 
 **Implementation**: `OverlayOrchestrator` encapsulates:
 - `OverlayContextProvider` - Builds/updates `IOverlayContext` from window state
@@ -82,8 +115,13 @@ public interface IOverlayOrchestrator : IDisposable
 - `IOverlayActionHandler` - Centralizes Confirm/Export/Cancel actions
 - Layer creation (Mask/Selection/Annotation/Toolbar)
 
+**Lifetime**: Transient (one per window), created and owned by Session
+
+### 5. Window Layer (Pure UI Container)
+
 #### IOverlayWindow
-Simplified interface for overlay windows:
+**Minimal UI container** - delegates all logic to Session, no business logic.
+
 ```csharp
 public interface IOverlayWindow
 {
@@ -94,27 +132,34 @@ public interface IOverlayWindow
     void Show();
     void Close();
     
-    // Overlay configuration
-    void SetMaskSize(double width, double height);
-    void SetSession(IOverlaySession? session);
-    void SetScreens(IReadOnlyList<Screen>? screens);
+    // Configuration (called by Session/WindowBuilder)
     void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap);
-    bool ElementDetectionEnabled { get; set; }
+    void SetMaskSize(double width, double height);
+    void SetSession(IOverlaySession? session);  // Reverse reference for event delegation
+    void SetScreens(IReadOnlyList<Screen>? screens);
     
-    // Events
-    event EventHandler<RegionSelectedEventArgs>? RegionSelected;
-    event EventHandler<OverlayCancelledEventArgs>? Cancelled;
+    // Session accessors (for initialization)
+    ILayerHost? GetLayerHost();
+    Size GetMaskSize();
+    TopLevel AsTopLevel();
     
     // IOverlaySession compatibility
     Window AsWindow();
 }
 ```
 
-**Dependencies**: `OverlayWindow` depends only on `IOverlayOrchestrator` and `IImeController`, delegating all overlay logic to the orchestrator.
+**Key Changes from Previous Architecture**:
+- ❌ Removed `event EventHandler<RegionSelectedEventArgs>? RegionSelected` (no events, delegates to Session)
+- ❌ Removed `bool ElementDetectionEnabled { get; set; }` (dead code)
+- ✅ Simplified to pure UI container
+- ✅ All input events delegated to Session via `_session.RoutePointerEvent/RouteKeyEvent`
 
-**Implementation**: `OverlayWindow` (Avalonia Window + annotation canvas)
+**Implementation**: `OverlayWindow` (Avalonia Window + XAML)
+- No longer injects `IOverlayOrchestrator` in constructor
+- Only holds reverse reference to `IOverlaySession`
+- Delegates all input events to Session
 
-**Factory**: `IOverlayWindowFactory` creates instances with DI dependencies
+**Creation**: Created by `OverlayWindowBuilder` (owned by Session)
 
 ### 5. Platform Services
 
@@ -144,27 +189,57 @@ public interface IScreenCaptureStrategy
 }
 ```
 
-## Architecture Layers
+## Architecture Layers (Session-Centric Design)
 
 ```
-┌─────────────────────────────────────────┐
-│    IScreenshotService (High-Level)      │  User-facing API
-├─────────────────────────────────────────┤
-│    IOverlayCoordinator (Orchestration)  │  Platform abstraction
-│    ├─ WindowsOverlayCoordinator         │
-│    └─ MacOverlayCoordinator             │
-├─────────────────────────────────────────┤
-│    IOverlaySession (Lifecycle)          │  Session management
-├─────────────────────────────────────────┤
-│    IOverlayWindow (UI)                  │  Window implementation
-│    └─ OverlayWindow (Avalonia)          │
-├─────────────────────────────────────────┤
-│    Platform Services                     │  Coordinate/Capture/Clipboard
-│    ├─ IScreenCoordinateMapper           │
-│    ├─ IScreenCaptureStrategy            │
-│    └─ IClipboardStrategy                │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│  IScreenshotService (User-Facing API)              │  Entry point
+│  - TakeScreenshotAsync()                           │
+│  - Cancel()                                        │
+└──────────────────┬─────────────────────────────────┘
+                   │ creates
+                   ↓
+┌────────────────────────────────────────────────────┐
+│  IOverlaySession (Central Coordinator) ⭐          │  Session owner
+│  - Holds: IOverlayOrchestrator                     │
+│  - Manages: List<IOverlayWindow>                   │
+│  - Routes: All input events                        │
+│  - Coordinates: High-level workflow                │
+└──────────────────┬─────────────────────────────────┘
+                   │ owns & controls
+                   ↓
+┌────────────────────────────────────────────────────┐
+│  IOverlayOrchestrator (Layer Manager)              │  Drawing coordinator
+│  - Manages: Layers (Mask/Selection/Annotation)     │
+│  - Routes: Input to layers                         │
+│  - Notifies: Session via callbacks                 │
+│  - NO reverse dependency on Session ✅             │
+└──────────────────┬─────────────────────────────────┘
+                   │ manages
+                   ↓
+┌────────────────────────────────────────────────────┐
+│  Layers (Drawing Logic)                            │  Rendering
+│  - MaskLayer, SelectionLayer                       │
+│  - AnnotationLayer, ToolbarLayer                   │
+│  - Pure drawing and interaction logic              │
+└────────────────────────────────────────────────────┘
+
+                   ↑ input events
+┌────────────────────────────────────────────────────┐
+│  IOverlayWindow (UI Container)                     │  View layer
+│  - Pure Avalonia Window (XAML)                     │
+│  - Delegates ALL events → Session                  │
+│  - NO business logic ✅                            │
+│  - NO Orchestrator reference ✅                    │
+└────────────────────────────────────────────────────┘
 ```
+
+**Key Architectural Principles**:
+1. ✅ **Unidirectional dependency**: Session → Orchestrator → Layers
+2. ✅ **Single ownership**: Session creates and owns Orchestrator
+3. ✅ **Event delegation**: Window → Session → Orchestrator → Layers
+4. ✅ **Callback pattern**: Orchestrator notifies Session via callbacks (no reverse dependency)
+5. ✅ **Pure UI container**: Window has zero business logic
 
 ## Platform Differences
 
@@ -182,22 +257,42 @@ public interface IScreenCaptureStrategy
 - Each window positioned on individual screen bounds
 - Requires Screen Recording permission
 
-## Event Flow
+## Event Flow (Session-Centric)
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Service as IScreenshotService
     participant Session as IOverlaySession
+    participant Orchestrator as IOverlayOrchestrator
     participant Window as IOverlayWindow
     
     User->>Service: TakeScreenshotAsync()
     Service->>Session: Create()
-    Service->>Window: Create and configure
-    Window-->>Service: RegionSelected event
-    Service->>Session: CloseAll()
+    Session->>Orchestrator: Create (via DI)
+    Session->>Window: CreateWindowBuilder().Build()
+    Window->>Session: NotifyWindowReady()
+    Session->>Orchestrator: Initialize() & BuildLayers()
+    Session->>Window: Show()
+    
+    User->>Window: Pointer/Keyboard Input
+    Window->>Session: RoutePointerEvent()
+    Session->>Orchestrator: RoutePointerEvent()
+    Orchestrator-->>Session: OnRegionSelected(callback)
+    Session-->>Service: RegionSelected(event)
+    
+    Service->>Session: Close()
     Session->>Window: Close()
+    Session->>Orchestrator: Dispose()
 ```
+
+**Key Flow Characteristics**:
+1. Session creates and initializes Orchestrator
+2. Session creates Windows via WindowBuilder
+3. Window delegates all input to Session
+4. Session routes input to Orchestrator
+5. Orchestrator notifies Session via callbacks
+6. Session fires events to Service
 
 ## Service Registration
 
@@ -247,8 +342,16 @@ services.AddTransient<IScreenCaptureStrategy, WindowsScreenCaptureStrategy>();
 ### 5. Why IOverlayOrchestrator Facade?
 - **Separation of Concerns**: `OverlayWindow` focuses on UI lifecycle, not overlay subsystems
 - **Single Responsibility**: Orchestrator owns layer creation, input routing, context management
-- **Simplified DI**: `OverlayWindow` constructor takes only 2 dependencies instead of 9+
+- **Simplified DI**: `OverlayWindow` constructor has NO dependencies (pure UI container)
 - **Testability**: Mock orchestrator to test window behavior without layer complexity
+
+### 6. Why Session-Centric Architecture?
+- **Clear ownership**: Session owns the entire screenshot workflow from start to finish
+- **Unidirectional dependency**: Session → Orchestrator → Layers (no circular dependencies)
+- **Centralized coordination**: All business logic in Session, not scattered across components
+- **Pure UI separation**: Window is purely a UI container with zero business logic
+- **Callback pattern**: Orchestrator uses callbacks instead of events to notify Session (decoupling)
+- **Simplified lifecycle**: Session controls creation and initialization of all components
 
 ## Testing Strategy
 

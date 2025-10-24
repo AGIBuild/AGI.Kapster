@@ -25,9 +25,7 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
     private double _opacity = 0.25; // 25% opacity (40FFFFFF in hex is ~25%)
     private Color _color = Colors.White;
     
-    // Double-click tracking for confirmation
-    private int _lastClickCount = 0;
-    private Point _lastClickPosition;
+    // (Double-click detection is handled by Avalonia via e.ClickCount)
     
     public string LayerId => LayerIds.Mask;
     public int ZIndex { get; set; } = 0; // Bottom layer

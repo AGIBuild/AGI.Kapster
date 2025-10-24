@@ -223,14 +223,12 @@ public class OverlayLayerManager : IOverlayLayerManager
             // Enter: confirm
             if (e.Key == Key.Enter)
             {
-                if (_layers.TryGetValue(LayerIds.Selection, out var layer) && layer is ISelectionLayer selection)
+                // Use LayerManager's CurrentSelection instead of SelectionLayer
+                // because in Annotation mode, selection is already in LayerManager
+                if (HasValidSelection)
                 {
-                    var selectionRect = selection.GetCurrentSelection();
-                    if (selectionRect.HasValue && selectionRect.Value.Width > 0 && selectionRect.Value.Height > 0)
-                    {
-                        _eventBus.Publish(new ConfirmRequestedEvent(selectionRect.Value));
-                        return true;
-                    }
+                    _eventBus.Publish(new ConfirmRequestedEvent(CurrentSelection));
+                    return true;
                 }
             }
 

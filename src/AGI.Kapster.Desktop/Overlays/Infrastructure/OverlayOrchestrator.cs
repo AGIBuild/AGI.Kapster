@@ -48,15 +48,17 @@ public class OverlayOrchestrator : IOverlayOrchestrator
     private TopLevel? _window;
     private IOverlayContext? _currentContext;
     private Size _maskSize;
-    private IOverlaySession? _session; // Session for element highlight coordination
+    private IOverlaySession? _session; // Passed in Initialize, used by SelectionLayer
 
     // Layers
     private IMaskLayer? _maskLayer;
     private ISelectionLayer? _selectionLayer;
     private IAnnotationLayer? _annotationLayer;
     private IToolbarLayer? _toolbarLayer;
-
-    public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+    
+    // Callbacks for notifying Session (no reverse dependency)
+    public Action<object?, RegionSelectedEventArgs>? OnRegionSelected { get; set; }
+    public Action<string>? OnCancelled { get; set; }
 
     public OverlayOrchestrator(
         IOverlayLayerManager layerManager,
@@ -86,14 +88,16 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         Log.Debug("OverlayOrchestrator created");
     }
 
-    public void Initialize(TopLevel window, ILayerHost host, Size maskSize)
+    public void Initialize(TopLevel window, ILayerHost host, Size maskSize, IOverlaySession session, IReadOnlyList<Screen>? screens = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _maskSize = maskSize;
+        _session = session ?? throw new ArgumentNullException(nameof(session));
 
-        // Build initial context
-        _currentContext = _contextProvider.BuildContext(window, null, null);
+        // Build initial context with screens information
+        _currentContext = _contextProvider.BuildContext(window, null, screens);
+        Log.Debug("Orchestrator: Context initialized with {ScreenCount} screens", screens?.Count ?? 0);
 
         // Create action handler with direct ContextProvider reference and ClipboardStrategy
         _actionHandler = new OverlayActionHandler(
@@ -108,7 +112,12 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         // Create coordinator
         _coordinator = new OverlayEventCoordinator(_eventBus, _layerManager, _actionHandler);
         _coordinator.SetOrchestrator(this); // Set orchestrator reference for IME control
-        _coordinator.RegionSelected += (s, e) => RegionSelected?.Invoke(this, e);
+        
+        // Use callback to notify Session when region is selected (no reverse dependency)
+        _coordinator.RegionSelected += (s, e) =>
+        {
+            OnRegionSelected?.Invoke(this, e);
+        };
 
         // Disable IME at startup
         DisableIme();
@@ -116,11 +125,6 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         Log.Debug("OverlayOrchestrator initialized");
     }
 
-    public void SetSession(IOverlaySession session)
-    {
-        _session = session ?? throw new ArgumentNullException(nameof(session));
-        Log.Debug("OverlayOrchestrator: Session reference set for element highlight coordination");
-    }
 
     public void BuildLayers()
     {

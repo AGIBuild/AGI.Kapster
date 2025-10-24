@@ -43,12 +43,6 @@ public interface IOverlayWindow
     // --- Overlay-Specific Configuration ---
     
     /// <summary>
-    /// Gets or sets whether element detection mode is enabled
-    /// When true, allows user to select specific UI elements
-    /// </summary>
-    bool ElementDetectionEnabled { get; set; }
-    
-    /// <summary>
     /// Sets the pre-captured background bitmap for instant display
     /// Should be called before Show() for optimal user experience
     /// </summary>
@@ -63,26 +57,25 @@ public interface IOverlayWindow
     /// <param name="height">Mask height in logical pixels</param>
     void SetMaskSize(double width, double height);
     
-    /// <summary>
-    /// Sets the overlay session for state management
-    /// Must be called before showing the window
-    /// </summary>
-    /// <param name="session">The overlay session managing this window</param>
-    void SetSession(AGI.Kapster.Desktop.Services.Overlay.State.IOverlaySession? session);
+    // --- Accessors for Session initialization (called by Session.NotifyWindowReady) ---
     
     /// <summary>
-    /// Sets the screens information for coordinate mapping
-    /// Used for DPI scaling and multi-monitor support
+    /// Gets the LayerHost for Orchestrator initialization
+    /// Called by Session when window is ready
     /// </summary>
-    /// <param name="screens">List of screens relevant to this overlay</param>
-    void SetScreens(IReadOnlyList<Screen>? screens);
-    
-    // --- Events ---
+    ILayerHost? GetLayerHost();
     
     /// <summary>
-    /// Raised when user selects a region (single-click or annotation export)
+    /// Gets the mask size for Orchestrator initialization
+    /// Called by Session when window is ready
     /// </summary>
-    event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+    Size GetMaskSize();
+    
+    /// <summary>
+    /// Gets this window as TopLevel for Orchestrator initialization
+    /// Called by Session when window is ready
+    /// </summary>
+    TopLevel AsTopLevel();
     
     // --- Window as base type (for IOverlaySession compatibility) ---
     

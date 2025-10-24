@@ -22,7 +22,6 @@ public class OverlayWindowBuilder : IOverlayWindowBuilder
     private readonly IServiceProvider _serviceProvider;
     private Rect? _bounds;
     private IReadOnlyList<Screen>? _screens;
-    private bool _elementDetection = false;
 
     internal OverlayWindowBuilder(OverlaySession session, IServiceProvider serviceProvider)
     {
@@ -42,12 +41,6 @@ public class OverlayWindowBuilder : IOverlayWindowBuilder
         return this;
     }
 
-    public IOverlayWindowBuilder EnableElementDetection(bool enable = true)
-    {
-        _elementDetection = enable;
-        return this;
-    }
-
     public IOverlayWindow Build()
     {
         // Validate required parameters
@@ -58,7 +51,7 @@ public class OverlayWindowBuilder : IOverlayWindowBuilder
 
         var bounds = _bounds.Value;
         
-        // Create window via DI (IOverlayOrchestrator auto-injected)
+        // Create window (no DI dependencies in constructor)
         var window = ActivatorUtilities.CreateInstance<OverlayWindow>(_serviceProvider);
         
         // Configure window properties (position and size)
@@ -66,20 +59,20 @@ public class OverlayWindowBuilder : IOverlayWindowBuilder
         window.Width = bounds.Width;
         window.Height = bounds.Height;
         
-        // Set overlay-specific configuration
-        window.SetSession(_session);
-        window.SetScreens(_screens);
+        // Set overlay-specific configuration (UI only - no Session reference)
         window.SetMaskSize(bounds.Width, bounds.Height);
-        window.ElementDetectionEnabled = _elementDetection;
         
-        // Wire window events to session (event forwarding)
-        window.RegionSelected += (sender, e) => _session.NotifyRegionSelected(sender, e);
+        // Screens information is stored in builder for potential future use
+        // (e.g., passing to Session/Orchestrator for context updates)
         
         // Add window to session (unified lifecycle management)
         _session.AddWindow(window.AsWindow());
         
-        Log.Debug("OverlayWindowBuilder: Window created via DI and configured - Bounds={Bounds}, Screens={ScreenCount}, ElementDetection={ElementDetection}", 
-            bounds, _screens.Count, _elementDetection);
+        // Subscribe to Loaded event - Session will initialize Orchestrator and subscribe to events
+        window.AsWindow().Loaded += (sender, e) => _session.NotifyWindowReady(window);
+        
+        Log.Debug("OverlayWindowBuilder: Window created via DI and configured - Bounds={Bounds}, Screens={ScreenCount}", 
+            bounds, _screens.Count);
         
         return window;
     }

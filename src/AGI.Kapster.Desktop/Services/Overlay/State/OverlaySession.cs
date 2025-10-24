@@ -2,12 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Desktop.Overlays;
+using AGI.Kapster.Desktop.Overlays.Infrastructure;
+using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
+using AGI.Kapster.Desktop.Services.Export.Imaging;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using SelectionMode = AGI.Kapster.Desktop.Overlays.Layers.Selection.SelectionMode;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
@@ -20,7 +29,12 @@ namespace AGI.Kapster.Desktop.Services.Overlay.State;
 public class OverlaySession : IOverlaySession
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly IOverlayOrchestrator _orchestrator;  // Session owns Orchestrator
+    private readonly IScreenCaptureStrategy _captureStrategy;  // Session owns capture capability
+    private readonly IScreenCoordinateMapper _coordinateMapper;  // Session owns coordinate mapping
     private readonly List<Window> _windows = new();
+    private readonly List<IOverlayWindow> _subscribedWindows = new();  // Track windows for event unsubscription
+    private readonly Dictionary<IOverlayWindow, IReadOnlyList<Screen>> _windowScreens = new();  // Track screens for each window
     private readonly object _lock = new();
     private bool _disposed = false;
     
@@ -41,9 +55,23 @@ public class OverlaySession : IOverlaySession
     // Unified event for all windows in this session
     public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
 
-    public OverlaySession(IServiceProvider serviceProvider)
+    public OverlaySession(
+        IServiceProvider serviceProvider,
+        IScreenCaptureStrategy captureStrategy,
+        IScreenCoordinateMapper coordinateMapper)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _captureStrategy = captureStrategy ?? throw new ArgumentNullException(nameof(captureStrategy));
+        _coordinateMapper = coordinateMapper ?? throw new ArgumentNullException(nameof(coordinateMapper));
+        
+        // Session creates and owns the Orchestrator
+        _orchestrator = serviceProvider.GetRequiredService<IOverlayOrchestrator>();
+        
+        // Register callbacks so Orchestrator can notify Session without reverse dependency
+        _orchestrator.OnRegionSelected = (sender, e) => NotifyRegionSelected(sender, e);
+        _orchestrator.OnCancelled = (reason) => Log.Debug("[OverlaySession] Orchestrator cancelled: {Reason}", reason);
+        
+        Log.Debug("[OverlaySession] Created with owned Orchestrator and capture capabilities");
     }
 
     public IReadOnlyList<Window> Windows
@@ -96,12 +124,249 @@ public class OverlaySession : IOverlaySession
     }
     
     /// <summary>
-    /// Internal: Called by OverlayWindowBuilder to notify region selection
-    /// Forwards to session-level event
+    /// Notify that a region has been selected (called by orchestrator)
+    /// Forwards to session-level event for all subscribers
     /// </summary>
-    internal void NotifyRegionSelected(object? sender, RegionSelectedEventArgs e)
+    public void NotifyRegionSelected(object? sender, RegionSelectedEventArgs e)
     {
         RegionSelected?.Invoke(sender, e);
+    }
+    
+    /// <summary>
+    /// Notify that a window is ready (loaded and initialized)
+    /// Session will initialize the Orchestrator and subscribe to window events
+    /// </summary>
+    public void NotifyWindowReady(IOverlayWindow window)
+    {
+        if (window == null) throw new ArgumentNullException(nameof(window));
+        
+        var layerHost = window.GetLayerHost();
+        var maskSize = window.GetMaskSize();
+        var topLevel = window.AsTopLevel();
+        
+        if (layerHost == null)
+        {
+            Log.Error("[OverlaySession] Cannot initialize Orchestrator: LayerHost is null");
+            return;
+        }
+        
+        // Get screens for this window (if available)
+        _windowScreens.TryGetValue(window, out var screens);
+        
+        // Initialize Orchestrator with window context, session reference, and screens
+        _orchestrator.Initialize(topLevel, layerHost, maskSize, this, screens);
+        _orchestrator.BuildLayers();
+        
+        // Subscribe to window events - Session handles all event routing
+        SubscribeToWindowEvents(window);
+
+        Log.Debug("[OverlaySession] Orchestrator initialized with {ScreenCount} screens and window events subscribed", screens?.Count ?? 0);
+    }
+    
+    /// <summary>
+    /// Subscribe to window input and lifecycle events
+    /// Session owns event routing logic, Window is just a UI container
+    /// </summary>
+    private void SubscribeToWindowEvents(IOverlayWindow window)
+    {
+        var topLevel = window.AsTopLevel();
+        
+        // Subscribe to input events with tunneling to ensure we catch them
+        topLevel.AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, handledEventsToo: false);
+        topLevel.AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved, handledEventsToo: false);
+        topLevel.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, handledEventsToo: false);
+        topLevel.AddHandler(InputElement.KeyUpEvent, OnWindowKeyUp, handledEventsToo: false);
+        
+        // Subscribe to lifecycle events
+        if (window is Window w)
+        {
+            w.Closing += OnWindowClosing;
+        }
+        
+        // Track window for cleanup
+        _subscribedWindows.Add(window);
+        
+        // Focus window for keyboard events
+        topLevel.Focus();
+        
+        Log.Debug("[OverlaySession] Subscribed to window events");
+    }
+    
+    /// <summary>
+    /// Unsubscribe from window events to prevent memory leaks
+    /// </summary>
+    private void UnsubscribeFromWindowEvents()
+    {
+        foreach (var window in _subscribedWindows)
+        {
+            try
+            {
+                var topLevel = window.AsTopLevel();
+                
+                // Remove input event handlers
+                topLevel.RemoveHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed);
+                topLevel.RemoveHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved);
+                topLevel.RemoveHandler(InputElement.KeyDownEvent, OnWindowKeyDown);
+                topLevel.RemoveHandler(InputElement.KeyUpEvent, OnWindowKeyUp);
+                
+                // Remove lifecycle event handlers
+                if (window is Window w)
+                {
+                    w.Closing -= OnWindowClosing;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[OverlaySession] Error unsubscribing from window events");
+            }
+        }
+        
+        _subscribedWindows.Clear();
+        Log.Debug("[OverlaySession] Unsubscribed from all window events");
+    }
+    
+    /// <summary>
+    /// Handle pointer pressed event from window
+    /// </summary>
+    private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _orchestrator.RoutePointerEvent(e);
+    }
+    
+    /// <summary>
+    /// Handle pointer moved event from window
+    /// </summary>
+    private void OnWindowPointerMoved(object? sender, PointerEventArgs e)
+    {
+        _orchestrator.RoutePointerEvent(e);
+    }
+    
+    /// <summary>
+    /// Handle key down event from window
+    /// </summary>
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_orchestrator.RouteKeyEvent(e))
+        {
+            e.Handled = true;
+        }
+    }
+    
+    /// <summary>
+    /// Handle key up event from window
+    /// </summary>
+    private void OnWindowKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (_orchestrator.RouteKeyEvent(e))
+        {
+            e.Handled = true;
+        }
+    }
+    
+    /// <summary>
+    /// Handle window closing event
+    /// When any window closes, close the entire session (multi-screen support)
+    /// </summary>
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        Log.Debug("[OverlaySession] Window closing detected, closing entire session");
+        Close();
+    }
+    
+    /// <summary>
+    /// Route pointer event from Window to Orchestrator
+    /// </summary>
+    public void RoutePointerEvent(PointerEventArgs e)
+    {
+        if (e == null) return;
+        _orchestrator.RoutePointerEvent(e);
+    }
+    
+    /// <summary>
+    /// Route key event from Window to Orchestrator
+    /// </summary>
+    public bool RouteKeyEvent(KeyEventArgs e)
+    {
+        if (e == null) return false;
+        return _orchestrator.RouteKeyEvent(e);
+    }
+    
+    /// <summary>
+    /// Set frozen background bitmap for image capture
+    /// </summary>
+    public void SetFrozenBackground(Bitmap? background)
+    {
+        _orchestrator.SetFrozenBackground(background);
+        Log.Debug("[OverlaySession] Frozen background set");
+    }
+
+    /// <summary>
+    /// Create window with background in a single operation
+    /// Flow: Capture → Create → Set (straight line, no loops)
+    /// This is the high-level API for screenshot services
+    /// </summary>
+    public async Task<IOverlayWindow> CreateWindowWithBackgroundAsync(
+        Rect bounds, 
+        IReadOnlyList<Screen> screens)
+    {
+        // 1. First capture background (before window creation, to avoid window appearing in screenshot)
+        var background = await CaptureBackgroundAsync(bounds, screens.FirstOrDefault() ?? throw new ArgumentException("Screens list is empty"));
+        
+        // 2. Create window
+        var window = CreateWindowBuilder()
+            .WithBounds(bounds)
+            .WithScreens(screens)
+            .Build();
+        
+        // 3. Store screens for this window (needed later for Orchestrator initialization)
+        _windowScreens[window] = screens;
+        
+        // 4. Set background (on UI thread)
+        if (background != null)
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                window.SetPrecapturedAvaloniaBitmap(background);
+                SetFrozenBackground(background);
+                Log.Debug("[OverlaySession] Background captured and set for window at {Position}", bounds.Position);
+            });
+        }
+        else
+        {
+            Log.Warning("[OverlaySession] Background capture failed, window created without background");
+        }
+        
+        return window;
+    }
+    
+    /// <summary>
+    /// Internal method: Capture background for a region
+    /// Encapsulates coordinate mapping, capture, and format conversion
+    /// </summary>
+    private async Task<Bitmap?> CaptureBackgroundAsync(Rect bounds, Screen screen)
+    {
+        try
+        {
+            var physicalBounds = _coordinateMapper.MapToPhysicalRect(bounds, screen);
+            Log.Debug("[OverlaySession] Capturing background: Logical={Logical}, Physical={Physical}", bounds, physicalBounds);
+            
+            var skBitmap = await _captureStrategy.CaptureRegionAsync(physicalBounds);
+            if (skBitmap == null)
+            {
+                Log.Warning("[OverlaySession] Screen capture returned null");
+                return null;
+            }
+            
+            var avaBitmap = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
+            Log.Debug("[OverlaySession] Background captured: {Width}x{Height}", skBitmap.Width, skBitmap.Height);
+            
+            return avaBitmap;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[OverlaySession] Failed to capture background");
+            return null;
+        }
     }
 
     public event Action? Closed;
@@ -384,8 +649,21 @@ public class OverlaySession : IOverlaySession
         Interlocked.Exchange(ref SelectionStateChanged, null);
         Interlocked.Exchange(ref SelectionModeChanged, null);
 
+        // Unsubscribe from window events to prevent memory leaks
+        UnsubscribeFromWindowEvents();
+
         // Close all windows first
         Close();
+        
+        // Dispose owned Orchestrator
+        try
+        {
+            _orchestrator?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "[OverlaySession] Error disposing Orchestrator");
+        }
 
         lock (_lock)
         {

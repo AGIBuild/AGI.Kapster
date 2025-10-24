@@ -260,7 +260,7 @@ public sealed class NewAnnotationOverlay : Canvas
 
         // CRITICAL: Use semi-transparent background (1% opacity) to enable hit-testing
         // Pure Transparent background does NOT trigger hit-test in Avalonia
-        Background = new SolidColorBrush(Colors.Transparent, 0.01);
+        Background = Brushes.Transparent;
         IsHitTestVisible = false; // Start as non-interactive
 
         // Subscribe to annotation events

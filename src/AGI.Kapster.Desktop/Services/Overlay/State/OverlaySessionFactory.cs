@@ -1,9 +1,13 @@
 using System;
+using AGI.Kapster.Desktop.Services.Capture;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
 
 /// <summary>
 /// Default implementation of overlay session factory
+/// Resolves capture dependencies and passes them to session
 /// </summary>
 public class OverlaySessionFactory : IOverlaySessionFactory
 {
@@ -16,7 +20,11 @@ public class OverlaySessionFactory : IOverlaySessionFactory
 
     public IOverlaySession CreateSession()
     {
-        return new OverlaySession(_serviceProvider);
+        // Resolve capture dependencies from DI container
+        var captureStrategy = _serviceProvider.GetRequiredService<IScreenCaptureStrategy>();
+        var coordinateMapper = _serviceProvider.GetRequiredService<IScreenCoordinateMapper>();
+        
+        return new OverlaySession(_serviceProvider, captureStrategy, coordinateMapper);
     }
 }
 

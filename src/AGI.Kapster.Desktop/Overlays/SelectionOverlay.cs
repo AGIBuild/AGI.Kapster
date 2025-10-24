@@ -28,6 +28,9 @@ public sealed class SelectionOverlay : Canvas
 
     private const double HandleSize = 8;
     private const double HandleHit = 10;
+    
+    // Session reference set by SelectionLayer (not obtained from Window anymore)
+    private IOverlaySession? _session;
 
     private enum HandleKind { None, N, S, E, W, NE, NW, SE, SW }
     
@@ -69,19 +72,32 @@ public sealed class SelectionOverlay : Canvas
         // Subscribe to session selection state changes (will be wired up when session is set)
     }
     
+    /// <summary>
+    /// Set session reference (called by SelectionLayer after creation)
+    /// </summary>
+    internal void SetSession(IOverlaySession? session)
+    {
+        // Unsubscribe from old session
+        if (_session != null)
+        {
+            _session.SelectionStateChanged -= OnSessionSelectionStateChanged;
+        }
+        
+        _session = session;
+        
+        // Subscribe to new session
+        if (_session != null)
+        {
+            _session.SelectionStateChanged += OnSessionSelectionStateChanged;
+            Log.Debug("SelectionOverlay: Session reference set and events subscribed");
+        }
+    }
+    
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         
-        // Wire up to session when attached to window
-        var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        if (session != null)
-        {
-            session.SelectionStateChanged += OnSessionSelectionStateChanged;
-            Log.Debug("SelectionOverlay attached to session");
-        }
-        
+        // Session is set by SelectionLayer via SetSession(), not obtained from Window
         // Subscribe to LayoutUpdated to ensure sizing after layout is complete
         // This is more reliable than OnAttachedToVisualTree as parent Bounds may still be 0
         _isSized = false;
@@ -92,15 +108,7 @@ public sealed class SelectionOverlay : Canvas
     {
         base.OnDetachedFromVisualTree(e);
         
-        // Unsubscribe from session when detached
-        var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        if (session != null)
-        {
-            session.SelectionStateChanged -= OnSessionSelectionStateChanged;
-            Log.Debug("SelectionOverlay detached from session");
-        }
-        
+        // Session cleanup is handled in SetSession() and Dispose()
         // Unsubscribe from layout updates
         this.LayoutUpdated -= OnLayoutUpdated;
         _isSized = false;
@@ -134,8 +142,7 @@ public sealed class SelectionOverlay : Canvas
     private void OnSessionSelectionStateChanged(bool hasSelection)
     {
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        var isActiveWindow = session?.ActiveSelectionWindow == parentWindow;
+        var isActiveWindow = _session?.ActiveSelectionWindow == parentWindow;
 
         // Update cursor based on selection state
         if (hasSelection && !isActiveWindow)
@@ -161,8 +168,7 @@ public sealed class SelectionOverlay : Canvas
 
         // Check if another overlay window already has a selection
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        if (parentWindow != null && session != null && !session.CanStartSelection(parentWindow))
+        if (parentWindow != null && _session != null && !_session.CanStartSelection(parentWindow))
         {
             Log.Information("SelectionOverlay: Cannot start selection, another window has active selection");
             e.Handled = true;
@@ -252,10 +258,9 @@ public sealed class SelectionOverlay : Canvas
 
             // Set selection state in session
             var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-            var session = parentWindow?.GetSession();
-            if (parentWindow != null && session != null)
+            if (parentWindow != null && _session != null)
             {
-                session.SetSelection(parentWindow);
+                _session.SetSelection(parentWindow);
             }
 
             // Show info overlay
@@ -370,10 +375,9 @@ public sealed class SelectionOverlay : Canvas
 
         // Set selection state in session
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        if (parentWindow != null && session != null)
+        if (parentWindow != null && _session != null)
         {
-            session.SetSelection(parentWindow);
+            _session.SetSelection(parentWindow);
         }
 
         // Fire events
@@ -499,10 +503,9 @@ public sealed class SelectionOverlay : Canvas
 
         // Set selection state in session when drag starts
         var parentWindow = this.FindAncestorOfType<OverlayWindow>();
-        var session = parentWindow?.GetSession();
-        if (parentWindow != null && session != null)
+        if (parentWindow != null && _session != null)
         {
-            session.SetSelection(parentWindow);
+            _session.SetSelection(parentWindow);
             Log.Information("SelectionOverlay: Started selection on window");
         }
     }

@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services.ElementDetection;
@@ -41,6 +46,47 @@ public interface IOverlaySession : IDisposable
     /// Unified event handler for all windows in the session
     /// </summary>
     event EventHandler<RegionSelectedEventArgs>? RegionSelected;
+    
+    /// <summary>
+    /// Notify that a region has been selected (called by orchestrator via callback)
+    /// Raises the RegionSelected event for all session subscribers
+    /// </summary>
+    void NotifyRegionSelected(object? sender, RegionSelectedEventArgs e);
+    
+    /// <summary>
+    /// Notify that a window is ready (loaded and initialized)
+    /// Session will initialize the Orchestrator when called
+    /// Called by Window in Loaded event handler
+    /// </summary>
+    void NotifyWindowReady(IOverlayWindow window);
+    
+    /// <summary>
+    /// Route pointer event from Window to Orchestrator
+    /// Called by Window's pointer event handlers
+    /// </summary>
+    void RoutePointerEvent(PointerEventArgs e);
+    
+    /// <summary>
+    /// Route key event from Window to Orchestrator
+    /// Called by Window's key event handlers
+    /// </summary>
+    bool RouteKeyEvent(KeyEventArgs e);
+    
+    /// <summary>
+    /// Set frozen background bitmap for image capture
+    /// Called by Window when pre-captured background is ready
+    /// </summary>
+    void SetFrozenBackground(Bitmap? background);
+
+    /// <summary>
+    /// Create window with background in a single operation (high-level API)
+    /// Flow: Capture → Create → Set (straight line, no loops)
+    /// This is the primary method for screenshot services to create overlay windows
+    /// </summary>
+    /// <param name="bounds">Window bounds (logical coordinates)</param>
+    /// <param name="screens">Screens for this window (for coordinate mapping and DPI)</param>
+    /// <returns>Created overlay window with background already set</returns>
+    Task<IOverlayWindow> CreateWindowWithBackgroundAsync(Rect bounds, IReadOnlyList<Screen> screens);
 
     /// <summary>
     /// Get all windows in this session
