@@ -52,7 +52,7 @@ public class ElementSelectionStrategy : ISelectionStrategy
         // Immediately detect element at current mouse position
         DetectAtCurrentMousePosition();
         
-        Log.Debug("Element selection strategy activated");
+        Log.Debug("Element selection strategy activated, IsActive={IsActive}", _highlight.IsActive);
     }
 
     public void Deactivate()
@@ -97,9 +97,12 @@ public class ElementSelectionStrategy : ISelectionStrategy
     {
         var position = e.GetPosition(_overlayWindow);
         
+        Log.Debug("ElementSelectionStrategy.HandlePointerMoved: Position={Position}", position);
+        
         // Fast check: if mouse is within current cutout rect, no need to update
         if (_maskLayer.IsPointInCutout(position))
         {
+            Log.Debug("Mouse within cutout, no update needed");
             return true; // Event handled, don't propagate
         }
         
@@ -115,7 +118,7 @@ public class ElementSelectionStrategy : ISelectionStrategy
             _currentElement = element;
             _highlight.SetCurrentElement(element);
             
-            Log.Debug("Mouse outside cutout - element updated");
+            Log.Debug("Mouse outside cutout - element detected: {ElementName}", element?.Name ?? "null");
             
             return true; // Event handled
         }

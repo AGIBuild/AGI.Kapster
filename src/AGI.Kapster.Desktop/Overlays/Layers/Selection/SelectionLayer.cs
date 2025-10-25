@@ -193,8 +193,13 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
     public bool HandlePointerEvent(PointerEventArgs e)
     {
         if (!IsVisible || !IsInteractive)
+        {
+            Log.Debug("SelectionLayer.HandlePointerEvent: Skipping (IsVisible={IsVisible}, IsInteractive={IsInteractive})", 
+                IsVisible, IsInteractive);
             return false;
+        }
         
+        Log.Debug("SelectionLayer.HandlePointerEvent: Routing to {Strategy} strategy", _currentMode);
         return _currentStrategy.HandlePointerEvent(e);
     }
 
