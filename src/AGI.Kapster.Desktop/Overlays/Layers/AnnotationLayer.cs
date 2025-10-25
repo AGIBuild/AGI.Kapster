@@ -37,6 +37,11 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
         set => _overlay.IsHitTestVisible = value; 
     }
     
+    /// <summary>
+    /// Check if text editing is currently active
+    /// </summary>
+    public bool IsTextEditing => _overlay.IsTextEditing;
+    
     public AnnotationLayer(Services.Settings.ISettingsService settingsService, IOverlayEventBus eventBus)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));

@@ -239,6 +239,15 @@ public class OverlayLayerManager : IOverlayLayerManager
                 return true;
             }
 
+            // CRITICAL: Check if text editing is active before handling tool hotkeys
+            // If user is typing text, let the text input go through instead of switching tools
+            var annotationLayer = GetLayer(LayerIds.Annotation) as IAnnotationLayer;
+            if (annotationLayer?.IsTextEditing == true)
+            {
+                // Text editing is active, don't intercept hotkeys, let text input go through
+                return false;
+            }
+
             // Tool hotkeys (annotation): A/R/E/T/F/M without modifiers
             if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
                 !e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&

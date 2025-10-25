@@ -31,24 +31,32 @@ public class OverlayContextProvider : IDisposable
 
     /// <summary>
     /// Build initial context from window and environment
+    /// If frozenBackground is provided (non-null), it will update the stored background.
+    /// If null, the previously set background (via SetFrozenBackground) will be preserved.
     /// </summary>
     public IOverlayContext BuildContext(
         TopLevel window,
         Bitmap? frozenBackground,
         IReadOnlyList<Screen>? screens)
     {
-        _frozenBackground = frozenBackground;
+        // Only update frozen background if a non-null value is provided
+        // This prevents Initialize from clearing a background set via SetFrozenBackground
+        if (frozenBackground != null)
+        {
+            _frozenBackground = frozenBackground;
+        }
+        
         _screens = screens;
 
         var context = new OverlayContext(
             overlaySize: window.Bounds.Size,
             overlayPosition: window is Window w ? w.Position : new PixelPoint(0, 0),
             screens: screens ?? Array.Empty<Screen>(),
-            frozenBackground: frozenBackground,
+            frozenBackground: _frozenBackground, // Use field value to preserve previously set background
             ime: _imeController,
             dispatcher: Avalonia.Threading.Dispatcher.UIThread);
 
-        Log.Debug("OverlayContextProvider: Built context");
+        Log.Debug("OverlayContextProvider: Built context with FrozenBackground={HasBackground}", _frozenBackground != null);
         return context;
     }
 

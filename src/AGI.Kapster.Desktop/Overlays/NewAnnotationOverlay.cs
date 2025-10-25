@@ -72,6 +72,11 @@ public sealed class NewAnnotationOverlay : Canvas
     // Text editing
     private TextBox? _editingTextBox;
     private TextAnnotation? _editingTextItem;
+    
+    /// <summary>
+    /// Check if text editing is currently active
+    /// </summary>
+    public bool IsTextEditing => _editingTextBox != null;
 
     // Selection and transformation
     private bool _isDragging;

@@ -43,6 +43,11 @@ public interface IAnnotationLayer : IOverlayLayer
     void SetStyle(IAnnotationStyle style);
     
     /// <summary>
+    /// Check if text editing is currently active
+    /// </summary>
+    bool IsTextEditing { get; }
+    
+    /// <summary>
     /// End text editing (if currently editing text annotation)
     /// </summary>
     void EndTextEditing();
