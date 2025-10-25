@@ -171,11 +171,13 @@ public class OverlaySession : IOverlaySession
     {
         var topLevel = window.AsTopLevel();
         
-        // Subscribe to input events with tunneling to ensure we catch them
-        topLevel.AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, handledEventsToo: false);
-        topLevel.AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved, handledEventsToo: false);
-        topLevel.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, handledEventsToo: false);
-        topLevel.AddHandler(InputElement.KeyUpEvent, OnWindowKeyUp, handledEventsToo: false);
+        // Subscribe to input events with handledEventsToo:true to receive events even after child controls handle them
+        // This is critical for ElementPicker mode where SelectionOverlay handles pointer events but we still need
+        // to route them to ElementSelectionStrategy for element detection
+        topLevel.AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, handledEventsToo: true);
+        topLevel.AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved, handledEventsToo: true);
+        topLevel.AddHandler(InputElement.KeyDownEvent, OnWindowKeyDown, handledEventsToo: true);
+        topLevel.AddHandler(InputElement.KeyUpEvent, OnWindowKeyUp, handledEventsToo: true);
         
         // Subscribe to lifecycle events
         if (window is Window w)
