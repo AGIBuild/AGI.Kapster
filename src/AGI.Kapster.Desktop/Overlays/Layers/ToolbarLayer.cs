@@ -19,7 +19,7 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
     private readonly NewAnnotationToolbar _toolbar;
     private readonly IOverlayEventBus _eventBus;
     private readonly IToolbarPositionCalculator _positionCalculator;
-    private IOverlayLayerManager? _layerManager; // Phase 3: State management integration
+    private readonly IOverlayLayerManager _layerManager;
     
     private ILayerHost? _host;
     private IOverlayContext? _context;
@@ -35,19 +35,20 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
         set => _toolbar.IsVisible = value; 
     }
     
-    public bool IsInteractive { get; set; } = true; // Toolbar is always interactive when visible
+    public bool IsInteractive { get; set; } = true;
     
     public ToolbarLayer(
         IOverlayEventBus eventBus,
-        IToolbarPositionCalculator positionCalculator)
+        IToolbarPositionCalculator positionCalculator,
+        IOverlayLayerManager layerManager)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _positionCalculator = positionCalculator ?? throw new ArgumentNullException(nameof(positionCalculator));
+        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
         
-        // Create toolbar - let it measure naturally with XAML constraints
+        // Create toolbar
         _toolbar = new NewAnnotationToolbar
         {
-            // Use Canvas positioning instead of margin hack
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
         };
@@ -58,24 +59,7 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
         _eventBus.Subscribe<ToolChangedEvent>(OnToolChanged);
         _eventBus.Subscribe<StyleChangedEvent>(OnStyleChanged);
         
-        Log.Debug("ToolbarLayer created with self-owned visual");
-    }
-    
-    /// <summary>
-    /// Set LayerManager reference for state management integration
-    /// Called by Orchestrator after layer creation
-    /// Performance optimization: Does not subscribe to SelectionChanged
-    /// Toolbar will only update when selection is finished (via SelectionFinished event)
-    /// </summary>
-    internal void SetLayerManager(IOverlayLayerManager layerManager)
-    {
-        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
-        
-        // Performance optimization: Do NOT subscribe to SelectionChanged
-        // Toolbar will position itself only when selection is finished
-        // This eliminates 60-240 unnecessary updates during selection dragging
-        
-        Log.Debug("ToolbarLayer: LayerManager reference set (deferred positioning until SelectionFinished)");
+        Log.Debug("ToolbarLayer created");
     }
     
     public void OnActivate()

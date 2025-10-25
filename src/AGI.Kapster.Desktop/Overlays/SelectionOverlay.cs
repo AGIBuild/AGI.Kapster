@@ -29,15 +29,11 @@ public sealed class SelectionOverlay : Canvas
     private const double HandleSize = 8;
     private const double HandleHit = 10;
     
-    // Session reference set by SelectionLayer (not obtained from Window anymore)
     private IOverlaySession? _session;
+    private readonly AGI.Kapster.Desktop.Overlays.Layers.IOverlayLayerManager _layerManager;
 
     private enum HandleKind { None, N, S, E, W, NE, NW, SE, SW }
     
-    // Phase 2: LayerManager integration (property injection for backward compatibility)
-    internal AGI.Kapster.Desktop.Overlays.Layers.IOverlayLayerManager? LayerManager { get; set; }
-    
-    // Track if we've already sized to avoid repeated updates
     private bool _isSized = false;
 
     public Rect SelectionRect
@@ -50,8 +46,10 @@ public sealed class SelectionOverlay : Canvas
     public event Action<Rect>? ConfirmRequested;
     public event Action<Rect>? SelectionChanged;
 
-    public SelectionOverlay()
+    public SelectionOverlay(AGI.Kapster.Desktop.Overlays.Layers.IOverlayLayerManager layerManager)
     {
+        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
+        
         Cursor = new Cursor(StandardCursorType.Cross);
         Focusable = true;
         Background = Brushes.Transparent;
@@ -276,7 +274,7 @@ public sealed class SelectionOverlay : Canvas
             e.Handled = true;
 
             // Phase 2: Write to LayerManager (state management)
-            LayerManager?.SetSelection(SelectionRect);
+            _layerManager.SetSelection(SelectionRect);
             
             // Fire selection events (backward compatibility)
             SelectionFinished?.Invoke(SelectionRect);
@@ -299,7 +297,7 @@ public sealed class SelectionOverlay : Canvas
             UpdateInfoOverlay(e.GetPosition(this));
 
             // Phase 2: Write to LayerManager (state management)
-            LayerManager?.SetSelection(SelectionRect);
+            _layerManager.SetSelection(SelectionRect);
             
             // Fire selection events (backward compatibility)
             SelectionFinished?.Invoke(SelectionRect);
@@ -329,7 +327,7 @@ public sealed class SelectionOverlay : Canvas
         }
         
         // Phase 2: Write to LayerManager during drag (real-time updates)
-        LayerManager?.SetSelection(SelectionRect);
+        _layerManager.SetSelection(SelectionRect);
         
         // Fire event (backward compatibility)
         SelectionChanged?.Invoke(SelectionRect);

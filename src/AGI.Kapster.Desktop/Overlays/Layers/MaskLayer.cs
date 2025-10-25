@@ -16,7 +16,7 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
 {
     private readonly Path _maskPath;
     private readonly IOverlayEventBus _eventBus;
-    private IOverlayLayerManager? _layerManager; // Phase 3: State management integration
+    private readonly IOverlayLayerManager _layerManager;
     
     private ILayerHost? _host;
     private IOverlayContext? _context;
@@ -24,8 +24,6 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
     private Rect _currentCutout;
     private double _opacity = 0.25; // 25% opacity (40FFFFFF in hex is ~25%)
     private Color _color = Colors.White;
-    
-    // (Double-click detection is handled by Avalonia via e.ClickCount)
     
     public string LayerId => LayerIds.Mask;
     public int ZIndex { get; set; } = 0; // Bottom layer
@@ -36,13 +34,14 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         set => _maskPath.IsVisible = value; 
     }
     
-    public bool IsInteractive { get; set; } = false; // Mask doesn't handle events
+    public bool IsInteractive { get; set; } = false;
     
     public event EventHandler<CutoutChangedEventArgs>? CutoutChanged;
 
-    public MaskLayer(IOverlayEventBus eventBus)
+    public MaskLayer(IOverlayEventBus eventBus, IOverlayLayerManager layerManager)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
         
         // Create own Path visual
         _maskPath = new Path
@@ -55,51 +54,17 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         // Subscribe to pointer events for double-click detection
         _maskPath.PointerPressed += OnMaskPointerPressed;
         
-        // Subscribe to EventBus for backward compatibility
-        _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChangedFromBus);
+        // Subscribe to LayerManager selection changes
+        _layerManager.SelectionChanged += OnSelectionChanged;
         
-        Log.Debug("MaskLayer created with self-owned visual");
+        Log.Debug("MaskLayer created");
     }
     
-    /// <summary>
-    /// Phase 3: Set LayerManager reference for state management integration
-    /// Called by Orchestrator after layer creation
-    /// </summary>
-    internal void SetLayerManager(IOverlayLayerManager layerManager)
+    private void OnSelectionChanged(object? sender, EventArgs e)
     {
-        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
-        
-        // Subscribe to LayerManager.SelectionChanged (primary data source)
-        _layerManager.SelectionChanged += OnSelectionChangedFromManager;
-        
-        // Initialize with current selection
-        var currentSelection = _layerManager.CurrentSelection;
-        if (currentSelection != default)
-        {
-            SetCutout(currentSelection);
-            Log.Debug("MaskLayer: Initialized with current selection from LayerManager");
-        }
-        
-        Log.Debug("MaskLayer: LayerManager reference set for state management");
-    }
-    
-    private void OnSelectionChangedFromManager(object? sender, EventArgs e)
-    {
-        // Phase 3: Primary handler - pull data from LayerManager
-        var selection = _layerManager?.CurrentSelection ?? default;
+        var selection = _layerManager.CurrentSelection;
         SetCutout(selection);
-        Log.Debug("MaskLayer: Updated cutout from LayerManager: {Selection}", selection);
-    }
-    
-    private void OnSelectionChangedFromBus(SelectionChangedEvent e)
-    {
-        // Backward compatibility: Update cutout from EventBus if LayerManager not set
-        if (_layerManager == null)
-        {
-            SetCutout(e.Selection);
-            Log.Debug("MaskLayer: Updated cutout from EventBus (fallback): {Selection}", e.Selection);
-        }
-        // If LayerManager is set, ignore EventBus (already handled by manager)
+        Log.Debug("MaskLayer: Updated cutout: {Selection}", selection);
     }
 
     public void SetMaskSize(Size size)

@@ -128,84 +128,43 @@ public class OverlayOrchestrator : IOverlayOrchestrator
 
     public void BuildLayers()
     {
-        if (_host == null || _currentContext == null || _window == null)
+        if (_host == null || _currentContext == null || _window == null || _session == null)
         {
-            Log.Error("Cannot build layers: Orchestrator not initialized");
+            Log.Error("Cannot build layers: Orchestrator not initialized or session not set");
             return;
         }
 
         // 1. Create and register MaskLayer
-        var maskLayer = new MaskLayer(_eventBus);
-        maskLayer.SetMaskSize(_maskSize);
-        maskLayer.SetMaskColor(Colors.White);
-        maskLayer.SetMaskOpacity(0.25);
-        
-        // Phase 3: Inject LayerManager for state management (requires concrete type)
-        maskLayer.SetLayerManager(_layerManager);
-        
-        _maskLayer = maskLayer;
+        _maskLayer = new MaskLayer(_eventBus, _layerManager);
+        _maskLayer.SetMaskSize(_maskSize);
+        _maskLayer.SetMaskColor(Colors.White);
+        _maskLayer.SetMaskOpacity(0.25);
         _layerManager.RegisterAndAttachLayer(_maskLayer.LayerId, _maskLayer, _host, _currentContext);
         Log.Debug("Orchestrator: MaskLayer registered");
 
         // 2. Create and register SelectionLayer
-        var selectionLayer = _elementDetector != null
-            ? new SelectionLayer(_elementDetector, _maskLayer, _window as Window ?? throw new InvalidOperationException(), _eventBus)
-            : new SelectionLayer(_eventBus);
+        _selectionLayer = _elementDetector != null
+            ? new SelectionLayer(_elementDetector, _maskLayer, _window as Window ?? throw new InvalidOperationException(), _eventBus, _layerManager, _session)
+            : new SelectionLayer(_eventBus, _layerManager, _session);
         
-        // Phase 2: Inject LayerManager for state management (requires concrete type)
-        selectionLayer.SetLayerManager(_layerManager);
-        
-        // Inject Session for element highlight coordination
-        if (_session != null)
-        {
-            selectionLayer.SetSession(_session);
-        }
-        else
-        {
-            Log.Warning("Orchestrator.BuildLayers: Session not set, element highlight will use fallback singleton");
-        }
-        
-        _selectionLayer = selectionLayer;
         _layerManager.RegisterAndAttachLayer(_selectionLayer.LayerId, _selectionLayer, _host, _currentContext);
         Log.Debug("Orchestrator: SelectionLayer registered");
 
         // 3. Create and register AnnotationLayer
-        var annotationLayer = new AnnotationLayer(_settingsService, _eventBus);
-        annotationLayer.SetTool(AnnotationToolType.Arrow);
-        
-        // Phase 3: Inject LayerManager for state management
-        annotationLayer.SetLayerManager(_layerManager);
-        
-        _annotationLayer = annotationLayer;
+        _annotationLayer = new AnnotationLayer(_settingsService, _eventBus, _layerManager);
+        _annotationLayer.SetTool(AnnotationToolType.Arrow);
         _layerManager.RegisterAndAttachLayer(_annotationLayer.LayerId, _annotationLayer, _host, _currentContext);
         Log.Debug("Orchestrator: AnnotationLayer registered with default tool: Arrow");
 
         // 4. Create and register ToolbarLayer
-        var toolbarLayer = new ToolbarLayer(_eventBus, _toolbarPositionCalculator);
-        toolbarLayer.SetAnnotationLayer(_annotationLayer);
-        
-        // Phase 3: Inject LayerManager for state management
-        toolbarLayer.SetLayerManager(_layerManager);
-        
-        _toolbarLayer = toolbarLayer;
+        _toolbarLayer = new ToolbarLayer(_eventBus, _toolbarPositionCalculator, _layerManager);
+        _toolbarLayer.SetAnnotationLayer(_annotationLayer);
         _layerManager.RegisterAndAttachLayer(_toolbarLayer.LayerId, _toolbarLayer, _host, _currentContext);
         Log.Debug("Orchestrator: ToolbarLayer registered");
 
-        // 🔧 CRITICAL FIX: Activate initial mode through LayerManager
-        // This ensures all layers that CanHandle(FreeSelection) are properly activated
-        // DO NOT manually call OnActivate() - let SwitchMode manage lifecycle
-        Log.Debug("🔧 Orchestrator.BuildLayers: About to switch to FreeSelection mode");
-        
+        // Activate initial mode
         _layerManager.SwitchMode(OverlayMode.FreeSelection);
-        
-        Log.Debug("🔧 Orchestrator.BuildLayers COMPLETED: Initial mode activated: FreeSelection");
-        
-        // Diagnostic: Check SelectionLayer state
-        if (_selectionLayer != null)
-        {
-            Log.Debug("🔧 Orchestrator.BuildLayers: SelectionLayer state - IsVisible={IsVisible}, IsInteractive={IsInteractive}, CanHandle(FreeSelection)={CanHandle}",
-                _selectionLayer.IsVisible, _selectionLayer.IsInteractive, _selectionLayer.CanHandle(OverlayMode.FreeSelection));
-        }
+        Log.Debug("Orchestrator.BuildLayers: Initial mode activated: FreeSelection");
     }
 
     public void PublishContextChanged(Size overlaySize, PixelPoint overlayPosition, IReadOnlyList<Screen>? screens)

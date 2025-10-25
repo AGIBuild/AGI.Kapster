@@ -18,7 +18,7 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
 {
     private readonly NewAnnotationOverlay _overlay;
     private readonly IOverlayEventBus _eventBus;
-    private IOverlayLayerManager? _layerManager; // Phase 3: State management integration
+    private readonly IOverlayLayerManager _layerManager;
     
     private ILayerHost? _host;
     private IOverlayContext? _context;
@@ -42,16 +42,16 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
     /// </summary>
     public bool IsTextEditing => _overlay.IsTextEditing;
     
-    public AnnotationLayer(Services.Settings.ISettingsService settingsService, IOverlayEventBus eventBus)
+    public AnnotationLayer(Services.Settings.ISettingsService settingsService, IOverlayEventBus eventBus, IOverlayLayerManager layerManager)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
         
         // Create own NewAnnotationOverlay visual
         _overlay = new NewAnnotationOverlay(settingsService)
         {
             Name = "Annotator",
             EventBus = eventBus,  // Set EventBus for IME events
-            // CRITICAL: Ensure overlay fills the entire window to receive pointer events
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch
         };
@@ -62,54 +62,20 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
         _overlay.ColorPickerRequested += OnColorPickerRequested;
         _overlay.ConfirmRequested += OnConfirmRequested;
         
-        // Subscribe to EventBus for backward compatibility
-        _eventBus.Subscribe<SelectionFinishedEvent>(OnSelectionFinishedFromBus);
+        // Subscribe to LayerManager selection changes
+        _layerManager.SelectionChanged += OnSelectionChanged;
         
-        Log.Debug("AnnotationLayer created with self-owned visual");
+        Log.Debug("AnnotationLayer created");
     }
     
-    /// <summary>
-    /// Phase 3: Set LayerManager reference for state management integration
-    /// Called by Orchestrator after layer creation
-    /// </summary>
-    internal void SetLayerManager(IOverlayLayerManager layerManager)
+    private void OnSelectionChanged(object? sender, EventArgs e)
     {
-        _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
-        
-        // Subscribe to LayerManager.SelectionChanged (primary data source)
-        _layerManager.SelectionChanged += OnSelectionChangedFromManager;
-        
-        // Initialize with current selection if valid
         if (_layerManager.HasValidSelection)
         {
-            var currentSelection = _layerManager.CurrentSelection;
-            SetSelectionRect(currentSelection);
-            Log.Debug("AnnotationLayer: Initialized with current selection from LayerManager");
-        }
-        
-        Log.Debug("AnnotationLayer: LayerManager reference set for state management");
-    }
-    
-    private void OnSelectionChangedFromManager(object? sender, EventArgs e)
-    {
-        // Phase 3: Primary handler - pull data from LayerManager
-        var selection = _layerManager?.CurrentSelection ?? default;
-        if (_layerManager?.HasValidSelection == true)
-        {
+            var selection = _layerManager.CurrentSelection;
             SetSelectionRect(selection);
-            Log.Debug("AnnotationLayer: Selection rect updated from LayerManager: {Selection}", selection);
+            Log.Debug("AnnotationLayer: Selection rect updated: {Selection}", selection);
         }
-    }
-    
-    private void OnSelectionFinishedFromBus(SelectionFinishedEvent e)
-    {
-        // Backward compatibility: Set selection from EventBus if LayerManager not set
-        if (_layerManager == null)
-        {
-            SetSelectionRect(e.Selection);
-            Log.Debug("AnnotationLayer: Selection rect set from EventBus (fallback): {Selection}", e.Selection);
-        }
-        // If LayerManager is set, ignore EventBus (already handled by manager)
     }
     
     /// <summary>
@@ -122,9 +88,7 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
     {
         IsVisible = true;
 
-        // P1 Fix: Sync selection from LayerManager when activated
-        // Ensure annotation layer has correct selection rect for drawing
-        if (_layerManager?.HasValidSelection == true)
+        if (_layerManager.HasValidSelection)
         {
             var selection = _layerManager.CurrentSelection;
             SetSelectionRect(selection);
@@ -134,12 +98,9 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
         }
         else
         {
-            // No valid selection - stay visible but not interactive
             IsInteractive = false;
-            Log.Debug("AnnotationLayer activated but no valid selection, not interactive");
+            Log.Debug("AnnotationLayer activated but no valid selection");
         }
-
-        Log.Debug("AnnotationLayer activated");
     }
     
     public void OnDeactivate()
@@ -172,7 +133,6 @@ public class AnnotationLayer : IAnnotationLayer, IOverlayVisual
     public void SetSelectionRect(Rect rect)
     {
         _overlay.SelectionRect = rect;
-        // P3 Fix: Use unified validation logic
         IsInteractive = SelectionValidator.IsValid(rect);
         Log.Debug("AnnotationLayer selection rect set: {Rect}, IsInteractive={IsInteractive}", rect, IsInteractive);
     }

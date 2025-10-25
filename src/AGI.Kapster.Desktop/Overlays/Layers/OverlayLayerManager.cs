@@ -19,19 +19,16 @@ public class OverlayLayerManager : IOverlayLayerManager
     private readonly Dictionary<string, IOverlayLayer> _layers = new();
     private readonly IOverlayEventBus _eventBus;
     private string? _activeLayerId;
-    private OverlayMode _currentMode = OverlayMode.None; // Start with None to ensure first SwitchMode() activates layers
+    private OverlayMode _currentMode = OverlayMode.None;
     
-    // State Management (Phase 1)
     private Rect _currentSelection = default;
-    private readonly object _stateLock = new(); // Thread-safe state access
+    private readonly object _stateLock = new();
     
     public OverlayMode CurrentMode => _currentMode;
     
-    // State Management Events
     public event EventHandler? SelectionChanged;
     public event EventHandler? ModeChanged;
     
-    // State Management Properties
     public Rect CurrentSelection
     {
         get
@@ -49,7 +46,6 @@ public class OverlayLayerManager : IOverlayLayerManager
         {
             lock (_stateLock)
             {
-                // P3 Fix: Use unified validation logic
                 return SelectionValidator.IsValid(_currentSelection);
             }
         }
@@ -417,8 +413,6 @@ public class OverlayLayerManager : IOverlayLayerManager
         Log.Debug("LayerManager: Mode switched {OldMode} -> {NewMode}", oldMode, mode);
     }
     
-    // === Plan A: Unified Layer Visual Management ===
-    
     public void RegisterAndAttachLayer(string layerId, IOverlayLayer layer, ILayerHost host, IOverlayContext context)
     {
         if (string.IsNullOrEmpty(layerId))
@@ -460,8 +454,6 @@ public class OverlayLayerManager : IOverlayLayerManager
         }
     }
     
-    // === State Management Methods (Phase 1) ===
-    
     public void SetSelection(Rect selection)
     {
         bool changed = false;
@@ -481,11 +473,7 @@ public class OverlayLayerManager : IOverlayLayerManager
         {
             Log.Debug("LayerManager: Selection changed from {Old} to {New}", oldSelection, selection);
             
-            // Notify subscribers (no data - they should pull from CurrentSelection)
             SelectionChanged?.Invoke(this, EventArgs.Empty);
-            
-            // Also publish to EventBus for backward compatibility (with data)
-            // TODO Phase 4: Remove Rect parameter from event
             _eventBus.Publish(new SelectionChangedEvent(selection));
         }
     }

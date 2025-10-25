@@ -54,8 +54,10 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
         IElementDetector elementDetector,
         IMaskLayer maskLayer,
         Avalonia.Controls.Window overlayWindow,
-        IOverlayEventBus eventBus)
-        : this(eventBus)
+        IOverlayEventBus eventBus,
+        IOverlayLayerManager layerManager,
+        IOverlaySession session)
+        : this(eventBus, layerManager, session)
     {
         // Create ElementHighlightOverlay and ElementSelectionStrategy
         _highlightOverlay = new ElementHighlightOverlay(elementDetector);
@@ -71,18 +73,23 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
         _elementStrategy.SelectionFinished += OnStrategySelectionFinished;
         _elementStrategy.SelectionConfirmed += OnStrategySelectionConfirmed;
         
+        // Pass session to ElementHighlightOverlay for highlight coordination
+        _highlightOverlay.SetSession(session);
+        
         Log.Debug("SelectionLayer created with element detection support");
     }
 
     /// <summary>
     /// Constructor for SelectionLayer with only free selection (no element detection)
     /// </summary>
-    public SelectionLayer(IOverlayEventBus eventBus)
+    public SelectionLayer(IOverlayEventBus eventBus, IOverlayLayerManager layerManager, IOverlaySession session)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
         
         // Create own SelectionOverlay visual
-        _selectionOverlay = new SelectionOverlay();
+        _selectionOverlay = new SelectionOverlay(layerManager);
+        _selectionOverlay.SetSession(session);
         
         // Create FreeSelectionStrategy
         _freeStrategy = new FreeSelectionStrategyAdapter(_selectionOverlay);
@@ -95,38 +102,6 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
         _freeStrategy.SelectionFinished += OnStrategySelectionFinished;
         _freeStrategy.SelectionConfirmed += OnStrategySelectionConfirmed;
         
-        Log.Debug("SelectionLayer created with free selection only");
-    }
-    
-    /// <summary>
-    /// Phase 2: Set LayerManager reference for state management integration
-    /// Internal method called by Orchestrator after layer creation
-    /// </summary>
-    internal void SetLayerManager(IOverlayLayerManager layerManager)
-    {
-        _selectionOverlay.LayerManager = layerManager;
-        Log.Debug("SelectionLayer: LayerManager reference set for state management");
-    }
-    
-    /// <summary>
-    /// Set Session reference for element highlight coordination and mode synchronization
-    /// Replaces GlobalElementHighlightState singleton with session-scoped coordination
-    /// Internal method called by Orchestrator after layer creation
-    /// </summary>
-    internal void SetSession(IOverlaySession session)
-    {
-        _session = session ?? throw new ArgumentNullException(nameof(session));
-        
-        // Pass session to SelectionOverlay for selection state coordination
-        _selectionOverlay.SetSession(session);
-        
-        // Pass session to ElementHighlightOverlay for highlight coordination
-        if (_highlightOverlay != null)
-        {
-            _highlightOverlay.SetSession(session);
-            Log.Debug("SelectionLayer: Session reference passed to ElementHighlightOverlay");
-        }
-        
         // Subscribe to session's SelectionMode changes for synchronized mode switching
         _session.SelectionModeChanged += OnSessionSelectionModeChanged;
         
@@ -137,7 +112,7 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
             SwitchMode(sessionMode);
         }
         
-        Log.Debug("SelectionLayer: Session reference set and passed to overlays, mode synchronized to {Mode}", _currentMode);
+        Log.Debug("SelectionLayer created with free selection only, mode synchronized to {Mode}", _currentMode);
     }
     
     private void OnSessionSelectionModeChanged(SelectionMode newMode)

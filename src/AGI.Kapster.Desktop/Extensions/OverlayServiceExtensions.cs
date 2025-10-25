@@ -15,15 +15,11 @@ public static class OverlayServiceExtensions
         // Event bus - singleton for application-wide event coordination
         services.AddSingleton<IOverlayEventBus, OverlayEventBus>();
         
-        // Layer manager - singleton as there's typically one overlay at a time
-        services.AddSingleton<IOverlayLayerManager, OverlayLayerManager>();
+        // Layer manager - transient per session for state isolation
+        services.AddTransient<IOverlayLayerManager, OverlayLayerManager>();
         
         // Register orchestrator infrastructure (transient per overlay window)
         services.AddOverlayOrchestrator();
-        
-        // Note: OverlayWindowBuilder is created by Session.CreateWindowBuilder(), not through DI
-        // Note: Individual layers (MaskLayer, SelectionLayer, etc.) will be created
-        // per-overlay-instance within the OverlayOrchestrator, not through DI
         
         return services;
     }
