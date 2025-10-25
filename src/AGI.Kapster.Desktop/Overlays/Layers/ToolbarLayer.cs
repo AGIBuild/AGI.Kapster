@@ -53,6 +53,9 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
         };
         
+        // Subscribe to toolbar size changes to reposition when content changes (e.g., switching to text tool)
+        _toolbar.SizeChanged += OnToolbarSizeChanged;
+        
         // Subscribe to EventBus events
         _eventBus.Subscribe<SelectionFinishedEvent>(OnSelectionFinished);
         _eventBus.Subscribe<OverlayContextChangedEvent>(OnOverlayContextChanged);
@@ -60,6 +63,18 @@ public class ToolbarLayer : IToolbarLayer, IOverlayVisual
         _eventBus.Subscribe<StyleChangedEvent>(OnStyleChanged);
         
         Log.Debug("ToolbarLayer created");
+    }
+    
+    private void OnToolbarSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        // When toolbar size changes (e.g., switching to text tool adds font size controls),
+        // recalculate position to prevent overflow
+        if (IsVisible && _currentSelection != default)
+        {
+            Log.Debug("ToolbarLayer: Size changed from {OldSize} to {NewSize}, recalculating position", 
+                e.PreviousSize, e.NewSize);
+            UpdatePositionFromContext();
+        }
     }
     
     public void OnActivate()
