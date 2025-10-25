@@ -54,6 +54,15 @@ public class OverlayLayerManager : IOverlayLayerManager
     public OverlayLayerManager(IOverlayEventBus eventBus)
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        
+        // Subscribe to mode change requests from layers (e.g., SelectionLayer switching between Free/Element modes)
+        _eventBus.Subscribe<OverlayModeChangeRequestedEvent>(OnModeChangeRequested);
+    }
+    
+    private void OnModeChangeRequested(OverlayModeChangeRequestedEvent e)
+    {
+        Log.Debug("LayerManager: Received mode change request: {RequestedMode}", e.RequestedMode);
+        SwitchMode(e.RequestedMode);
     }
 
     public void RegisterLayer(string layerId, IOverlayLayer layer)

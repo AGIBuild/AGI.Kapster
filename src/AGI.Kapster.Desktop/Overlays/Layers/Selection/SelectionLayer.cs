@@ -143,7 +143,17 @@ public class SelectionLayer : ISelectionLayer, IOverlayVisual
         // Activate new strategy
         _currentStrategy?.Activate();
         
-        Log.Debug("Selection mode switched: {OldMode} -> {NewMode}", oldMode, mode);
+        // Notify LayerManager to switch OverlayMode for proper event routing and layer coordination
+        var overlayMode = mode switch
+        {
+            SelectionMode.Element => OverlayMode.ElementPicker,
+            SelectionMode.Free => OverlayMode.FreeSelection,
+            _ => OverlayMode.FreeSelection
+        };
+        _eventBus.Publish(new OverlayModeChangeRequestedEvent(overlayMode));
+        
+        Log.Debug("Selection mode switched: {OldMode} -> {NewMode}, requesting OverlayMode: {OverlayMode}", 
+            oldMode, mode, overlayMode);
     }
 
     public Rect? GetCurrentSelection()

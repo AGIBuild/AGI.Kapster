@@ -100,7 +100,11 @@ public sealed class SelectionInfoOverlay : Canvas
     /// <param name="mousePosition">Current mouse position</param>
     public void UpdateInfo(Rect selectionRect, Point mousePosition)
     {
-        if (!_isVisible) return;
+        if (!_isVisible)
+        {
+            Log.Debug("SelectionInfoOverlay: UpdateInfo() called but _isVisible={IsVisible}, skipping", _isVisible);
+            return;
+        }
 
         // Update size information (only if there's a valid selection)
         if (selectionRect.Width > 0 && selectionRect.Height > 0)
@@ -108,6 +112,7 @@ public sealed class SelectionInfoOverlay : Canvas
             var width = Math.Round(selectionRect.Width);
             var height = Math.Round(selectionRect.Height);
             _sizeText.Text = $"{width} × {height}";
+            Log.Debug("SelectionInfoOverlay: Updated size to {Width} × {Height}", width, height);
         }
         else
         {
@@ -130,6 +135,9 @@ public sealed class SelectionInfoOverlay : Canvas
     {
         _isVisible = true;
         IsVisible = true;
+        var parentControl = this.Parent as Control;
+        Log.Debug("SelectionInfoOverlay: Show() called, IsVisible={IsVisible}, Parent.IsVisible={ParentVisible}", 
+            IsVisible, parentControl?.IsVisible);
     }
 
     /// <summary>
