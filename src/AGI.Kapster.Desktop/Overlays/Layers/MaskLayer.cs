@@ -15,6 +15,7 @@ namespace AGI.Kapster.Desktop.Overlays.Layers;
 public class MaskLayer : IMaskLayer, IOverlayVisual
 {
     private readonly Path _maskPath;
+    private readonly Path _borderPath; // Border for cutout area
     private readonly IOverlayEventBus _eventBus;
     private readonly IOverlayLayerManager _layerManager;
     
@@ -31,7 +32,11 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
     public bool IsVisible 
     { 
         get => _maskPath.IsVisible; 
-        set => _maskPath.IsVisible = value; 
+        set
+        {
+            _maskPath.IsVisible = value;
+            _borderPath.IsVisible = value;
+        }
     }
     
     public bool IsInteractive { get; set; } = false;
@@ -43,12 +48,22 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _layerManager = layerManager ?? throw new ArgumentNullException(nameof(layerManager));
         
-        // Create own Path visual
+        // Create own Path visual for mask
         _maskPath = new Path
         {
             Fill = Brushes.Transparent,
             IsHitTestVisible = false, // Will be enabled in Annotation mode
             ZIndex = this.ZIndex
+        };
+        
+        // Create border Path for cutout area (shown in Annotation mode)
+        _borderPath = new Path
+        {
+            Stroke = Brushes.DeepSkyBlue, // Match SelectionOverlay border color
+            StrokeThickness = 2,
+            IsHitTestVisible = false,
+            IsVisible = false, // Hidden by default, shown in Annotation mode
+            ZIndex = this.ZIndex + 1 // Above mask
         };
         
         // Subscribe to pointer events for double-click detection
@@ -130,23 +145,24 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
     {
         IsVisible = true;
         
-        // P1 Fix: Sync cutout from LayerManager when activated
-        // Ensure mask displays correct cutout for current selection
+        // Sync cutout from LayerManager when activated
         if (_layerManager?.HasValidSelection == true)
         {
             var selection = _layerManager.CurrentSelection;
             SetCutout(selection);
             
-            // Enable hit testing in Annotation mode to handle double-click outside selection
+            // In Annotation mode: enable hit testing and show border
             if (_layerManager.CurrentMode == OverlayMode.Annotation)
             {
                 _maskPath.IsHitTestVisible = true;
-                Log.Debug("MaskLayer activated with cutout: {Selection}, IsHitTestVisible=True (Annotation mode)", selection);
+                _borderPath.IsVisible = true; // Show border in Annotation mode
+                Log.Debug("MaskLayer activated with cutout: {Selection}, IsHitTestVisible=True, Border=Visible (Annotation mode)", selection);
             }
             else
             {
                 _maskPath.IsHitTestVisible = false;
-                Log.Debug("MaskLayer activated with cutout: {Selection}, IsHitTestVisible=False", selection);
+                _borderPath.IsVisible = false; // Hide border in other modes
+                Log.Debug("MaskLayer activated with cutout: {Selection}, IsHitTestVisible=False, Border=Hidden", selection);
             }
         }
         else
@@ -154,6 +170,7 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
             // No valid selection - show full mask without cutout
             ClearCutout();
             _maskPath.IsHitTestVisible = false;
+            _borderPath.IsVisible = false;
             Log.Debug("MaskLayer activated with no cutout (no valid selection)");
         }
         
@@ -165,8 +182,9 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         // Mask is always visible, even when "deactivated"
         // Just clear cutout when deactivating
         ClearCutout();
-        // Disable hit testing when deactivated
+        // Disable hit testing and hide border when deactivated
         _maskPath.IsHitTestVisible = false;
+        _borderPath.IsVisible = false;
         Log.Debug("Mask layer deactivated");
     }
 
@@ -257,6 +275,14 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
             _currentCutout.Height > 0)
         {
             group.Children.Add(new RectangleGeometry(_currentCutout));
+            
+            // Update border geometry to show cutout outline
+            _borderPath.Data = new RectangleGeometry(_currentCutout);
+        }
+        else
+        {
+            // No cutout, hide border
+            _borderPath.Data = null;
         }
         
         _maskPath.Data = group;
@@ -283,8 +309,10 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         
-        // Attach visual to host
+        // Attach mask visual to host
         host.Attach(_maskPath, this.ZIndex);
+        // Attach border visual to host (above mask)
+        host.Attach(_borderPath, this.ZIndex + 1);
         
         // Initialize with context size if not set
         if (_maskSize == default && context.OverlaySize != default)
@@ -295,14 +323,15 @@ public class MaskLayer : IMaskLayer, IOverlayVisual
         // Initialize fill
         UpdateMaskFill();
         
-        Log.Debug("MaskLayer attached to host");
+        Log.Debug("MaskLayer attached to host with border");
     }
-    
+
     public void Detach()
     {
         if (_host != null)
         {
             _host.Detach(_maskPath);
+            _host.Detach(_borderPath);
             _host = null;
             _context = null;
             Log.Debug("MaskLayer detached from host");
