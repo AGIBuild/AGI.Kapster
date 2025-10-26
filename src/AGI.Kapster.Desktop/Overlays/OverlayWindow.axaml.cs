@@ -247,46 +247,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     internal IOverlaySession? GetSession() => _session;
 
-    private async Task InitializeFrozenBackgroundAsync()
-    {
-        if (_screenCaptureStrategy == null)
-            return;
-
-        try
-        {
-            // Temporarily make window transparent to avoid capturing the overlay itself
-            var originalOpacity = this.Opacity;
-            this.Opacity = OverlayConstants.TransparentOpacity;
-            await Task.Delay(OverlayConstants.FrameDelay);
-
-            var rect = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
-            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
-
-            this.Opacity = originalOpacity;
-
-            var bitmap = BitmapConverter.ConvertToAvaloniaBitmapFast(skBitmap);
-            if (bitmap != null)
-            {
-                _frozenBackground = bitmap;
-                if (_backgroundImage != null)
-                {
-                    _backgroundImage.Source = _frozenBackground;
-                }
-                Log.Debug("Frozen background initialized: {W}x{H} pixels", 
-                    bitmap.PixelSize.Width, bitmap.PixelSize.Height);
-            }
-            else
-            {
-                Log.Warning("Failed to create frozen background bitmap");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to initialize frozen background");
-            this.Opacity = OverlayConstants.OpaqueOpacity;
-        }
-    }
-
     private void SetupSelectionOverlay()
     {
         if (_selector != null)
@@ -442,10 +402,12 @@ public partial class OverlayWindow : Window, IOverlayWindow
         var maskWidth = _maskSize.Width > 0 ? _maskSize.Width : this.ClientSize.Width;
         var maskHeight = _maskSize.Height > 0 ? _maskSize.Height : this.ClientSize.Height;
 
+        // Create geometry with even-odd fill rule to create a "hole" for the selection
         var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
         group.Children.Add(new RectangleGeometry(new Rect(0, 0, maskWidth, maskHeight)));
         if (selection.Width > 0 && selection.Height > 0)
             group.Children.Add(new RectangleGeometry(selection));
+        
         _maskPath.Data = group;
     }
 

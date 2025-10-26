@@ -66,8 +66,13 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Change shutdown mode to only exit when explicitly requested
-            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
+            // Create and set ScreenMonitorWindow as MainWindow
+            // This hidden window monitors screen changes and provides IScreenMonitorService
+            var monitorWindow = new Services.ScreenMonitorWindow();
+            desktop.MainWindow = monitorWindow;
+            
+            // Change shutdown mode to exit when MainWindow closes
+            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose;
 
             // Initialize services asynchronously
             Task.Run(async () =>
@@ -154,14 +159,19 @@ public partial class App : Application
         {
             Log.Debug("Application exit requested from system tray");
 
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                desktop.Shutdown();
-            }
+            // Use screen monitor service to exit (closes MainWindow properly)
+            var screenMonitor = Services!.GetRequiredService<IScreenMonitorService>();
+            screenMonitor.RequestAppExit();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to exit application");
+            
+            // Fallback to direct shutdown
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
         }
     }
 

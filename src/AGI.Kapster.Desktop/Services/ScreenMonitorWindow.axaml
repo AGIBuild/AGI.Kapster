@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AGI.Kapster.Desktop.Services.ScreenMonitorWindow"
+        Width="1"
+        Height="1"
+        ShowInTaskbar="False"
+        WindowState="Minimized"
+        SystemDecorations="None"
+        Opacity="0"
+        CanResize="False"
+        Title="AGI Kapster Monitor">
+    <!-- This is a hidden background window that serves as MainWindow -->
+    <!-- It monitors screen configuration changes and provides IScreenMonitorService -->
+</Window>
+

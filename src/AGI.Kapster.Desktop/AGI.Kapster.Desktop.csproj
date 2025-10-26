@@ -16,14 +16,14 @@
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2025.10.22.25415</AssemblyVersion>
-    <FileVersion>2025.10.22.25415</FileVersion>
-    <Version>2025.10.22.25415</Version>
+    <AssemblyVersion>2025.10.26.47301</AssemblyVersion>
+    <FileVersion>2025.10.26.47301</FileVersion>
+    <Version>2025.10.26.47301</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.10.22.25415</InformationalVersion>
+    <InformationalVersion>2025.10.26.47301</InformationalVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
