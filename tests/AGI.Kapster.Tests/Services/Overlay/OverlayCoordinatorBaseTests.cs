@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AGI.Kapster.Desktop.Overlays;
+using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Overlay;
@@ -26,6 +27,7 @@ namespace AGI.Kapster.Tests.Services.Overlay;
 /// </summary>
 public class OverlayCoordinatorBaseTests : TestBase
 {
+    private readonly IScreenMonitorService _screenMonitor;
     private readonly IOverlaySessionFactory _sessionFactory;
     private readonly IOverlayWindowFactory _windowFactory;
     private readonly IScreenCoordinateMapper _coordinateMapper;
@@ -35,6 +37,7 @@ public class OverlayCoordinatorBaseTests : TestBase
 
     public OverlayCoordinatorBaseTests(ITestOutputHelper output) : base(output)
     {
+        _screenMonitor = Substitute.For<IScreenMonitorService>();
         _sessionFactory = Substitute.For<IOverlaySessionFactory>();
         _windowFactory = Substitute.For<IOverlayWindowFactory>();
         _coordinateMapper = Substitute.For<IScreenCoordinateMapper>();
@@ -42,6 +45,7 @@ public class OverlayCoordinatorBaseTests : TestBase
         _clipboardStrategy = Substitute.For<IClipboardStrategy>();
 
         _coordinator = new TestOverlayCoordinator(
+            _screenMonitor,
             _sessionFactory,
             _windowFactory,
             _coordinateMapper,
@@ -202,12 +206,13 @@ public class OverlayCoordinatorBaseTests : TestBase
         protected override string PlatformName => "TestCoordinator";
 
         public TestOverlayCoordinator(
+            IScreenMonitorService screenMonitor,
             IOverlaySessionFactory sessionFactory,
             IOverlayWindowFactory windowFactory,
             IScreenCoordinateMapper coordinateMapper,
             IScreenCaptureStrategy? captureStrategy,
             IClipboardStrategy? clipboardStrategy)
-            : base(sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
+            : base(screenMonitor, sessionFactory, windowFactory, coordinateMapper, captureStrategy, clipboardStrategy)
         {
         }
 

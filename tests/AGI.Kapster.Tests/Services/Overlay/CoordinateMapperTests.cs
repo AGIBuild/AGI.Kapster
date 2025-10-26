@@ -6,6 +6,8 @@ using Avalonia.Platform;
 using FluentAssertions;
 using Xunit;
 
+#pragma warning disable CA1416 // Validate platform compatibility - tests intentionally test platform-specific mappers
+
 namespace AGI.Kapster.Tests.Services.Overlay;
 
 /// <summary>
