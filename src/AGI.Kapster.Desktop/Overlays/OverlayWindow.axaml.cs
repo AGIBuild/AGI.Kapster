@@ -38,6 +38,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     // Handlers for separate concerns
     private ImeHandler? _imeHandler;
     private ToolbarHandler? _toolbarHandler;
+    private ElementDetectionHandler? _elementDetectionHandler;
+    private AnnotationHandler? _annotationHandler;
     
     private ElementHighlightOverlay? _elementHighlight;
     private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
@@ -56,12 +58,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
     // Session for this overlay (scoped state management)
     private IOverlaySession? _session;
     private IReadOnlyList<Screen>? _screens;
-
-    // Throttling for element detection to prevent excessive updates
-    private PixelPoint _lastDetectionPos;
-    private DateTime _lastDetectionTime = DateTime.MinValue;
-    private const double MinMovementThreshold = 8.0; // pixels
-    private static readonly TimeSpan MinDetectionInterval = TimeSpan.FromMilliseconds(30); // ~33 FPS max
 
 	// Frozen background (snapshot at overlay activation)
 	private Bitmap? _frozenBackground;
@@ -100,8 +96,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
         // Cache control references immediately after InitializeComponent
         CacheControlReferences();
         
-        // Initialize handlers (IME handler can be created immediately)
+        // Initialize handlers (IME and Annotation handlers can be created immediately)
         _imeHandler = new ImeHandler(this, _imeController);
+        _annotationHandler = new AnnotationHandler(_settingsService);
 
         // Minimal setup for immediate display
         this.Cursor = new Cursor(StandardCursorType.Cross);
@@ -147,20 +144,10 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     private void InitializeHeavyComponents()
     {
-        // Create annotator with injected settings service
-        _annotator = new NewAnnotationOverlay(_settingsService)
+        // Initialize annotator using handler
+        if (this.Content is Grid grid && _selector != null && _toolbar != null && _annotationHandler != null)
         {
-            Name = "Annotator"
-        };
-
-        // Add annotator to grid (after Selector, before UiCanvas)
-        if (this.Content is Grid grid && _selector != null && _uiCanvas != null)
-        {
-            var selectorIndex = grid.Children.IndexOf(_selector);
-            grid.Children.Insert(selectorIndex + 1, _annotator);
-            
-            // Set focus to enable keyboard shortcuts
-            _annotator.Focus();
+            _annotator = _annotationHandler.InitializeAnnotator(grid, _selector, _toolbar);
         }
 
         SetupElementHighlight();
@@ -276,11 +263,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 Log.Information("Selection finished: {X},{Y} {W}x{H} - editable selection created", r.X, r.Y, r.Width, r.Height);
 
                 // Ensure focus is on annotator for keyboard shortcuts
-                if (_annotator != null)
-                {
-                    _annotator.Focus();
-                    Log.Debug("Focus set to annotator after selection finished");
-                }
+                _annotationHandler?.FocusAnnotator();
 
                 // Raise public event with isEditableSelection = true
                 RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
@@ -290,11 +273,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
             _selector.SelectionChanged += r =>
             {
                 UpdateMaskForSelection(r);
-                if (_annotator != null)
-                {
-                    _annotator.SelectionRect = r;
-                    _annotator.IsHitTestVisible = r.Width > 2 && r.Height > 2;
-                }
+                _annotationHandler?.UpdateSelection(r);
                 _toolbarHandler?.UpdatePosition(r);
             };
 
@@ -321,24 +300,12 @@ public partial class OverlayWindow : Window, IOverlayWindow
             };
         }
 
-        if (_toolbar != null && _annotator != null)
+        if (_annotationHandler != null)
         {
-            // Set default tool to Arrow first
-            Log.Information("Setting default tool to Arrow");
-            _annotator.CurrentTool = AnnotationToolType.Arrow;
-            Log.Information("Default tool set to: {CurrentTool}", _annotator.CurrentTool);
-
-            // Then set up toolbar (this will call UpdateUIFromTarget and sync the UI)
-            _toolbar.SetTarget(_annotator);
-
-            // Subscribe to export events
-            _annotator.ExportRequested += HandleExportRequest;
-            
-            // Subscribe to color picker events
-            _annotator.ColorPickerRequested += HandleColorPickerRequest;
-
-            // Handle double-click confirm (unified cross-platform logic)
-            _annotator.ConfirmRequested += async r =>
+            // Subscribe to annotation handler events
+            _annotationHandler.ExportRequested += HandleExportRequest;
+            _annotationHandler.ColorPickerRequested += HandleColorPickerRequest;
+            _annotationHandler.ConfirmRequested += async r =>
             {
                 // Directly capture the window region (includes background + annotations)
                 // This avoids coordinate transformation issues
@@ -438,10 +405,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
             if (_selectionMode == OverlaySelectionMode.FreeSelection)
             {
                 _selectionMode = OverlaySelectionMode.ElementPicker;
-                if (_elementHighlight != null)
-                {
-                    _elementHighlight.IsActive = true;
-                }
+                _elementDetectionHandler?.EnableElementPicker();
 
                 // Hide selection overlay
                 if (_selector != null)
@@ -466,20 +430,20 @@ public partial class OverlayWindow : Window, IOverlayWindow
         else if (e.Key == Key.Space && _selectionMode == OverlaySelectionMode.ElementPicker)
         {
             // Toggle between window and element detection mode
-            _elementDetector?.ToggleDetectionMode();
+            _elementDetectionHandler?.ToggleDetectionMode();
             e.Handled = true;
         }
         else if (e.Key == Key.S && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             // Ctrl+S: Export current selection to file
-            if (_selectionMode == OverlaySelectionMode.Editing && _annotator != null)
+            if (_selectionMode == OverlaySelectionMode.Editing)
             {
-                Log.Information("Ctrl+S pressed - triggering export via annotator");
-                _annotator.RequestExport();
+                Log.Information("Ctrl+S pressed - triggering export");
+                _annotationHandler?.RequestExport();
             }
             else
             {
-                Log.Debug("Ctrl+S pressed but no editable selection or annotator found");
+                Log.Debug("Ctrl+S pressed but no editable selection");
             }
             e.Handled = true;
         }
@@ -514,11 +478,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
             if (_selectionMode == OverlaySelectionMode.ElementPicker)
             {
                 _selectionMode = OverlaySelectionMode.FreeSelection;
-                if (_elementHighlight != null)
-                {
-                    _elementHighlight.IsActive = false;
-                    // Element highlight state is managed internally
-                }
+                _elementDetectionHandler?.DisableElementPicker();
 
                 // Show selection overlay
                 if (_selector != null)
@@ -554,7 +514,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
             grid.Children.Add(_elementHighlight);
         }
 
-        // Element selection is now handled directly by OverlayWindow mouse events
+        // Create element detection handler
+        _elementDetectionHandler = new ElementDetectionHandler(this, _elementDetector, _elementHighlight);
+        _elementDetectionHandler.ElementSelected += OnElementSelected;
     }
 
     private void ToggleElementPickerMode()
@@ -562,9 +524,13 @@ public partial class OverlayWindow : Window, IOverlayWindow
         bool isElementPicker = _selectionMode == OverlaySelectionMode.ElementPicker;
         _selectionMode = isElementPicker ? OverlaySelectionMode.FreeSelection : OverlaySelectionMode.ElementPicker;
 
-        if (_elementHighlight != null)
+        if (isElementPicker)
         {
-            _elementHighlight.IsActive = _selectionMode == OverlaySelectionMode.ElementPicker;
+            _elementDetectionHandler?.DisableElementPicker();
+        }
+        else
+        {
+            _elementDetectionHandler?.EnableElementPicker();
         }
 
         // Hide/show selection overlay based on mode
@@ -589,10 +555,14 @@ public partial class OverlayWindow : Window, IOverlayWindow
         {
             _selectionMode = newMode;
 
-            // Update element highlight state
-            if (_elementHighlight != null)
+            // Update element highlight state via handler
+            if (enabled)
             {
-                _elementHighlight.IsActive = enabled;
+                _elementDetectionHandler?.EnableElementPicker();
+            }
+            else
+            {
+                _elementDetectionHandler?.DisableElementPicker();
             }
 
             // Hide/show selection overlay based on mode
@@ -611,21 +581,10 @@ public partial class OverlayWindow : Window, IOverlayWindow
     {
         Log.Information("Element selected: {Name} - {Bounds}", element.Name, element.Bounds);
 
-        // Convert element bounds to overlay coordinates and set selection
-        if (_selector != null)
+        // Convert element bounds to overlay coordinates via handler
+        if (_selector != null && _elementDetectionHandler != null)
         {
-            // Convert screen coordinates to window coordinates with proper bounds checking
-            var screenBounds = element.Bounds;
-            var overlayTopLeft = this.PointToClient(new PixelPoint((int)screenBounds.X, (int)screenBounds.Y));
-            var overlayBottomRight = this.PointToClient(new PixelPoint(
-                (int)(screenBounds.X + screenBounds.Width),
-                (int)(screenBounds.Y + screenBounds.Height)));
-
-            var selectionRect = new Rect(
-                Math.Min(overlayTopLeft.X, overlayBottomRight.X),
-                Math.Min(overlayTopLeft.Y, overlayBottomRight.Y),
-                Math.Abs(overlayBottomRight.X - overlayTopLeft.X),
-                Math.Abs(overlayBottomRight.Y - overlayTopLeft.Y));
+            var selectionRect = _elementDetectionHandler.ConvertElementBoundsToOverlay(element);
 
             // Show and enable selection overlay
             _selector.IsVisible = true;
@@ -637,14 +596,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
             // Switch to editing mode
             _selectionMode = OverlaySelectionMode.Editing;
 
-            if (_elementHighlight != null)
-            {
-                _elementHighlight.IsActive = false;
-                // Element highlight state is managed internally
-            }
-
-            // Reset cursor to normal selection mode (let overlay handle cursor)
-            // this.Cursor = new Cursor(StandardCursorType.Cross);
+            // Disable element picker
+            _elementDetectionHandler.DisableElementPicker();
 
             // Raise public event with isEditableSelection = true
             RegionSelected?.Invoke(this, new RegionSelectedEventArgs(selectionRect, false, element, true));
@@ -655,77 +608,17 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     private void OnOverlayPointerMoved(object? sender, PointerEventArgs e)
     {
-        // Only handle mouse events in element picker mode
-        if (_selectionMode != OverlaySelectionMode.ElementPicker || _elementDetector == null || _elementHighlight == null)
-            return;
-
-        var position = e.GetPosition(this);
-        var screenPos = this.PointToScreen(position);
-
-        // Throttle element detection to prevent excessive updates
-        // Only detect if mouse moved significantly or enough time has passed
-        if (ShouldUpdateElementDetection(screenPos))
-        {
-            try
-            {
-                var overlayHandle = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-                var element = _elementDetector.DetectElementAt((int)screenPos.X, (int)screenPos.Y, overlayHandle);
-                _elementHighlight.SetCurrentElement(element);
-
-                // Update last detection position and time
-                _lastDetectionPos = screenPos;
-                _lastDetectionTime = DateTime.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Error during mouse move element detection");
-            }
-        }
-    }
-
-    private bool ShouldUpdateElementDetection(PixelPoint currentPos)
-    {
-        var now = DateTime.UtcNow;
-
-        // Check time throttling - don't update too frequently
-        if (now - _lastDetectionTime < MinDetectionInterval)
-            return false;
-
-        // Check movement threshold - only update if mouse moved significantly
-        var distance = Math.Sqrt(
-            Math.Pow(currentPos.X - _lastDetectionPos.X, 2) +
-            Math.Pow(currentPos.Y - _lastDetectionPos.Y, 2));
-
-        return distance >= MinMovementThreshold;
+        // Delegate to element detection handler
+        _elementDetectionHandler?.HandlePointerMoved(e, _selectionMode == OverlaySelectionMode.ElementPicker);
     }
 
     private void OnOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_selectionMode == OverlaySelectionMode.ElementPicker && _elementDetector != null)
+        // Delegate to element detection handler
+        var handled = _elementDetectionHandler?.HandlePointerPressed(e, _selectionMode == OverlaySelectionMode.ElementPicker) ?? false;
+        if (handled)
         {
-            // In element picker mode - only handle single clicks for element selection
-            var position = e.GetPosition(this);
-            var screenPos = this.PointToScreen(position);
-
-            try
-            {
-                // Get element at click position with error handling, ignoring this overlay window
-                var overlayHandle = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-                var element = _elementDetector.DetectElementAt((int)screenPos.X, (int)screenPos.Y, overlayHandle);
-                if (element != null)
-                {
-                    OnElementSelected(element);
-                    e.Handled = true;
-                }
-                else
-                {
-                    Log.Warning("No element detected at click position {X}, {Y}", screenPos.X, screenPos.Y);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error during element selection at {X}, {Y}", screenPos.X, screenPos.Y);
-            }
+            e.Handled = true;
         }
         // Note: When not in element picker mode, let SelectionOverlay handle the event for custom drag selection
     }
@@ -774,8 +667,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
             }
 
             // End text editing before capture to prevent TextBox background artifacts.
-            // Null-safety is handled by the null-conditional operator (?.).
-            _annotator?.EndTextEditing();
+            _annotationHandler?.EndTextEditing();
 
             // Temporarily hide UI elements
             bool selectorWasVisible = _selector?.IsVisible ?? false;
@@ -827,7 +719,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     private IEnumerable<IAnnotationItem>? GetAnnotationsFromAnnotator()
     {
-        return _annotator?.GetAnnotations();
+        return _annotationHandler?.Annotator?.GetAnnotations();
     }
 
     /// <summary>
@@ -981,10 +873,11 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     private bool ValidateExportPreconditions()
     {
-        if (_annotator == null)
+        var annotator = _annotationHandler?.Annotator;
+        if (annotator == null)
             return false;
 
-        var selectionRect = _annotator.SelectionRect;
+        var selectionRect = annotator.SelectionRect;
         if (selectionRect.Width <= 0 || selectionRect.Height <= 0)
         {
             Log.Warning("Cannot export: no valid selection area");
@@ -998,7 +891,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     {
         var exportService = new ExportService();
         var defaultSettings = exportService.GetDefaultSettings();
-        var imageSize = new Avalonia.Size(_annotator!.SelectionRect.Width, _annotator.SelectionRect.Height);
+        var annotator = _annotationHandler!.Annotator!;
+        var imageSize = new Avalonia.Size(annotator.SelectionRect.Width, annotator.SelectionRect.Height);
         var settingsDialog = new ExportSettingsDialog(defaultSettings, imageSize);
 
         var dialogResult = await settingsDialog.ShowDialog<bool?>(this);
@@ -1093,7 +987,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private async Task<Bitmap?> CaptureScreenshotForExportAsync(ExportProgressDialog progressDialog)
     {
         progressDialog.UpdateProgress(10, "Capturing screenshot...");
-        return await CaptureWindowRegionWithAnnotationsAsync(_annotator!.SelectionRect);
+        var annotator = _annotationHandler!.Annotator!;
+        return await CaptureWindowRegionWithAnnotationsAsync(annotator.SelectionRect);
     }
 
     private async Task ExportImageToFileAsync(
@@ -1127,15 +1022,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     {
         try
         {
-            if (_toolbar != null)
-            {
-                _toolbar.ShowColorPicker();
-                Log.Debug("Color picker opened via keyboard shortcut");
-            }
-            else
-            {
-                Log.Warning("Could not find toolbar to open color picker");
-            }
+            _annotationHandler?.ShowColorPicker();
         }
         catch (Exception ex)
         {
