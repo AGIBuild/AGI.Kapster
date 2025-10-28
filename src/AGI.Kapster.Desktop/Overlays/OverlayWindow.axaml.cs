@@ -1,5 +1,6 @@
 using AGI.Kapster.Desktop.Dialogs;
 using AGI.Kapster.Desktop.Models;
+using AGI.Kapster.Desktop.Overlays.Handlers;
 using AGI.Kapster.Desktop.Services.Annotation;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
@@ -33,6 +34,11 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private readonly IToolbarPositionCalculator _toolbarPositionCalculator;
     private readonly ISettingsService _settingsService;
     private readonly IImeController _imeController;
+    
+    // Handlers for separate concerns
+    private ImeHandler? _imeHandler;
+    private ToolbarHandler? _toolbarHandler;
+    
     private ElementHighlightOverlay? _elementHighlight;
     private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
@@ -93,6 +99,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
         // Cache control references immediately after InitializeComponent
         CacheControlReferences();
+        
+        // Initialize handlers (IME handler can be created immediately)
+        _imeHandler = new ImeHandler(this, _imeController);
 
         // Minimal setup for immediate display
         this.Cursor = new Cursor(StandardCursorType.Cross);
@@ -168,6 +177,13 @@ public partial class OverlayWindow : Window, IOverlayWindow
             _selector.IsHitTestVisible = true;
         }
 
+        // Initialize toolbar handler after toolbar is available
+        if (_toolbar != null && _uiCanvas != null)
+        {
+            _toolbarHandler = new ToolbarHandler(this, _uiCanvas, _toolbar, _toolbarPositionCalculator);
+            _toolbarHandler.HideToolbar(); // Hide initially
+        }
+
         // Setup selection overlay
         SetupSelectionOverlay();
     }
@@ -186,7 +202,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
         }
 
         // Disable IME to prevent input method interference with keyboard shortcuts
-        DisableImeForOverlay();
+        _imeHandler?.DisableIme();
     }
 
     /// <summary>
@@ -232,6 +248,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     public void SetScreens(IReadOnlyList<Screen>? screens)
     {
         _screens = screens;
+        _toolbarHandler?.SetScreens(screens);
         Log.Debug("Overlay screens set: {Count} screen(s)", screens?.Count ?? 0);
     }
     
@@ -278,7 +295,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
                     _annotator.SelectionRect = r;
                     _annotator.IsHitTestVisible = r.Width > 2 && r.Height > 2;
                 }
-                UpdateToolbarPosition(r);
+                _toolbarHandler?.UpdatePosition(r);
             };
 
             _selector.ConfirmRequested += async r =>
@@ -351,13 +368,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
         }
 
 
-        // Hide toolbar initially
-        if (_toolbar != null)
-        {
-            Canvas.SetLeft(_toolbar, -10000);
-            Canvas.SetTop(_toolbar, -10000);
-        }
-
         // Clean up resources when this window closes
         this.Closing += (sender, e) =>
         {
@@ -408,35 +418,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
             group.Children.Add(new RectangleGeometry(selection));
         
         _maskPath.Data = group;
-    }
-
-    private void UpdateToolbarPosition(Rect selection)
-    {
-        if (_toolbar == null || _uiCanvas == null)
-            return;
-
-        if (selection.Width <= 0 || selection.Height <= 0)
-        {
-            Canvas.SetLeft(_toolbar, -10000);
-            Canvas.SetTop(_toolbar, -10000);
-            return;
-        }
-
-        // Measure toolbar size
-        _toolbar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var toolbarSize = _toolbar.DesiredSize;
-
-        // Calculate position using the calculator service
-        var context = new ToolbarPositionContext(
-            Selection: selection,
-            ToolbarSize: toolbarSize,
-            OverlayPosition: this.Position,
-            Screens: _screens);
-
-        var position = _toolbarPositionCalculator.CalculatePosition(context);
-
-        Canvas.SetLeft(_toolbar, position.X);
-        Canvas.SetTop(_toolbar, position.Y);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -1223,57 +1204,11 @@ public partial class OverlayWindow : Window, IOverlayWindow
     #region IME Control
 
     /// <summary>
-    /// Disable IME for overlay window to prevent input method interference with shortcuts
-    /// </summary>
-    private void DisableImeForOverlay()
-    {
-        if (!_imeController.IsSupported)
-            return;
-
-        try
-        {
-            var handle = TryGetPlatformHandle()?.Handle ?? nint.Zero;
-            if (handle != nint.Zero)
-            {
-                _imeController.DisableIme(handle);
-                Log.Debug("IME disabled for overlay window");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to disable IME for overlay window");
-        }
-    }
-
-    /// <summary>
-    /// Enable IME for overlay window (called when text editing starts or window closes)
-    /// </summary>
-    private void EnableImeForOverlay()
-    {
-        if (!_imeController.IsSupported)
-            return;
-
-        try
-        {
-            var handle = TryGetPlatformHandle()?.Handle ?? nint.Zero;
-            if (handle != nint.Zero)
-            {
-                _imeController.EnableIme(handle);
-                Log.Debug("IME enabled for overlay window");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to enable IME for overlay window");
-        }
-    }
-
-    /// <summary>
     /// Public method for annotation overlay to enable IME during text editing
     /// </summary>
     public void EnableImeForTextEditing()
     {
-        EnableImeForOverlay();
+        _imeHandler?.EnableIme();
     }
 
     /// <summary>
@@ -1281,7 +1216,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     public void DisableImeAfterTextEditing()
     {
-        DisableImeForOverlay();
+        _imeHandler?.DisableIme();
     }
 
     #endregion
