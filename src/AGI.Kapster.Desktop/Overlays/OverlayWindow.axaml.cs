@@ -108,17 +108,14 @@ public partial class OverlayWindow : Window, IOverlayWindow
         this.PointerPressed += OnOverlayPointerPressed;
         this.PointerMoved += OnOverlayPointerMoved;
 
-		// Opened event: initialize UI components
+		// Opened event: initialize UI components synchronously
 		// Note: Background is set automatically by SetPrecapturedAvaloniaBitmap when ready
-		this.Opened += async (_, __) =>
+		this.Opened += (_, __) =>
 		{
 		    UpdateMaskForSelection(default);
 		    
-		    // Initialize heavy components immediately
-		    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-		    {
-		        InitializeHeavyComponents();
-		    });
+		    // Initialize heavy components immediately (synchronous to ensure ready before user interaction)
+		    InitializeHeavyComponents();
 		};
 
 		// Set focus to annotator when window is loaded
