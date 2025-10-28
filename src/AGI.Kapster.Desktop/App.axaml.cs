@@ -13,8 +13,8 @@ using Serilog;
 using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Hotkeys;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Update;
-using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Views;
 
@@ -132,8 +132,8 @@ public partial class App : Application
         try
         {
             // Check if screenshot is currently in progress
-            var screenshotService = Services!.GetRequiredService<IScreenshotService>();
-            if (screenshotService.IsActive)
+            var overlayCoordinator = Services!.GetRequiredService<IOverlayCoordinator>();
+            if (overlayCoordinator.HasActiveSession)
             {
                 Log.Debug("Settings window request ignored - screenshot is active");
                 return;

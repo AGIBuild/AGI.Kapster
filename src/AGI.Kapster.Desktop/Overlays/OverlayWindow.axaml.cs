@@ -8,7 +8,6 @@ using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
-using AGI.Kapster.Desktop.Services.Screenshot;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.UI;
 using Avalonia;
@@ -364,8 +363,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
         {
             Log.Information("OverlayWindow: Window closing, cleaning up resources");
             
-            // Restore IME state before closing
-            EnableImeForOverlay();
+            // NOTE: Do not restore IME here - window handle is being destroyed
+            // System will automatically restore IME state when window is closed
             
             try
             {
