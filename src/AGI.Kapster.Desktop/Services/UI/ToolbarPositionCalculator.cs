@@ -29,11 +29,26 @@ public class ToolbarPositionCalculator : IToolbarPositionCalculator
         var spaceBelow = screenBounds.Bottom - context.Selection.Bottom;
         var spaceAbove = context.Selection.Top - screenBounds.Top;
 
+        // Check if selection is very large (near or exceeds screen bounds)
+        // This handles full-screen/full-virtual-screen captures
+        var isLargeSelection = 
+            context.Selection.Bottom >= screenBounds.Bottom - context.Margin ||
+            context.Selection.Top <= screenBounds.Top + context.Margin ||
+            spaceBelow < context.ToolbarSize.Height + context.Margin && spaceAbove < context.ToolbarSize.Height + context.Margin;
+
         // Determine position with priority: below -> above -> inside
         Point position;
         double rightAlign = context.Selection.Right - context.ToolbarSize.Width;
 
-        if (spaceBelow >= context.ToolbarSize.Height + context.Margin)
+        if (isLargeSelection)
+        {
+            // For large selections (e.g., full virtual screen), always place toolbar inside at bottom-right
+            position = new Point(
+                context.Selection.Right - context.ToolbarSize.Width - context.Margin,
+                context.Selection.Bottom - context.ToolbarSize.Height - context.Margin);
+            Log.Debug("Toolbar: inside selection (bottom-right) - large selection detected");
+        }
+        else if (spaceBelow >= context.ToolbarSize.Height + context.Margin)
         {
             // Priority: below selection (outside)
             position = new Point(rightAlign, context.Selection.Bottom + context.Margin);
