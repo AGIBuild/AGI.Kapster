@@ -77,6 +77,7 @@ internal sealed class SelectionHandler
     /// </summary>
     public void HandleCtrlKeyDown()
     {
+        Log.Debug("HandleCtrlKeyDown called - current mode: {Mode}", _selectionMode);
         if (_selectionMode == OverlaySelectionMode.FreeSelection)
         {
             SwitchToElementPicker();

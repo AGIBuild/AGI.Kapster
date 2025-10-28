@@ -45,8 +45,24 @@ internal sealed class ElementDetectionHandler
     /// </summary>
     public void EnableElementPicker()
     {
+        Log.Debug("EnableElementPicker called");
+        
+        // Ensure element highlight is properly initialized before enabling
+        if (_elementHighlight == null)
+        {
+            Log.Warning("ElementHighlight is null, cannot enable element picker");
+            return;
+        }
+        
         _elementHighlight.IsActive = true;
-        Log.Debug("Element picker enabled");
+        
+        // Additional verification - check if element detector is ready
+        if (!_elementDetector.IsDetectionActive)
+        {
+            Log.Warning("Element detector is not active, element highlighting may not work");
+        }
+        
+        Log.Debug("Element picker enabled - IsActive: {IsActive}", _elementHighlight.IsActive);
     }
 
     /// <summary>
@@ -55,7 +71,6 @@ internal sealed class ElementDetectionHandler
     public void DisableElementPicker()
     {
         _elementHighlight.IsActive = false;
-        Log.Debug("Element picker disabled");
     }
 
     /// <summary>
@@ -84,6 +99,12 @@ internal sealed class ElementDetectionHandler
             {
                 var overlayHandle = _window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
                 var element = _elementDetector.DetectElementAt((int)screenPos.X, (int)screenPos.Y, overlayHandle);
+                
+                if (element != null)
+                {
+                    Log.Debug("Element detected: {Name} at {Bounds}", element.Name, element.Bounds);
+                }
+                
                 _elementHighlight.SetCurrentElement(element);
 
                 // Update last detection position and time

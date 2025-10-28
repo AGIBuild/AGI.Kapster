@@ -1,11 +1,6 @@
-using AGI.Kapster.Desktop.Dialogs;
-using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Desktop.Overlays.Handlers;
-using AGI.Kapster.Desktop.Services.Annotation;
 using AGI.Kapster.Desktop.Services.Capture;
 using AGI.Kapster.Desktop.Services.ElementDetection;
-using AGI.Kapster.Desktop.Services.Export;
-using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Input;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Overlay.State;
@@ -14,14 +9,14 @@ using AGI.Kapster.Desktop.Services.UI;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace AGI.Kapster.Desktop.Overlays;
@@ -45,6 +40,11 @@ public partial class OverlayWindow : Window, IOverlayWindow
     
     private ElementHighlightOverlay? _elementHighlight;
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
+
+    // Initialization state tracking
+    private bool _componentsInitialized = false;
+    private bool _backgroundReady = false;
+    private bool _focusSet = false;
 
     // Cached control references to avoid FindControl<>() abuse
     private Image? _backgroundImage;
@@ -91,6 +91,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _coordinateMapper = coordinateMapper;
         _toolbarPositionCalculator = toolbarPositionCalculator ?? new ToolbarPositionCalculator(coordinateMapper);
         
+        Log.Debug("OverlayWindow constructor: elementDetector = {Detector}", 
+            elementDetector?.GetType().Name ?? "null");
+        
         // Fast initialization: only XAML parsing
         InitializeComponent();
 
@@ -107,6 +110,11 @@ public partial class OverlayWindow : Window, IOverlayWindow
         // Set up mouse event handlers
         this.PointerPressed += OnOverlayPointerPressed;
         this.PointerMoved += OnOverlayPointerMoved;
+        
+        // Use tunneling events (PreviewKeyDown/Up) to intercept Ctrl key before children
+        // This ensures OverlayWindow receives Ctrl key events even when focus is on child controls
+        this.AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        this.AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);
 
 		// Opened event: initialize UI components synchronously
 		// Note: Background is set automatically by SetPrecapturedAvaloniaBitmap when ready
@@ -114,12 +122,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
 		{
 		    UpdateMaskForSelection(default);
 		    
-		    // Initialize heavy components immediately (synchronous to ensure ready before user interaction)
-		    InitializeHeavyComponents();
+		    // Initialize components in dependency order
+		    InitializeComponents();
 		};
-
-		// Set focus to annotator when window is loaded
-		this.Loaded += OnOverlayWindowLoaded;
 		
 		// Setup window cleanup
 		SetupWindowCleanup();
@@ -140,14 +145,44 @@ public partial class OverlayWindow : Window, IOverlayWindow
     }
 
     /// <summary>
-    /// Initialize heavy UI components (Annotator, Toolbar, ElementHighlight) after background is visible
+    /// Initialize components in proper dependency order
+    /// Phase 1: Core UI components
+    /// Phase 2: Handlers that depend on UI components  
+    /// Phase 3: Event subscriptions and final setup
     /// </summary>
-    private void InitializeHeavyComponents()
+    private void InitializeComponents()
     {
+        Log.Debug("Starting component initialization");
+        
+        // Phase 1: Initialize core UI components
+        InitializeCoreUIComponents();
+        
+        // Phase 2: Initialize handlers in dependency order
+        InitializeHandlers();
+        
+        // Phase 3: Setup event subscriptions and final configuration
+        SetupEventSubscriptions();
+        
+        // Mark components as initialized
+        _componentsInitialized = true;
+        Log.Debug("Component initialization completed");
+        
+        // Try to set focus if background is already ready
+        TrySetFocusWhenReady();
+    }
+
+    /// <summary>
+    /// Phase 1: Initialize core UI components (Annotator, ElementHighlight)
+    /// </summary>
+    private void InitializeCoreUIComponents()
+    {
+        Log.Debug("Phase 1: Initializing core UI components");
+        
         // Initialize annotator using handler
         if (this.Content is Grid grid && _selector != null && _toolbar != null && _annotationHandler != null)
         {
             _annotator = _annotationHandler.InitializeAnnotator(grid, _selector, _toolbar);
+            Log.Debug("Annotator initialized");
         }
 
         SetupElementHighlight();
@@ -155,21 +190,33 @@ public partial class OverlayWindow : Window, IOverlayWindow
         if (_elementDetector != null && _elementHighlight != null)
         {
             _elementHighlight.IsActive = false; // Initially disabled
+            Log.Debug("Element highlight setup completed");
         }
+    }
 
-        // Initialize handlers that depend on UI components
+    /// <summary>
+    /// Phase 2: Initialize handlers in dependency order
+    /// </summary>
+    private void InitializeHandlers()
+    {
+        Log.Debug("Phase 2: Initializing handlers");
+        
+        // SelectionHandler - depends on _selector
         if (_selector != null)
         {
             _selectionHandler = new SelectionHandler(this, _selector);
-            SetupSelectionHandlerEvents();
+            Log.Debug("SelectionHandler initialized");
         }
 
+        // ToolbarHandler - depends on _toolbar and _uiCanvas
         if (_toolbar != null && _uiCanvas != null)
         {
             _toolbarHandler = new ToolbarHandler(this, _uiCanvas, _toolbar, _toolbarPositionCalculator);
             _toolbarHandler.HideToolbar(); // Hide initially
+            Log.Debug("ToolbarHandler initialized");
         }
 
+        // CaptureHandler - depends on _selector and _annotationHandler
         if (_selector != null && _annotationHandler != null)
         {
             _captureHandler = new CaptureHandler(
@@ -177,28 +224,96 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 _screenCaptureStrategy, _coordinateMapper,
                 () => _frozenBackground,  // Use lambda to get latest value
                 () => _screens);           // Use lambda to get latest value
-            SetupCaptureHandlerEvents();
+            Log.Debug("CaptureHandler initialized");
         }
-
-        // Setup annotation handler events
-        SetupAnnotationHandlerEvents();
     }
 
-    private void OnOverlayWindowLoaded(object? sender, EventArgs e)
+    /// <summary>
+    /// Phase 3: Setup event subscriptions and final configuration
+    /// </summary>
+    private void SetupEventSubscriptions()
     {
+        Log.Debug("Phase 3: Setting up event subscriptions");
+        
+        // Setup handler events
+        SetupSelectionHandlerEvents();
+        SetupCaptureHandlerEvents();
+        SetupAnnotationHandlerEvents();
+        
+        Log.Debug("Event subscriptions completed");
+    }
+
+    /// <summary>
+    /// Verify that all critical components are properly initialized
+    /// </summary>
+    private bool VerifyInitialization()
+    {
+        var isReady = _annotator != null && 
+                     _selectionHandler != null && 
+                     _elementDetectionHandler != null &&
+                     _captureHandler != null;
+        
+        Log.Debug("Initialization verification: Ready={Ready}, Annotator={A}, SelectionHandler={SH}, ElementDetectionHandler={EDH}, CaptureHandler={CH}",
+            isReady, _annotator != null, _selectionHandler != null, _elementDetectionHandler != null, _captureHandler != null);
+        
+        return isReady;
+    }
+
+    /// <summary>
+    /// Try to set focus when both components and background are ready
+    /// This ensures focus is set at the right time regardless of initialization order
+    /// </summary>
+    private void TrySetFocusWhenReady()
+    {
+        if (_componentsInitialized && _backgroundReady && !_focusSet)
+        {
+            Log.Debug("Both components and background ready - setting focus");
+            SetFocusAfterInitialization();
+            _focusSet = true;
+        }
+        else
+        {
+            Log.Debug("Not ready for focus yet - Components: {C}, Background: {B}, FocusSet: {F}", 
+                _componentsInitialized, _backgroundReady, _focusSet);
+        }
+    }
+
+    /// <summary>
+    /// Ensure focus is set after background is ready (called from async background loading)
+    /// </summary>
+    private void EnsureFocusAfterBackgroundReady()
+    {
+        Log.Debug("Background ready - checking if focus should be set");
+        _backgroundReady = true;
+        TrySetFocusWhenReady();
+    }
+
+    /// <summary>
+    /// Set focus after all initialization is complete
+    /// This ensures keyboard events work properly on first screenshot
+    /// </summary>
+    private void SetFocusAfterInitialization()
+    {
+        Log.Debug("Setting focus after initialization");
+        
+        // Verify all components are ready before setting focus
+        if (!VerifyInitialization())
+        {
+            Log.Warning("Not all components initialized, focus may not work properly");
+        }
+        
         // Ensure annotator has focus for keyboard shortcuts
         if (_annotator != null)
         {
             _annotator.Focus();
-            Log.Debug("Focus set to annotator after window loaded");
-
-            // Also set focus to the window itself to ensure keyboard events are captured
             this.Focus();
-            Log.Debug("Focus also set to overlay window");
+            Log.Debug("Focus set to annotator and window");
         }
 
         // Disable IME to prevent input method interference with keyboard shortcuts
         _imeHandler?.DisableIme();
+        
+        Log.Debug("Focus initialization completed - keyboard events ready");
     }
 
     /// <summary>
@@ -217,6 +332,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
             {
                 _backgroundImage.Source = bitmap;
                 _frozenBackground = bitmap;
+                
+                // Background is now ready - set focus if not already done
+                EnsureFocusAfterBackgroundReady();
             }
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
@@ -391,39 +509,42 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _maskPath.Data = group;
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    /// <summary>
+    /// Preview (tunneling) keyboard event - captures keys before children
+    /// This ensures OverlayWindow handles Ctrl key even when NewAnnotationOverlay has focus
+    /// </summary>
+    private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
-        base.OnKeyDown(e);
+        Log.Debug("OnPreviewKeyDown: Key={Key}, Modifiers={Modifiers}", e.Key, e.KeyModifiers);
+        
+        // Handle Ctrl, Tab, Space keys in preview - let other keys go to children first
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+        {
+            Log.Debug("Ctrl key detected - calling handlers");
+            _selectionHandler?.HandleCtrlKeyDown();
+            _elementDetectionHandler?.EnableElementPicker();
+            // Don't set e.Handled = true to allow children to also receive the event
+            return;
+        }
+
+        if (e.Key == Key.Tab)
+        {
+            _selectionHandler?.HandleTabKey();
+            e.Handled = true; // Prevent tab navigation
+            return;
+        }
+
+        if (e.Key == Key.Space && _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker)
+        {
+            _elementDetectionHandler?.ToggleDetectionMode();
+            e.Handled = true;
+            return;
+        }
 
         // ESC key - delegate to selection handler
         if (e.Key == Key.Escape)
         {
             _selectionHandler?.HandleEscapeKey();
-            e.Handled = true;
-            return;
-        }
-
-        // Ctrl keys - delegate to selection handler
-        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
-        {
-            _selectionHandler?.HandleCtrlKeyDown();
-            _elementDetectionHandler?.EnableElementPicker();
-            e.Handled = true;
-            return;
-        }
-
-        // Tab key - delegate to selection handler
-        if (e.Key == Key.Tab)
-        {
-            _selectionHandler?.HandleTabKey();
-            e.Handled = true;
-            return;
-        }
-
-        // Space key - toggle detection mode (window vs element)
-        if (e.Key == Key.Space && _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker)
-        {
-            _elementDetectionHandler?.ToggleDetectionMode();
             e.Handled = true;
             return;
         }
@@ -449,21 +570,30 @@ public partial class OverlayWindow : Window, IOverlayWindow
         }
     }
 
-    protected override void OnKeyUp(KeyEventArgs e)
+    /// <summary>
+    /// Preview (tunneling) keyboard event for key release
+    /// </summary>
+    private void OnPreviewKeyUp(object? sender, KeyEventArgs e)
     {
-        base.OnKeyUp(e);
-
         if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
         {
             _selectionHandler?.HandleCtrlKeyUp();
             _elementDetectionHandler?.DisableElementPicker();
-            e.Handled = true;
+            // Don't set e.Handled = true to allow children to also receive the event
         }
     }
 
+
     private void SetupElementHighlight()
     {
-        if (_elementDetector == null) return;
+        if (_elementDetector == null)
+        {
+            Log.Warning("ElementDetector is null, skipping element highlight setup");
+            return;
+        }
+
+        Log.Debug("Setting up element highlight with detector: {Type}, IsSupported: {IsSupported}, HasPermissions: {HasPermissions}",
+            _elementDetector.GetType().Name, _elementDetector.IsSupported, _elementDetector.HasPermissions);
 
         _elementHighlight = new ElementHighlightOverlay(_elementDetector);
 
@@ -482,6 +612,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
         // Create element detection handler
         _elementDetectionHandler = new ElementDetectionHandler(this, _elementDetector, _elementHighlight);
         _elementDetectionHandler.ElementSelected += OnElementSelected;
+        
+        Log.Debug("Element detection handler created successfully");
     }
 
 
