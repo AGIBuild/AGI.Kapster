@@ -18,7 +18,6 @@ internal sealed class SelectionHandler
     private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
 
     // Events
-    public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
     public event EventHandler<OverlayCancelledEventArgs>? Cancelled;
     public event Action<Rect>? SelectionChanged;
     public event Action<Rect>? SelectionFinished;
@@ -51,15 +50,17 @@ internal sealed class SelectionHandler
     }
 
     /// <summary>
-    /// Handle Enter key - confirm selection
+    /// Handle Enter key - confirm selection (requests capture)
+    /// Note: Should trigger capture with annotations, not just raise event
+    /// The capture will be handled by parent and final image will be provided
     /// </summary>
     public void HandleEnterKey()
     {
         var rect = _selector.SelectionRect;
         if (rect.Width > 0)
         {
-            Log.Debug("Enter key pressed - confirming selection");
-            RegionSelected?.Invoke(this, new RegionSelectedEventArgs(rect, false));
+            Log.Debug("Enter key pressed - requesting confirmation with capture");
+            ConfirmRequested?.Invoke(rect);
         }
     }
 

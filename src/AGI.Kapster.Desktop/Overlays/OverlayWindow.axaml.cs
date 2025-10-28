@@ -40,9 +40,10 @@ public partial class OverlayWindow : Window, IOverlayWindow
     private ToolbarHandler? _toolbarHandler;
     private ElementDetectionHandler? _elementDetectionHandler;
     private AnnotationHandler? _annotationHandler;
+    private SelectionHandler? _selectionHandler;
+    private CaptureHandler? _captureHandler;
     
     private ElementHighlightOverlay? _elementHighlight;
-    private OverlaySelectionMode _selectionMode = OverlaySelectionMode.FreeSelection;
     private NewAnnotationOverlay? _annotator; // Keep reference to correct annotator instance
 
     // Cached control references to avoid FindControl<>() abuse
@@ -71,8 +72,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
     // Property to check element detection support
     public bool ElementDetectionEnabled
     {
-        get => _selectionMode == OverlaySelectionMode.ElementPicker;
-        set => SetElementPickerMode(value);
+        get => _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker;
+        set => _selectionHandler?.SetElementPickerMode(value);
     }
 
     public OverlayWindow(
@@ -102,9 +103,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
         // Minimal setup for immediate display
         this.Cursor = new Cursor(StandardCursorType.Cross);
-        _selectionMode = OverlaySelectionMode.FreeSelection;
 
-        // Set up mouse event handlers for element selection
+        // Set up mouse event handlers
         this.PointerPressed += OnOverlayPointerPressed;
         this.PointerMoved += OnOverlayPointerMoved;
 
@@ -123,6 +123,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
 		// Set focus to annotator when window is loaded
 		this.Loaded += OnOverlayWindowLoaded;
+		
+		// Setup window cleanup
+		SetupWindowCleanup();
     }
 
     /// <summary>
@@ -157,22 +160,31 @@ public partial class OverlayWindow : Window, IOverlayWindow
             _elementHighlight.IsActive = false; // Initially disabled
         }
 
-        // Show selection overlay by default for free selection
+        // Initialize handlers that depend on UI components
         if (_selector != null)
         {
-            _selector.IsVisible = true;
-            _selector.IsHitTestVisible = true;
+            _selectionHandler = new SelectionHandler(this, _selector);
+            SetupSelectionHandlerEvents();
         }
 
-        // Initialize toolbar handler after toolbar is available
         if (_toolbar != null && _uiCanvas != null)
         {
             _toolbarHandler = new ToolbarHandler(this, _uiCanvas, _toolbar, _toolbarPositionCalculator);
             _toolbarHandler.HideToolbar(); // Hide initially
         }
 
-        // Setup selection overlay
-        SetupSelectionOverlay();
+        if (_selector != null && _annotationHandler != null)
+        {
+            _captureHandler = new CaptureHandler(
+                this, _selector, _annotationHandler,
+                _screenCaptureStrategy, _coordinateMapper,
+                () => _frozenBackground,  // Use lambda to get latest value
+                () => _screens);           // Use lambda to get latest value
+            SetupCaptureHandlerEvents();
+        }
+
+        // Setup annotation handler events
+        SetupAnnotationHandlerEvents();
     }
 
     private void OnOverlayWindowLoaded(object? sender, EventArgs e)
@@ -250,92 +262,87 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     internal IOverlaySession? GetSession() => _session;
 
-    private void SetupSelectionOverlay()
+    private void SetupSelectionHandlerEvents()
     {
-        if (_selector != null)
+        if (_selectionHandler == null)
+            return;
+
+        // Subscribe to selection handler events
+        _selectionHandler.SelectionChanged += r =>
         {
-            // Backdrop removed to avoid blur/ghosting issues
+            UpdateMaskForSelection(r);
+            _annotationHandler?.UpdateSelection(r);
+            _toolbarHandler?.UpdatePosition(r);
+        };
 
-            _selector.SelectionFinished += r =>
-            {
-                // Keep selection for annotation; don't capture yet
-                _selectionMode = OverlaySelectionMode.Editing;
-                Log.Information("Selection finished: {X},{Y} {W}x{H} - editable selection created", r.X, r.Y, r.Width, r.Height);
-
-                // Ensure focus is on annotator for keyboard shortcuts
-                _annotationHandler?.FocusAnnotator();
-
-                // Raise public event with isEditableSelection = true
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
-            };
-
-            // Create a hole in mask over selection using Path (even-odd)
-            _selector.SelectionChanged += r =>
-            {
-                UpdateMaskForSelection(r);
-                _annotationHandler?.UpdateSelection(r);
-                _toolbarHandler?.UpdatePosition(r);
-            };
-
-            _selector.ConfirmRequested += async r =>
-            {
-                // Directly capture the window region (includes background + annotations)
-                // This avoids coordinate transformation issues
-                Bitmap? finalImage = null;
-                
-                try
-                {
-                    Log.Debug("Capturing window region with annotations: {Region}", r);
-                    finalImage = await CaptureWindowRegionWithAnnotationsAsync(r);
-                    Log.Debug("Window region captured successfully");
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Failed to capture window region, falling back to frozen background");
-                    finalImage = await GetBaseScreenshotForRegionAsync(r);
-                }
-
-                // Raise region selected event with final image
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
-            };
-        }
-
-        if (_annotationHandler != null)
+        _selectionHandler.SelectionFinished += r =>
         {
-            // Subscribe to annotation handler events
-            _annotationHandler.ExportRequested += HandleExportRequest;
-            _annotationHandler.ColorPickerRequested += HandleColorPickerRequest;
-            _annotationHandler.ConfirmRequested += async r =>
+            _annotationHandler?.FocusAnnotator();
+            RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, true));
+        };
+
+        _selectionHandler.ConfirmRequested += async r =>
+        {
+            var finalImage = await CaptureWithFallbackAsync(r);
+            RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
+            
+            // Close overlay after capture
+            var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                // Directly capture the window region (includes background + annotations)
-                // This avoids coordinate transformation issues
-                Bitmap? finalImage = null;
-                
-                try
-                {
-                    Log.Debug("Capturing window region with annotations: {Region}", r);
-                    finalImage = await CaptureWindowRegionWithAnnotationsAsync(r);
-                    Log.Debug("Window region captured successfully");
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Failed to capture window region, falling back to frozen background");
-                    finalImage = await GetBaseScreenshotForRegionAsync(r);
-                }
+                await System.Threading.Tasks.Task.Delay(OverlayConstants.StandardUiDelay);
+                CloseOverlayWithController("selection confirmed");
+            });
+        };
 
-                // Raise region selected event with final image
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
+        _selectionHandler.Cancelled += (s, e) => Cancelled?.Invoke(this, e);
+    }
 
-                var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-                {
-                    await System.Threading.Tasks.Task.Delay(OverlayConstants.StandardUiDelay);
-                    CloseOverlayWithController("double-click save");
-                });
-            };
+    private void SetupAnnotationHandlerEvents()
+    {
+        if (_annotationHandler == null)
+            return;
+
+        _annotationHandler.ExportRequested += async () => await _captureHandler?.HandleExportRequestAsync()!;
+        _annotationHandler.ColorPickerRequested += () => _annotationHandler.ShowColorPicker();
+        _annotationHandler.ConfirmRequested += async r =>
+        {
+            var finalImage = await CaptureWithFallbackAsync(r);
+            RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false, null, false, finalImage));
+
+            var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await System.Threading.Tasks.Task.Delay(OverlayConstants.StandardUiDelay);
+                CloseOverlayWithController("double-click save");
+            });
+        };
+    }
+
+    private void SetupCaptureHandlerEvents()
+    {
+        if (_captureHandler == null)
+            return;
+
+        _captureHandler.CloseRequested += context => CloseOverlayWithController(context);
+    }
+
+    private async Task<Bitmap?> CaptureWithFallbackAsync(Rect region)
+    {
+        try
+        {
+            Log.Debug("Capturing window region with annotations: {Region}", region);
+            var image = await _captureHandler?.CaptureWindowRegionWithAnnotationsAsync(region)!;
+            Log.Debug("Window region captured successfully");
+            return image;
         }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to capture window region, falling back to frozen background");
+            return await _captureHandler?.GetBaseScreenshotForRegionAsync(region)!;
+        }
+    }
 
-
-        // Clean up resources when this window closes
+    private void SetupWindowCleanup()
+    {
         this.Closing += (sender, e) =>
         {
             Log.Information("OverlayWindow: Window closing, cleaning up resources");
@@ -391,80 +398,57 @@ public partial class OverlayWindow : Window, IOverlayWindow
     {
         base.OnKeyDown(e);
 
-        // ESC key always exits screenshot mode
+        // ESC key - delegate to selection handler
         if (e.Key == Key.Escape)
         {
-            Serilog.Log.Information("ESC key pressed - exiting screenshot mode");
-            Cancelled?.Invoke(this, new OverlayCancelledEventArgs("User pressed ESC"));
+            _selectionHandler?.HandleEscapeKey();
             e.Handled = true;
+            return;
         }
 
+        // Ctrl keys - delegate to selection handler
         if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
         {
-            // CTRL key pressed - switch to auto highlight mode (only if not in editing mode)
-            if (_selectionMode == OverlaySelectionMode.FreeSelection)
-            {
-                _selectionMode = OverlaySelectionMode.ElementPicker;
-                _elementDetectionHandler?.EnableElementPicker();
-
-                // Hide selection overlay
-                if (_selector != null)
-                {
-                    _selector.IsVisible = false;
-                    _selector.IsHitTestVisible = false;
-                }
-
-                // Set cursor for element selection
-                this.Cursor = new Cursor(StandardCursorType.Hand);
-
-                Log.Debug("Switched to element picker mode");
-            }
+            _selectionHandler?.HandleCtrlKeyDown();
+            _elementDetectionHandler?.EnableElementPicker();
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.Tab)
+
+        // Tab key - delegate to selection handler
+        if (e.Key == Key.Tab)
         {
-            // Tab key for manual toggle (fallback)
-            ToggleElementPickerMode();
+            _selectionHandler?.HandleTabKey();
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.Space && _selectionMode == OverlaySelectionMode.ElementPicker)
+
+        // Space key - toggle detection mode (window vs element)
+        if (e.Key == Key.Space && _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker)
         {
-            // Toggle between window and element detection mode
             _elementDetectionHandler?.ToggleDetectionMode();
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.S && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+
+        // Ctrl+S - Export
+        if (e.Key == Key.S && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            // Ctrl+S: Export current selection to file
-            if (_selectionMode == OverlaySelectionMode.Editing)
+            if (_selectionHandler?.SelectionMode == OverlaySelectionMode.Editing)
             {
                 Log.Information("Ctrl+S pressed - triggering export");
                 _annotationHandler?.RequestExport();
             }
-            else
-            {
-                Log.Debug("Ctrl+S pressed but no editable selection");
-            }
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.Enter)
-        {
-            if (_selector != null)
-            {
-                var r = _selector.SelectionRect;
-                if (r.Width > 0)
-                {
-                    // Raise region selected event
-                    RegionSelected?.Invoke(this, new RegionSelectedEventArgs(r, false));
 
-                    var _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await System.Threading.Tasks.Task.Delay(OverlayConstants.StandardUiDelay);
-                        CloseOverlayWithController("Enter key save");
-                    });
-                }
-            }
+        // Enter key - confirm selection with capture and close
+        if (e.Key == Key.Enter)
+        {
+            _selectionHandler?.HandleEnterKey();
             e.Handled = true;
+            return;
         }
     }
 
@@ -474,24 +458,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
         if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
         {
-            // CTRL key released - switch back to free selection mode (only if in element picker mode)
-            if (_selectionMode == OverlaySelectionMode.ElementPicker)
-            {
-                _selectionMode = OverlaySelectionMode.FreeSelection;
-                _elementDetectionHandler?.DisableElementPicker();
-
-                // Show selection overlay
-                if (_selector != null)
-                {
-                    _selector.IsVisible = true;
-                    _selector.IsHitTestVisible = true;
-                }
-
-                // Set cursor for free selection
-                this.Cursor = new Cursor(StandardCursorType.Cross);
-
-                Log.Debug("Switched to free selection mode");
-            }
+            _selectionHandler?.HandleCtrlKeyUp();
+            _elementDetectionHandler?.DisableElementPicker();
             e.Handled = true;
         }
     }
@@ -519,299 +487,40 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _elementDetectionHandler.ElementSelected += OnElementSelected;
     }
 
-    private void ToggleElementPickerMode()
-    {
-        bool isElementPicker = _selectionMode == OverlaySelectionMode.ElementPicker;
-        _selectionMode = isElementPicker ? OverlaySelectionMode.FreeSelection : OverlaySelectionMode.ElementPicker;
 
-        if (isElementPicker)
-        {
-            _elementDetectionHandler?.DisableElementPicker();
-        }
-        else
-        {
-            _elementDetectionHandler?.EnableElementPicker();
-        }
-
-        // Hide/show selection overlay based on mode
-        if (_selector != null)
-        {
-            _selector.IsHitTestVisible = _selectionMode != OverlaySelectionMode.ElementPicker;
-            _selector.IsVisible = _selectionMode != OverlaySelectionMode.ElementPicker;
-        }
-
-        // Set appropriate cursor
-        this.Cursor = _selectionMode == OverlaySelectionMode.ElementPicker 
-            ? new Cursor(StandardCursorType.Hand) 
-            : new Cursor(StandardCursorType.Cross);
-
-        Log.Debug("Selection mode: {Mode}", _selectionMode);
-    }
-
-    private void SetElementPickerMode(bool enabled)
-    {
-        var newMode = enabled ? OverlaySelectionMode.ElementPicker : OverlaySelectionMode.FreeSelection;
-        if (_selectionMode != newMode)
-        {
-            _selectionMode = newMode;
-
-            // Update element highlight state via handler
-            if (enabled)
-            {
-                _elementDetectionHandler?.EnableElementPicker();
-            }
-            else
-            {
-                _elementDetectionHandler?.DisableElementPicker();
-            }
-
-            // Hide/show selection overlay based on mode
-            if (_selector != null)
-            {
-                _selector.IsHitTestVisible = !enabled;
-                _selector.IsVisible = !enabled;
-            }
-
-            // Set appropriate cursor
-            this.Cursor = enabled ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Cross);
-        }
-    }
 
     private void OnElementSelected(DetectedElement element)
     {
         Log.Information("Element selected: {Name} - {Bounds}", element.Name, element.Bounds);
 
-        // Convert element bounds to overlay coordinates via handler
-        if (_selector != null && _elementDetectionHandler != null)
-        {
-            var selectionRect = _elementDetectionHandler.ConvertElementBoundsToOverlay(element);
+        if (_selectionHandler == null || _elementDetectionHandler == null)
+            return;
 
-            // Show and enable selection overlay
-            _selector.IsVisible = true;
-            _selector.IsHitTestVisible = true;
+        var selectionRect = _elementDetectionHandler.ConvertElementBoundsToOverlay(element);
 
-            // Set the selection and switch back to normal mode
-            _selector.SetSelection(selectionRect);
+        _selectionHandler.ShowSelector();
+        _selectionHandler.SetSelection(selectionRect);
+        _elementDetectionHandler.DisableElementPicker();
 
-            // Switch to editing mode
-            _selectionMode = OverlaySelectionMode.Editing;
+        RegionSelected?.Invoke(this, new RegionSelectedEventArgs(selectionRect, false, element, true));
 
-            // Disable element picker
-            _elementDetectionHandler.DisableElementPicker();
-
-            // Raise public event with isEditableSelection = true
-            RegionSelected?.Invoke(this, new RegionSelectedEventArgs(selectionRect, false, element, true));
-
-            Log.Debug("Element selected, switched to editing mode");
-        }
+        Log.Debug("Element selected, switched to editing mode");
     }
 
     private void OnOverlayPointerMoved(object? sender, PointerEventArgs e)
     {
-        // Delegate to element detection handler
-        _elementDetectionHandler?.HandlePointerMoved(e, _selectionMode == OverlaySelectionMode.ElementPicker);
+        var isElementPickerMode = _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker;
+        _elementDetectionHandler?.HandlePointerMoved(e, isElementPickerMode);
     }
 
     private void OnOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // Delegate to element detection handler
-        var handled = _elementDetectionHandler?.HandlePointerPressed(e, _selectionMode == OverlaySelectionMode.ElementPicker) ?? false;
+        var isElementPickerMode = _selectionHandler?.SelectionMode == OverlaySelectionMode.ElementPicker;
+        var handled = _elementDetectionHandler?.HandlePointerPressed(e, isElementPickerMode) ?? false;
         if (handled)
         {
             e.Handled = true;
         }
-        // Note: When not in element picker mode, let SelectionOverlay handle the event for custom drag selection
-    }
-
-    // Clipboard functionality has been moved to platform-specific strategies
-    // See IClipboardStrategy and its implementations
-
-    /// <summary>
-    /// Cross-platform screenshot capture method using strategy pattern
-    /// </summary>
-    private async Task<Bitmap?> CaptureRegionAsync(Avalonia.Rect rect)
-    {
-        if (_screenCaptureStrategy == null)
-        {
-            Log.Error("No screen capture strategy available");
-            return null;
-        }
-
-        try
-        {
-            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(rect, this);
-            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to capture region");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Capture what the user sees: render the actual window region including background and annotation overlay.
-    /// This avoids coordinate transformation issues by capturing the already-rendered content.
-    /// </summary>
-    private async Task<Bitmap?> CaptureWindowRegionWithAnnotationsAsync(Avalonia.Rect region)
-    {
-        try
-        {
-            // Calculate DPI scaling
-            var scaleX = 1.0;
-            var scaleY = 1.0;
-            if (_frozenBackground != null)
-            {
-                scaleX = _frozenBackground.PixelSize.Width / Math.Max(1.0, this.Bounds.Width);
-                scaleY = _frozenBackground.PixelSize.Height / Math.Max(1.0, this.Bounds.Height);
-            }
-
-            // End text editing before capture to prevent TextBox background artifacts.
-            _annotationHandler?.EndTextEditing();
-
-            // Temporarily hide UI elements
-            bool selectorWasVisible = _selector?.IsVisible ?? false;
-            if (_selector != null)
-            {
-                _selector.IsVisible = false;
-            }
-
-            try
-            {
-                var baseScreenshot = ExtractRegionFromFrozenBackground(region);
-                if (baseScreenshot == null)
-                {
-                    Log.Warning("Failed to extract region from frozen background");
-                    return null;
-                }
-
-                var annotations = GetAnnotationsFromAnnotator();
-                if (annotations == null || !annotations.Any())
-                {
-                    return baseScreenshot;
-                }
-
-                // Determine target screen for correct DPI handling
-                var targetScreen = GetScreenForSelection(region);
-
-                var exportService = new ExportService();
-                return await exportService.CreateCompositeImageWithAnnotationsAsync(
-                    baseScreenshot, annotations, region, targetScreen);
-            }
-            finally
-            {
-                // Restore UI elements
-                if (_selector != null && selectorWasVisible)
-                {
-                    _selector.IsVisible = true;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to capture window region with annotations");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Get annotations from annotator
-    /// </summary>
-    private IEnumerable<IAnnotationItem>? GetAnnotationsFromAnnotator()
-    {
-        return _annotationHandler?.Annotator?.GetAnnotations();
-    }
-
-    /// <summary>
-    /// Determine which screen the selection region is on (using center point)
-    /// </summary>
-    private Screen? GetScreenForSelection(Rect selectionRect)
-    {
-        if (_coordinateMapper == null)
-        {
-            Log.Debug("No coordinate mapper available, cannot determine target screen");
-            return null;
-        }
-
-        try
-        {
-            // Calculate center point of selection (in logical DIPs)
-            var centerX = selectionRect.X + selectionRect.Width / 2;
-            var centerY = selectionRect.Y + selectionRect.Height / 2;
-            var centerPoint = new PixelPoint((int)centerX, (int)centerY);
-
-            // Find screen containing this point
-            if (_screens == null || _screens.Count == 0)
-            {
-                Log.Warning("Cannot determine target screen: screens not available");
-                return null;
-            }
-
-            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint, _screens);
-            if (targetScreen != null)
-            {
-                Log.Debug("Selection at ({X}, {Y}) is on screen with scaling {Scaling}", 
-                    centerX, centerY, targetScreen.Scaling);
-            }
-            else
-            {
-                Log.Debug("Could not determine screen for selection at ({X}, {Y})", centerX, centerY);
-            }
-
-            return targetScreen;
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to determine target screen for selection");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Returns base screenshot for a region: uses frozen background if available, otherwise live capture.
-    /// </summary>
-    private async Task<Bitmap?> GetBaseScreenshotForRegionAsync(Avalonia.Rect region)
-    {
-        if (_frozenBackground != null)
-        {
-            Log.Debug("Using frozen background for region {Region}", region);
-            return ExtractRegionFromFrozenBackground(region);
-        }
-        Log.Debug("Frozen background not available, using live capture for region {Region}", region);
-        return await CaptureRegionAsync(region);
-    }
-
-    /// <summary>
-    /// Extract a region from the frozen background with DPI-aware source rect scaling.
-    /// </summary>
-    private Bitmap? ExtractRegionFromFrozenBackground(Avalonia.Rect region)
-    {
-        if (_frozenBackground == null)
-            return null;
-
-        var totalDipWidth = Math.Max(1.0, this.Bounds.Width);
-        var totalDipHeight = Math.Max(1.0, this.Bounds.Height);
-        var scaleX = _frozenBackground.PixelSize.Width / totalDipWidth;
-        var scaleY = _frozenBackground.PixelSize.Height / totalDipHeight;
-
-        // Calculate source rectangle in physical pixels
-        var sourceRect = new Avalonia.Rect(
-            region.X * scaleX,
-            region.Y * scaleY,
-            Math.Max(1.0, region.Width * scaleX),
-            Math.Max(1.0, region.Height * scaleY));
-
-        // Target should be in physical pixels, not DIPs
-        var targetWidth = Math.Max(1, (int)Math.Round(region.Width * scaleX));
-        var targetHeight = Math.Max(1, (int)Math.Round(region.Height * scaleY));
-
-        // Create bitmap at physical pixel resolution with standard 96 DPI
-        var target = new RenderTargetBitmap(new PixelSize(targetWidth, targetHeight), new Vector(96, 96));
-        using (var ctx = target.CreateDrawingContext())
-        {
-            ctx.DrawImage(_frozenBackground, sourceRect, new Avalonia.Rect(0, 0, targetWidth, targetHeight));
-        }
-        return target;
     }
 
     /// <summary>
@@ -819,24 +528,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     public async Task<Bitmap?> GetFullScreenScreenshotAsync()
     {
-        if (_screenCaptureStrategy == null)
-        {
-            Log.Debug("No screen capture strategy available for full screen screenshot");
-            return null;
-        }
-
-        try
-        {
-            // Get the full screen bounds
-            var screenBounds = new Avalonia.Rect(0, 0, this.Bounds.Width, this.Bounds.Height);
-            var skBitmap = await _screenCaptureStrategy.CaptureWindowRegionAsync(screenBounds, this);
-            return BitmapConverter.ConvertToAvaloniaBitmap(skBitmap);
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Failed to capture full screen screenshot for color sampling");
-            return null;
-        }
+        return await _captureHandler?.GetFullScreenScreenshotAsync()!;
     }
 
 
@@ -846,244 +538,19 @@ public partial class OverlayWindow : Window, IOverlayWindow
     #region Export Functionality
 
     /// <summary>
-    /// Handle export request from annotation overlay
+    /// Handle export request from annotation overlay (delegated to CaptureHandler)
     /// </summary>
     private async void HandleExportRequest()
     {
-        try
-        {
-            if (!ValidateExportPreconditions())
-                return;
-
-            var settings = await ShowExportSettingsDialogAsync();
-            if (settings == null)
-                return;
-
-            var file = await ShowSaveFileDialogAsync(settings);
-            if (file == null)
-                return;
-
-            await PerformExportAsync(file.Path.LocalPath, settings);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to handle export request");
-        }
-    }
-
-    private bool ValidateExportPreconditions()
-    {
-        var annotator = _annotationHandler?.Annotator;
-        if (annotator == null)
-            return false;
-
-        var selectionRect = annotator.SelectionRect;
-        if (selectionRect.Width <= 0 || selectionRect.Height <= 0)
-        {
-            Log.Warning("Cannot export: no valid selection area");
-            return false;
-        }
-
-        return true;
-    }
-
-    private async Task<ExportSettings?> ShowExportSettingsDialogAsync()
-    {
-        var exportService = new ExportService();
-        var defaultSettings = exportService.GetDefaultSettings();
-        var annotator = _annotationHandler!.Annotator!;
-        var imageSize = new Avalonia.Size(annotator.SelectionRect.Width, annotator.SelectionRect.Height);
-        var settingsDialog = new ExportSettingsDialog(defaultSettings, imageSize);
-
-        var dialogResult = await settingsDialog.ShowDialog<bool?>(this);
-        if (dialogResult != true)
-        {
-            Log.Information("Export cancelled by user");
-            return null;
-        }
-
-        return settingsDialog.Settings;
-    }
-
-    private async Task<IStorageFile?> ShowSaveFileDialogAsync(ExportSettings settings)
-    {
-        var storageProvider = GetTopLevel(this)?.StorageProvider;
-        if (storageProvider == null)
-        {
-            Log.Error("Cannot access storage provider for file dialog");
-            return null;
-        }
-
-        var exportService = new ExportService();
-        var fileTypes = CreateFileTypesFromFormats(exportService.GetSupportedFormats());
-        var suggestedFileName = $"Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}{settings.GetFileExtension()}";
-
-        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Export Annotated Screenshot",
-            FileTypeChoices = fileTypes,
-            DefaultExtension = settings.GetFileExtension().TrimStart('.'),
-            SuggestedFileName = suggestedFileName
-        });
-
-        if (file == null)
-        {
-            Log.Information("File save cancelled by user");
-        }
-
-        return file;
-    }
-
-    private async Task PerformExportAsync(string filePath, ExportSettings settings)
-    {
-        var progressDialog = new ExportProgressDialog();
-        progressDialog.SetFileInfo(System.IO.Path.GetFileName(filePath), settings.Format.ToString());
-
-        _ = progressDialog.ShowDialog(this);
-
-        var wasVisible = _selector?.IsVisible ?? false;
-
-        try
-        {
-            await HideSelectorAndWaitAsync(progressDialog);
-
-            var finalImage = await CaptureScreenshotForExportAsync(progressDialog);
-            if (finalImage == null)
-                throw new InvalidOperationException("Failed to capture screenshot");
-
-            await ExportImageToFileAsync(finalImage, filePath, settings, progressDialog);
-
-            progressDialog.Close();
-            Log.Information("Successfully exported to {FilePath}: {Format}, Q={Quality}",
-                filePath, settings.Format, settings.Quality);
-
-            CloseOverlayWithController("export");
-        }
-        catch (Exception ex)
-        {
-            RestoreSelectorVisibility(wasVisible);
-            var errorMessage = ex.InnerException?.Message ?? ex.Message;
-            progressDialog.ShowError($"Export failed: {errorMessage}");
-            Log.Error(ex, "Export failed");
-            throw;
-        }
-        finally
-        {
-            RestoreSelectorVisibility(wasVisible);
-        }
-    }
-
-    private async Task HideSelectorAndWaitAsync(ExportProgressDialog progressDialog)
-    {
-        progressDialog.UpdateProgress(5, "Preparing capture...");
-
-        if (_selector != null)
-        {
-            _selector.IsVisible = false;
-            await Task.Delay(OverlayConstants.StandardUiDelay); // UI update delay
-        }
-    }
-
-    private async Task<Bitmap?> CaptureScreenshotForExportAsync(ExportProgressDialog progressDialog)
-    {
-        progressDialog.UpdateProgress(10, "Capturing screenshot...");
-        var annotator = _annotationHandler!.Annotator!;
-        return await CaptureWindowRegionWithAnnotationsAsync(annotator.SelectionRect);
-    }
-
-    private async Task ExportImageToFileAsync(
-        Bitmap image,
-        string filePath,
-        ExportSettings settings,
-        ExportProgressDialog progressDialog)
-    {
-        var exportService = new ExportService();
-        await exportService.ExportToFileDirectAsync(image, filePath, settings,
-            (percentage, status) =>
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    progressDialog.UpdateProgress(percentage, status),
-                    Avalonia.Threading.DispatcherPriority.Background);
-            });
-    }
-
-    private void RestoreSelectorVisibility(bool wasVisible)
-    {
-        if (_selector != null && wasVisible)
-        {
-            _selector.IsVisible = true;
-        }
+        await _captureHandler?.HandleExportRequestAsync()!;
     }
 
     /// <summary>
-    /// Handle color picker request from annotation overlay
+    /// Handle color picker request from annotation overlay (delegated to AnnotationHandler)
     /// </summary>
     private void HandleColorPickerRequest()
     {
-        try
-        {
-            _annotationHandler?.ShowColorPicker();
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to handle color picker request");
-        }
-    }
-
-    /// <summary>
-    /// Create file types for file picker from supported export formats
-    /// </summary>
-    private FilePickerFileType[] CreateFileTypesFromFormats(ExportFormat[] formats)
-    {
-        var fileTypes = new List<FilePickerFileType>();
-
-        foreach (var format in formats)
-        {
-            var extension = GetExtensionForFormat(format);
-            var description = GetDescriptionForFormat(format);
-
-            fileTypes.Add(new FilePickerFileType(description)
-            {
-                Patterns = new[] { $"*{extension}" }
-            });
-        }
-
-        // Add "All Supported Images" option
-        var allPatterns = formats.Select(f => $"*{GetExtensionForFormat(f)}").ToArray();
-        fileTypes.Insert(0, new FilePickerFileType("All Supported Images")
-        {
-            Patterns = allPatterns
-        });
-
-        return fileTypes.ToArray();
-    }
-
-    private string GetExtensionForFormat(ExportFormat format)
-    {
-        return format switch
-        {
-            ExportFormat.PNG => ".png",
-            ExportFormat.JPEG => ".jpg",
-            ExportFormat.BMP => ".bmp",
-            ExportFormat.TIFF => ".tiff",
-            ExportFormat.WebP => ".webp",
-            ExportFormat.GIF => ".gif",
-            _ => ".png"
-        };
-    }
-
-    private string GetDescriptionForFormat(ExportFormat format)
-    {
-        return format switch
-        {
-            ExportFormat.PNG => "PNG Image",
-            ExportFormat.JPEG => "JPEG Image",
-            ExportFormat.BMP => "Bitmap Image",
-            ExportFormat.TIFF => "TIFF Image",
-            ExportFormat.WebP => "WebP Image",
-            ExportFormat.GIF => "GIF Image",
-            _ => "Image File"
-        };
+        _annotationHandler?.ShowColorPicker();
     }
 
     #endregion

@@ -28,8 +28,8 @@ internal sealed class CaptureHandler
     private readonly AnnotationHandler _annotationHandler;
     private readonly IScreenCaptureStrategy? _screenCaptureStrategy;
     private readonly IScreenCoordinateMapper? _coordinateMapper;
-    private readonly Bitmap? _frozenBackground;
-    private readonly IReadOnlyList<Screen>? _screens;
+    private readonly Func<Bitmap?> _getFrozenBackground;
+    private readonly Func<IReadOnlyList<Screen>?> _getScreens;
 
     // Event for requesting overlay close
     public event Action<string>? CloseRequested;
@@ -40,16 +40,16 @@ internal sealed class CaptureHandler
         AnnotationHandler annotationHandler,
         IScreenCaptureStrategy? screenCaptureStrategy,
         IScreenCoordinateMapper? coordinateMapper,
-        Bitmap? frozenBackground,
-        IReadOnlyList<Screen>? screens)
+        Func<Bitmap?> getFrozenBackground,
+        Func<IReadOnlyList<Screen>?> getScreens)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _selector = selector ?? throw new ArgumentNullException(nameof(selector));
         _annotationHandler = annotationHandler ?? throw new ArgumentNullException(nameof(annotationHandler));
         _screenCaptureStrategy = screenCaptureStrategy;
         _coordinateMapper = coordinateMapper;
-        _frozenBackground = frozenBackground;
-        _screens = screens;
+        _getFrozenBackground = getFrozenBackground ?? throw new ArgumentNullException(nameof(getFrozenBackground));
+        _getScreens = getScreens ?? throw new ArgumentNullException(nameof(getScreens));
     }
 
     #region Capture Methods
@@ -134,10 +134,11 @@ internal sealed class CaptureHandler
     /// </summary>
     public async Task<Bitmap?> GetBaseScreenshotForRegionAsync(Rect region)
     {
-        if (_frozenBackground != null)
+        var frozenBackground = _getFrozenBackground();
+        if (frozenBackground != null)
         {
             Log.Debug("Using frozen background for region {Region}", region);
-            return ExtractRegionFromFrozenBackground(region);
+            return ExtractRegionFromFrozenBackground(region, frozenBackground);
         }
         Log.Debug("Frozen background not available, using live capture for region {Region}", region);
         return await CaptureRegionAsync(region);
@@ -146,15 +147,16 @@ internal sealed class CaptureHandler
     /// <summary>
     /// Extract a region from the frozen background with DPI-aware source rect scaling
     /// </summary>
-    public Bitmap? ExtractRegionFromFrozenBackground(Rect region)
+    public Bitmap? ExtractRegionFromFrozenBackground(Rect region, Bitmap? frozenBackground = null)
     {
-        if (_frozenBackground == null)
+        frozenBackground ??= _getFrozenBackground();
+        if (frozenBackground == null)
             return null;
 
         var totalDipWidth = Math.Max(1.0, _window.Bounds.Width);
         var totalDipHeight = Math.Max(1.0, _window.Bounds.Height);
-        var scaleX = _frozenBackground.PixelSize.Width / totalDipWidth;
-        var scaleY = _frozenBackground.PixelSize.Height / totalDipHeight;
+        var scaleX = frozenBackground.PixelSize.Width / totalDipWidth;
+        var scaleY = frozenBackground.PixelSize.Height / totalDipHeight;
 
         // Calculate source rectangle in physical pixels
         var sourceRect = new Rect(
@@ -171,7 +173,7 @@ internal sealed class CaptureHandler
         var target = new RenderTargetBitmap(new PixelSize(targetWidth, targetHeight), new Vector(96, 96));
         using (var ctx = target.CreateDrawingContext())
         {
-            ctx.DrawImage(_frozenBackground, sourceRect, new Rect(0, 0, targetWidth, targetHeight));
+            ctx.DrawImage(frozenBackground, sourceRect, new Rect(0, 0, targetWidth, targetHeight));
         }
         return target;
     }
@@ -217,13 +219,14 @@ internal sealed class CaptureHandler
             var centerY = selectionRect.Y + selectionRect.Height / 2;
             var centerPoint = new PixelPoint((int)centerX, (int)centerY);
 
-            if (_screens == null || _screens.Count == 0)
+            var screens = _getScreens();
+            if (screens == null || screens.Count == 0)
             {
                 Log.Warning("Cannot determine target screen: screens not available");
                 return null;
             }
 
-            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint, _screens);
+            var targetScreen = _coordinateMapper.GetScreenFromPoint(centerPoint, screens);
             if (targetScreen != null)
             {
                 Log.Debug("Selection at ({X}, {Y}) is on screen with scaling {Scaling}",
