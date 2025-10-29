@@ -70,8 +70,27 @@ public class ToolbarPositionCalculator : IToolbarPositionCalculator
         }
 
         // Clamp to screen bounds (ensure max >= min to avoid ArgumentException)
-        var maxX = Math.Max(screenBounds.Left, screenBounds.Right - context.ToolbarSize.Width);
-        var maxY = Math.Max(screenBounds.Top, screenBounds.Bottom - context.ToolbarSize.Height);
+        double maxX, maxY;
+        if (screenBounds.Right - screenBounds.Left < context.ToolbarSize.Width)
+        {
+            // Toolbar wider than screen, clamp to left edge
+            maxX = screenBounds.Left;
+            Log.Warning("Toolbar width ({ToolbarWidth}) exceeds screen width ({ScreenWidth}). Positioning at left edge.", context.ToolbarSize.Width, screenBounds.Right - screenBounds.Left);
+        }
+        else
+        {
+            maxX = screenBounds.Right - context.ToolbarSize.Width;
+        }
+        if (screenBounds.Bottom - screenBounds.Top < context.ToolbarSize.Height)
+        {
+            // Toolbar taller than screen, clamp to top edge
+            maxY = screenBounds.Top;
+            Log.Warning("Toolbar height ({ToolbarHeight}) exceeds screen height ({ScreenHeight}). Positioning at top edge.", context.ToolbarSize.Height, screenBounds.Bottom - screenBounds.Top);
+        }
+        else
+        {
+            maxY = screenBounds.Bottom - context.ToolbarSize.Height;
+        }
         
         var finalX = Math.Clamp(position.X, screenBounds.Left, maxX);
         var finalY = Math.Clamp(position.Y, screenBounds.Top, maxY);
