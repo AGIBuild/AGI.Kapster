@@ -135,6 +135,7 @@ public sealed class NewAnnotationOverlay : Canvas
             // If currently editing text, don't handle tool hotkeys
             if (_editingTextBox != null)
             {
+                Log.Debug("Tool hotkeys skipped because text editing is active.");
                 return;
             }
             switch (e.Key)
