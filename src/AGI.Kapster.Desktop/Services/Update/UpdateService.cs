@@ -314,7 +314,7 @@ public class UpdateService : IUpdateService, IDisposable
                 _logger.Information("MSI installer launched, exiting application for update installation");
                 
                 // Give the installer a moment to start, then exit
-                _ = Task.Delay(2000).ContinueWith(_ => Environment.Exit(0));
+                ScheduleApplicationExitAsync();
             }
             
             return true;
