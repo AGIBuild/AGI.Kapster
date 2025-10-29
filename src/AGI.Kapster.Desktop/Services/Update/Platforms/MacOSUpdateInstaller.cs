@@ -183,7 +183,13 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
                     {
                         _logger.Error(ex, "Failed to launch updated application: {AppPath}", targetApp);
                     }
-                });
+                }).ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                    {
+                        _logger.Error(t.Exception, "Unhandled exception in background application launch task.");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
                 
                 return true;
             }
