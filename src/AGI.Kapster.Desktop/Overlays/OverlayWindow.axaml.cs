@@ -113,8 +113,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
         
         // Use tunneling events (PreviewKeyDown/Up) to intercept Ctrl key before children
         // This ensures OverlayWindow receives Ctrl key events even when focus is on child controls
-        this.AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
-        this.AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);
+        this.AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel); // Tunneling is critical: intercepts key before child controls
+        this.AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);     // Tunneling is critical: intercepts key before child controls
 
 		// Opened event: initialize UI components synchronously
 		// Note: Background is set automatically by SetPrecapturedAvaloniaBitmap when ready
