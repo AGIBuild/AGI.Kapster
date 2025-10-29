@@ -100,17 +100,17 @@ public class OverlayWindowComponentTests : TestBase
     }
 
     [Fact]
-    public void OverlayWindow_ShouldHaveStateTrackingFields()
+    public void OverlayWindow_ShouldHaveEssentialFields()
     {
         // Arrange
         var windowType = typeof(AGI.Kapster.Desktop.Overlays.OverlayWindow);
         var fields = windowType.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        // Act & Assert
-        var hasStateFields = Array.Exists(fields, f => 
-            f.Name.Contains("Initialized") || f.Name.Contains("Ready") || f.Name.Contains("Focus"));
+        // Act & Assert - Check for essential fields like handlers and cached controls
+        var hasEssentialFields = Array.Exists(fields, f => 
+            f.Name.Contains("Handler") || f.Name.Contains("_selector") || f.Name.Contains("_toolbar") || f.Name.Contains("_annotator"));
         
-        Assert.True(hasStateFields, "OverlayWindow should have state tracking fields");
+        Assert.True(hasEssentialFields, "OverlayWindow should have essential fields (handlers and cached controls)");
     }
 
     [Fact]
