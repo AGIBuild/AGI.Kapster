@@ -417,7 +417,13 @@ public partial class OverlayWindow : Window, IOverlayWindow
         if (_annotationHandler == null)
             return;
 
-        _annotationHandler.ExportRequested += async () => await _captureHandler?.HandleExportRequestAsync()!;
+        _annotationHandler.ExportRequested += async () =>
+        {
+            if (_captureHandler != null)
+            {
+                await _captureHandler.HandleExportRequestAsync();
+            }
+        };
         _annotationHandler.ColorPickerRequested += () => _annotationHandler.ShowColorPicker();
         _annotationHandler.ConfirmRequested += async r =>
         {
