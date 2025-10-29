@@ -568,6 +568,13 @@ public partial class OverlayWindow : Window, IOverlayWindow
             e.Handled = true;
             return;
         }
+
+        // For all other keys, delegate to the annotation overlay
+        // This ensures tool selection, arrow keys, size tools, etc. work properly
+        if (_annotator != null)
+        {
+            _annotator.HandleKeyDown(e);
+        }
     }
 
     /// <summary>
@@ -649,6 +656,22 @@ public partial class OverlayWindow : Window, IOverlayWindow
         if (handled)
         {
             e.Handled = true;
+            return;
+        }
+
+        // Handle double-click outside selection to close overlay
+        if (e.ClickCount == 2)
+        {
+            var point = e.GetPosition(this);
+            var selectionRect = _selector?.SelectionRect ?? default;
+            
+            // Check if double-click is outside the selection area
+            if (!selectionRect.Contains(point))
+            {
+                Log.Debug("Double-click outside selection - closing overlay");
+                _selectionHandler?.HandleEnterKey(); // Trigger capture and close
+                e.Handled = true;
+            }
         }
     }
 
