@@ -62,8 +62,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
 	// Frozen background (snapshot at overlay activation)
 	private Bitmap? _frozenBackground;
-	// Pre-captured Avalonia bitmap set before Show() for instant display
-	private Bitmap? _precapturedBackground;
 
     // Public events for external consumers
     public event EventHandler<RegionSelectedEventArgs>? RegionSelected;
@@ -140,8 +138,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _selector = this.FindControl<SelectionOverlay>("Selector");
         _toolbar = this.FindControl<NewAnnotationToolbar>("Toolbar");
         _uiCanvas = this.FindControl<Canvas>("UiCanvas");
-        
-        // Note: _annotator will be cached after creation in InitializeHeavyComponents
     }
 
     /// <summary>
@@ -301,15 +297,14 @@ public partial class OverlayWindow : Window, IOverlayWindow
         {
             Log.Warning("Not all components initialized, focus may not work properly");
         }
-        
-        // Ensure annotator has focus for keyboard shortcuts
-        if (_annotator != null)
-        {
-            _annotator.Focus();
-            this.Focus();
-            Log.Debug("Focus set to annotator and window");
-        }
 
+        Dispatcher.UIThread.Post(async () =>
+        {
+            await Task.Delay(OverlayConstants.StandardUiDelay); // Small delay to ensure window is fully ready
+            this.Focus();
+        }, DispatcherPriority.Background);
+
+      
         // Disable IME to prevent input method interference with keyboard shortcuts
         _imeHandler?.DisableIme();
         
@@ -322,11 +317,9 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     public void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap)
     {
-        _precapturedBackground = bitmap;
-        
         // If window is already shown and controls are initialized, apply background immediately
         // This handles the case where pre-capture completes after Opened event
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(() =>
         {
             if (bitmap != null && _backgroundImage != null)
             {
@@ -336,7 +329,7 @@ public partial class OverlayWindow : Window, IOverlayWindow
                 // Background is now ready - set focus if not already done
                 EnsureFocusAfterBackgroundReady();
             }
-        }, Avalonia.Threading.DispatcherPriority.Background);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>
