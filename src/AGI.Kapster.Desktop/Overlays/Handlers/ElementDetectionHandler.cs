@@ -100,9 +100,8 @@ internal sealed class ElementDetectionHandler
                 var overlayHandle = _window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
                 var element = _elementDetector.DetectElementAt((int)screenPos.X, (int)screenPos.Y, overlayHandle);
                 
-                // Debug log (e.g., detected element and pointer position) was removed to avoid performance impact in this high-frequency handler.
-                // If debugging is needed, consider temporarily enabling logging here, using conditional logging, or attaching a debugger to inspect
-                // the values of 'element' and 'screenPos'. Avoid leaving verbose logging enabled in production due to performance concerns.
+                // Debug log for detected element and pointer position. This may impact performance if Debug logging is enabled in production.
+                Log.Debug("Detected element: {@Element} at screen position: {ScreenPos}", element, screenPos);
                 
                 _elementHighlight.SetCurrentElement(element);
 
