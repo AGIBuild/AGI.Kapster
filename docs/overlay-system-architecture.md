@@ -8,18 +8,18 @@ Overlay system provides transparent screenshot windows with annotation support. 
 
 ### 1. High-Level API
 
-#### IScreenshotService
-Entry point for screenshot operations:
+#### Direct Coordinator Access
+Screenshot operations now use `IOverlayCoordinator` directly:
 ```csharp
-public interface IScreenshotService
+public interface IOverlayCoordinator
 {
-    bool IsActive { get; }
-    Task TakeScreenshotAsync();
-    void Cancel();
+    Task<IOverlaySession> StartSessionAsync();
+    void CloseCurrentSession();
+    bool HasActiveSession { get; }
 }
 ```
 
-**Implementation**: `ScreenshotService` → delegates to `IOverlayCoordinator`
+**Usage**: Services like `HotkeyManager` and `SystemTrayService` call `IOverlayCoordinator` directly
 
 ### 2. Coordinator Layer
 

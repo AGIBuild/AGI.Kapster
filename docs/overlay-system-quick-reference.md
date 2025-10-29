@@ -2,20 +2,13 @@
 
 ## Core Interfaces
 
-### IScreenshotService (High-Level API)
-```csharp
-bool IsActive { get; }
-Task TakeScreenshotAsync();
-void Cancel();
-```
-**Usage**: `IScreenshotService` → inject and call `TakeScreenshotAsync()`
-
-### IOverlayCoordinator (Platform Abstraction)
+### IOverlayCoordinator (High-Level API)
 ```csharp
 Task<IOverlaySession> StartSessionAsync();
 void CloseCurrentSession();
 bool HasActiveSession { get; }
 ```
+**Usage**: Services call `IOverlayCoordinator.StartSessionAsync()` directly
 **Implementations**: `WindowsOverlayCoordinator`, `MacOverlayCoordinator`
 
 ### IOverlaySession (Lifecycle Management)

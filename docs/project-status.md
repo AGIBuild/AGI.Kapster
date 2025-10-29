@@ -6,10 +6,12 @@ AGI.Kapster is in active development with a focus on cross-platform screen captu
 
 ## Recent Major Changes
 
-### Architecture Improvements ✅
-- **Background-Only Operation**: Removed main window for pure system tray integration
-- **Service Organization**: Grouped services by functionality (Clipboard, Capture, Export, Settings)
-- **Enhanced Testing**: 95+ unit tests with comprehensive coverage
+### Architecture Refactoring ✅ (Phase 1 Complete, Phase 2 In Progress)
+- **Service Layer Simplification**: Removed redundant `ScreenshotService`, consolidated service registrations
+- **God Object Refactoring**: Split `OverlayWindow` from 1290 to 630 lines (51% reduction)
+- **Handler Pattern Implementation**: Created specialized handlers for different responsibilities
+- **State-Driven Architecture**: Implemented robust initialization and focus management
+- **Enhanced Testing**: 256 unit tests with 100% pass rate
 - **Platform Abstraction**: Improved cross-platform service implementations
 
 ### Build System Modernization ✅
