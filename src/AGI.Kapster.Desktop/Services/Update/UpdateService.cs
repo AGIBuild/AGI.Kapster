@@ -309,7 +309,7 @@ public class UpdateService : IUpdateService, IDisposable
             
             // For Windows MSI installers, exit the application to allow update installation
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && 
-                Path.GetExtension(installerPath).Equals(".msi", StringComparison.OrdinalIgnoreCase))
+                string.Equals(Path.GetExtension(installerPath), ".msi", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.Information("MSI installer launched, exiting application for update installation");
                 
