@@ -102,7 +102,7 @@ internal sealed class ElementDetectionHandler
                 
                 if (element != null)
                 {
-                    Log.Debug("Element detected: {Name} at {Bounds}", element.Name, element.Bounds);
+                    // Debug log removed to avoid performance impact in high-frequency handler
                 }
                 
                 _elementHighlight.SetCurrentElement(element);
