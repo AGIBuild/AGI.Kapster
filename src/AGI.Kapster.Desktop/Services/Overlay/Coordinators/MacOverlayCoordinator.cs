@@ -91,16 +91,11 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             window.Width = screenBounds.Width;
             window.Height = screenBounds.Height;
 
-            // Associate window with session
-            window.SetSession(session);
+            // Configure window
             window.SetScreens(new[] { screen }); // Single screen for this window
             window.SetMaskSize(screenBounds.Width, screenBounds.Height);
 
-            // Subscribe to events
-            window.RegionSelected += OnRegionSelected;
-            window.Cancelled += OnCancelled;
-
-            // Add window to session (convert to Window)
+            // Add window to session (session will subscribe to window events automatically)
             session.AddWindow(window.AsWindow());
 
             // Asynchronously load background in parallel (non-blocking)

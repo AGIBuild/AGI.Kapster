@@ -1,25 +1,26 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Avalonia.Controls;
+using AGI.Kapster.Desktop.Overlays;
 using Serilog;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
 
 /// <summary>
 /// Scoped overlay session for a single screenshot operation
-/// Automatically cleans up state on disposal
+/// Manages window lifecycle and forwards window events to subscribers
+/// Automatically cleans up on disposal
 /// </summary>
 public class OverlaySession : IOverlaySession
 {
     private readonly List<Window> _windows = new();
-    private bool _hasSelection = false;
-    private object? _activeSelectionWindow = null;
     private readonly object _lock = new();
     private bool _disposed = false;
 
-    public event Action<bool>? SelectionStateChanged;
+    // Event forwarding (session aggregates all window events)
+    public event Action<RegionSelectedEventArgs>? RegionSelected;
+    public event Action<OverlayCancelledEventArgs>? Cancelled;
 
     public IReadOnlyList<Window> Windows
     {
@@ -32,52 +33,30 @@ public class OverlaySession : IOverlaySession
         }
     }
 
-    public bool HasSelection
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _hasSelection;
-            }
-        }
-    }
-
-    public object? ActiveSelectionWindow
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _activeSelectionWindow;
-            }
-        }
-    }
-
     public void AddWindow(Window window)
     {
         ThrowIfDisposed();
+        
         lock (_lock)
         {
             _windows.Add(window);
             Log.Debug("[OverlaySession] Window added, total: {Count}", _windows.Count);
         }
+        
+        // Subscribe to window events (outside lock to prevent deadlock)
+        SubscribeToWindowEvents(window);
     }
 
     public void RemoveWindow(Window window)
     {
         if (_disposed) return;
 
+        // Unsubscribe from window events (before removing from list)
+        UnsubscribeFromWindowEvents(window);
+        
         lock (_lock)
         {
             _windows.Remove(window);
-            
-            // Clear selection if this window has it
-            if (_activeSelectionWindow == window)
-            {
-                ClearSelectionInternal();
-            }
-            
             Log.Debug("[OverlaySession] Window removed, remaining: {Count}", _windows.Count);
         }
     }
@@ -135,92 +114,90 @@ public class OverlaySession : IOverlaySession
         }
     }
 
-    public bool CanStartSelection(object window)
-    {
-        ThrowIfDisposed();
-        lock (_lock)
-        {
-            return !_hasSelection || _activeSelectionWindow == window;
-        }
-    }
-
-    public void SetSelection(object window)
-    {
-        ThrowIfDisposed();
-        
-        Action<bool>? handlerCopy = null;
-        
-        lock (_lock)
-        {
-            if (_hasSelection && _activeSelectionWindow == window)
-                return; // No change
-
-            _hasSelection = true;
-            _activeSelectionWindow = window;
-            
-            // Capture event handler inside lock to prevent race with Dispose()
-            handlerCopy = SelectionStateChanged;
-            
-            Log.Debug("[OverlaySession] Selection set for window");
-        }
-        
-        // Invoke event outside lock to avoid deadlocks
-        // Using captured handler ensures thread safety even if Dispose() runs concurrently
-        handlerCopy?.Invoke(true);
-    }
-
-    public void ClearSelection(object? window = null)
-    {
-        if (_disposed) return;
-        
-        Action<bool>? handlerCopy = null;
-        
-        lock (_lock)
-        {
-            // If a specific window is provided, only clear if it's the active one
-            if (window != null && _activeSelectionWindow != window)
-                return;
-
-            if (_hasSelection)
-            {
-                ClearSelectionInternal();
-                
-                // Capture event handler inside lock to prevent race with Dispose()
-                handlerCopy = SelectionStateChanged;
-            }
-        }
-        
-        // Invoke event outside lock to avoid deadlocks
-        // Using captured handler ensures thread safety even if Dispose() runs concurrently
-        handlerCopy?.Invoke(false);
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
 
-        // Atomically clear event handlers to prevent race conditions
-        // This ensures no new handlers are invoked after disposal starts
-        Interlocked.Exchange(ref SelectionStateChanged, null);
+        // Clear event handlers to prevent race conditions
+        RegionSelected = null;
+        Cancelled = null;
 
-        // Close all windows first
+        // Unsubscribe from all windows
+        Window[] windowsToCleanup;
+        lock (_lock)
+        {
+            windowsToCleanup = _windows.ToArray();
+        }
+        
+        foreach (var window in windowsToCleanup)
+        {
+            UnsubscribeFromWindowEvents(window);
+        }
+
+        // Close all windows
         CloseAll();
 
         lock (_lock)
         {
             _disposed = true;
-            _hasSelection = false;
-            _activeSelectionWindow = null;
-            
             Log.Debug("[OverlaySession] Disposed");
         }
     }
-
-    private void ClearSelectionInternal()
+    
+    /// <summary>
+    /// Subscribe to window events for event forwarding
+    /// </summary>
+    private void SubscribeToWindowEvents(Window window)
     {
-        _hasSelection = false;
-        _activeSelectionWindow = null;
-        Log.Debug("[OverlaySession] Selection cleared");
+        if (window is IOverlayWindow overlayWindow)
+        {
+            overlayWindow.RegionSelected += OnWindowRegionSelected;
+            overlayWindow.Cancelled += OnWindowCancelled;
+            
+            Log.Debug("[OverlaySession] Subscribed to window events");
+        }
+    }
+    
+    /// <summary>
+    /// Unsubscribe from window events
+    /// </summary>
+    private void UnsubscribeFromWindowEvents(Window window)
+    {
+        if (window is IOverlayWindow overlayWindow)
+        {
+            overlayWindow.RegionSelected -= OnWindowRegionSelected;
+            overlayWindow.Cancelled -= OnWindowCancelled;
+            
+            Log.Debug("[OverlaySession] Unsubscribed from window events");
+        }
+    }
+    
+    /// <summary>
+    /// Forward RegionSelected event from window to session subscribers
+    /// </summary>
+    private void OnWindowRegionSelected(object? sender, RegionSelectedEventArgs e)
+    {
+        // Capture event handler to prevent race with Dispose()
+        var handler = RegionSelected;
+        if (handler != null)
+        {
+            handler.Invoke(e);
+            Log.Debug("[OverlaySession] RegionSelected event forwarded");
+        }
+    }
+    
+    /// <summary>
+    /// Forward Cancelled event from window to session subscribers
+    /// </summary>
+    private void OnWindowCancelled(object? sender, OverlayCancelledEventArgs e)
+    {
+        // Capture event handler to prevent race with Dispose()
+        var handler = Cancelled;
+        if (handler != null)
+        {
+            handler.Invoke(e);
+            Log.Debug("[OverlaySession] Cancelled event forwarded");
+        }
     }
 
     private void ThrowIfDisposed()

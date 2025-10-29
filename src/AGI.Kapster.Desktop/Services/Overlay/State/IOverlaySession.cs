@@ -1,23 +1,26 @@
 using System;
 using System.Collections.Generic;
 using Avalonia.Controls;
+using AGI.Kapster.Desktop.Overlays;
 
 namespace AGI.Kapster.Desktop.Services.Overlay.State;
 
 /// <summary>
-/// Represents a single screenshot session with scoped state management
+/// Represents a single screenshot session - manages overlay window lifecycle and events
 /// Session owns and manages all overlay windows created during the screenshot operation
 /// Automatically cleaned up on Dispose
 /// </summary>
 public interface IOverlaySession : IDisposable
 {
+    // --- Window Lifecycle Management ---
+    
     /// <summary>
-    /// Add a window to this session (establishes ownership)
+    /// Add a window to this session (establishes ownership and subscribes to events)
     /// </summary>
     void AddWindow(Window window);
 
     /// <summary>
-    /// Remove a window from this session
+    /// Remove a window from this session (unsubscribes from events)
     /// </summary>
     void RemoveWindow(Window window);
 
@@ -35,35 +38,17 @@ public interface IOverlaySession : IDisposable
     /// Close all windows in this session
     /// </summary>
     void CloseAll();
-
+    
+    // --- Event Forwarding (Session aggregates all window events) ---
+    
     /// <summary>
-    /// Check if a window can start a new selection
+    /// Fired when any window in this session completes a region selection
     /// </summary>
-    bool CanStartSelection(object window);
-
+    event Action<RegionSelectedEventArgs>? RegionSelected;
+    
     /// <summary>
-    /// Set selection for a window
+    /// Fired when any window in this session is cancelled
     /// </summary>
-    void SetSelection(object window);
-
-    /// <summary>
-    /// Clear selection (optionally for specific window)
-    /// </summary>
-    void ClearSelection(object? window = null);
-
-    /// <summary>
-    /// Event fired when selection state changes
-    /// </summary>
-    event Action<bool>? SelectionStateChanged;
-
-    /// <summary>
-    /// Gets whether any window in this session has a selection
-    /// </summary>
-    bool HasSelection { get; }
-
-    /// <summary>
-    /// Gets the window that currently has the active selection
-    /// </summary>
-    object? ActiveSelectionWindow { get; }
+    event Action<OverlayCancelledEventArgs>? Cancelled;
 }
 

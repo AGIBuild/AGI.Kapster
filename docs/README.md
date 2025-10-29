@@ -18,6 +18,9 @@ Technical documentation for the cross-platform screenshot and annotation tool.
 
 ## 📋 Development
 - **[Project Status](project-status.md)** - Current roadmap
+- **[Architecture Refactoring Plan](architecture-refactoring-plan.md)** - Refactoring strategy and progress
+- **[Refactoring Completion Report](refactoring-completion-report.md)** - Detailed completion status
+- **[Documentation Maintenance Guide](documentation-maintenance-guide.md)** - Documentation upkeep guidelines
 
 ### Core Patterns
 - **Dependency Injection** - Extension methods for service registration

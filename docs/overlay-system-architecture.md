@@ -8,18 +8,18 @@ Overlay system provides transparent screenshot windows with annotation support. 
 
 ### 1. High-Level API
 
-#### IScreenshotService
-Entry point for screenshot operations:
+#### Direct Coordinator Access
+Screenshot operations now use `IOverlayCoordinator` directly:
 ```csharp
-public interface IScreenshotService
+public interface IOverlayCoordinator
 {
-    bool IsActive { get; }
-    Task TakeScreenshotAsync();
-    void Cancel();
+    Task<IOverlaySession> StartSessionAsync();
+    void CloseCurrentSession();
+    bool HasActiveSession { get; }
 }
 ```
 
-**Implementation**: `ScreenshotService` → delegates to `IOverlayCoordinator`
+**Usage**: Services like `HotkeyManager` and `SystemTrayService` call `IOverlayCoordinator` directly
 
 ### 2. Coordinator Layer
 
@@ -48,26 +48,34 @@ public interface IOverlayCoordinator
 ### 3. Session Management
 
 #### IOverlaySession
-Manages lifecycle of a single screenshot operation:
+Manages lifecycle and events for a single screenshot operation:
 ```csharp
 public interface IOverlaySession : IDisposable
 {
+    // Window lifecycle
+    void AddWindow(Window window);
+    void RemoveWindow(Window window);
     IReadOnlyList<Window> Windows { get; }
     void ShowAll();
     void CloseAll();
     
-    // Selection state
-    bool CanStartSelection(object window);
-    void SetSelection(object window);
-    void ClearSelection(object? window = null);
-    bool HasSelection { get; }
+    // Event forwarding (session aggregates all window events)
+    event Action<RegionSelectedEventArgs>? RegionSelected;
+    event Action<OverlayCancelledEventArgs>? Cancelled;
 }
 ```
 
 **Features**:
-- Transient per screenshot
-- Automatic cleanup on disposal
-- Centralized selection state management
+- **Lifecycle management**: Owns and manages overlay windows
+- **Event aggregation**: Forwards window events to coordinator
+- **Automatic cleanup**: Disposes resources and unsubscribes events
+- **Thread-safe**: Lock-based concurrency control
+
+**Event Flow**:
+```
+Window.RegionSelected → Session.RegionSelected → Coordinator.OnRegionSelected
+Window.Cancelled → Session.Cancelled → Coordinator.OnCancelled
+```
 
 ### 4. Window Layer
 
@@ -85,12 +93,11 @@ public interface IOverlayWindow
     
     // Overlay configuration
     void SetMaskSize(double width, double height);
-    void SetSession(IOverlaySession? session);
     void SetScreens(IReadOnlyList<Screen>? screens);
     void SetPrecapturedAvaloniaBitmap(Bitmap? bitmap);
     bool ElementDetectionEnabled { get; set; }
     
-    // Events
+    // Events (subscribed by Session)
     event EventHandler<RegionSelectedEventArgs>? RegionSelected;
     event EventHandler<OverlayCancelledEventArgs>? Cancelled;
     
@@ -98,6 +105,10 @@ public interface IOverlayWindow
     Window AsWindow();
 }
 ```
+
+**Key Changes**:
+- ❌ Removed `SetSession()` - Window no longer holds Session reference
+- ✅ Events are subscribed by Session automatically when window is added
 
 **Implementation**: `OverlayWindow` (Avalonia Window + annotation canvas)
 
@@ -171,21 +182,39 @@ public interface IScreenCaptureStrategy
 
 ## Event Flow
 
+### Session Creation and Event Subscription
 ```mermaid
 sequenceDiagram
     participant User
-    participant Service as IScreenshotService
     participant Coord as IOverlayCoordinator
     participant Session as IOverlaySession
     participant Window as IOverlayWindow
     
-    User->>Service: TakeScreenshotAsync()
-    Service->>Coord: StartSessionAsync()
+    User->>Coord: StartSessionAsync()
+    Note over Coord: Prevent duplicate (lock check)
     Coord->>Session: Create()
-    Coord->>Window: Create and configure
-    Window-->>Coord: RegionSelected event
-    Coord->>Session: CloseAll()
-    Session->>Window: Close()
+    Coord->>Session: Subscribe to events
+    Note over Coord,Session: session.RegionSelected += ...
+    Note over Coord,Session: session.Cancelled += ...
+    Coord->>Window: Create/Configure
+    Coord->>Session: AddWindow(window)
+    Note over Session,Window: Session subscribes to window events
+    Session->>Session: ShowAll()
+```
+
+### Event Forwarding Flow
+```mermaid
+sequenceDiagram
+    participant Window as IOverlayWindow
+    participant Session as IOverlaySession
+    participant Coord as IOverlayCoordinator
+    participant Clipboard
+    
+    Window->>Session: RegionSelected event
+    Session->>Coord: Forward RegionSelected
+    Coord->>Clipboard: Copy image
+    Coord->>Session: Dispose()
+    Session->>Window: Unsubscribe & Close
 ```
 
 ## Service Registration
@@ -288,9 +317,9 @@ src/AGI.Kapster.Desktop/
 **Cause**: Using `Bounds` instead of `ClientSize` for mask dimensions  
 **Solution**: `UpdateMaskForSelection` uses `_maskSize` or `ClientSize` fallback
 
-### Issue: Second screenshot fails to draw selection
-**Cause**: Static `GlobalSelectionState` not reset  
-**Solution**: Session-scoped state via `IOverlaySession`, auto-cleared on window removal
+### Issue: Duplicate sessions on rapid screenshot triggers
+**Cause**: No prevention mechanism for concurrent session creation  
+**Solution**: Lock-based duplicate prevention in `OverlayCoordinatorBase.StartSessionAsync()`
 
 ### Issue: Saved image blurry
 **Cause**: Fixed 96 DPI for RenderTargetBitmap  

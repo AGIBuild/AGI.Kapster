@@ -29,7 +29,9 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     protected readonly IScreenCaptureStrategy? _captureStrategy;
     protected readonly IClipboardStrategy? _clipboardStrategy;
     
+    // Session management with thread safety
     protected IOverlaySession? _currentSession;
+    protected readonly object _sessionLock = new object();
 
     protected OverlayCoordinatorBase(
         IScreenMonitorService screenMonitor,
@@ -51,34 +53,49 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 
     /// <summary>
     /// Template method: defines the overall session creation flow
+    /// Prevents duplicate sessions and subscribes to session events
     /// </summary>
     public async Task<IOverlaySession> StartSessionAsync()
     {
+        // Prevent duplicate sessions
+        lock (_sessionLock)
+        {
+            if (_currentSession != null)
+            {
+                Log.Warning("[{Platform}] Session already active, ignoring duplicate request", PlatformName);
+                return _currentSession;
+            }
+        }
+        
         try
         {
             LogSessionStart();
-            
-            // Step 1: Close any existing session
-            CloseCurrentSession();
 
-            // Step 2: Create new session
+            // Step 1: Create new session
             var session = _sessionFactory.CreateSession();
+            
+            // Step 2: Subscribe to session events (before adding windows)
+            session.RegionSelected += OnRegionSelected;
+            session.Cancelled += OnCancelled;
+            
+            // Step 3: Store current session (inside lock)
+            lock (_sessionLock)
+            {
+                _currentSession = session;
+            }
 
-            // Step 3: Get screen information for this session (hook method)
+            // Step 4: Get screen information for this session (hook method)
             var screens = await GetScreensAsync();
             LogScreensInitialized(screens.Count);
 
-            // Step 4: Calculate target regions (hook method)
+            // Step 5: Calculate target regions (hook method)
             var targetRegions = CalculateTargetRegions(screens);
 
-            // Step 5: Platform-specific window creation (hook method)
+            // Step 6: Platform-specific window creation (hook method)
             await CreateAndConfigureWindowsAsync(session, screens, targetRegions);
 
-            // Step 6: Show all windows
+            // Step 7: Show all windows
             session.ShowAll();
-
-            // Step 7: Store current session
-            _currentSession = session;
             
             LogSessionCreated(session.Windows.Count);
             return session;
@@ -93,37 +110,37 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
 
     /// <summary>
     /// Close the current session if active
-    /// Unsubscribes from events and disposes the session
+    /// Unsubscribes from session events and disposes the session
     /// </summary>
     public virtual void CloseCurrentSession()
     {
-        if (_currentSession == null)
+        IOverlaySession? sessionToClose;
+        
+        lock (_sessionLock)
+        {
+            sessionToClose = _currentSession;
+            _currentSession = null;
+        }
+        
+        if (sessionToClose == null)
             return;
 
         try
         {
             Log.Information("[{Platform}] Closing current session", PlatformName);
 
-            // Unsubscribe from all windows
-            foreach (var window in _currentSession.Windows)
-            {
-                if (window is IOverlayWindow overlayWindow)
-                {
-                    overlayWindow.RegionSelected -= OnRegionSelected;
-                    overlayWindow.Cancelled -= OnCancelled;
-                }
-            }
+            // Unsubscribe from session events
+            sessionToClose.RegionSelected -= OnRegionSelected;
+            sessionToClose.Cancelled -= OnCancelled;
 
-            // Dispose session (will close all windows automatically)
-            _currentSession.Dispose();
-            _currentSession = null;
+            // Dispose session (will close all windows and unsubscribe from window events automatically)
+            sessionToClose.Dispose();
 
             Log.Debug("[{Platform}] Session closed", PlatformName);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "[{Platform}] Error closing session", PlatformName);
-            _currentSession = null;
         }
     }
 
@@ -220,9 +237,9 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     // Event handling methods (shared by all platforms)
 
     /// <summary>
-    /// Handle region selection event from overlay window
+    /// Handle region selection event from session (forwarded from any window)
     /// </summary>
-    protected async void OnRegionSelected(object? sender, RegionSelectedEventArgs e)
+    protected async void OnRegionSelected(RegionSelectedEventArgs e)
     {
         try
         {
@@ -250,9 +267,9 @@ public abstract class OverlayCoordinatorBase : IOverlayCoordinator
     }
 
     /// <summary>
-    /// Handle cancellation event from overlay window
+    /// Handle cancellation event from session (forwarded from any window)
     /// </summary>
-    protected void OnCancelled(object? sender, OverlayCancelledEventArgs e)
+    protected void OnCancelled(OverlayCancelledEventArgs e)
     {
         Log.Information("[{Platform}] Screenshot cancelled", PlatformName);
         CloseCurrentSession();

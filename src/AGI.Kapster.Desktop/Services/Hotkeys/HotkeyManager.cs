@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Serilog;
 
 using AGI.Kapster.Desktop.Services.Hotkeys;
-using AGI.Kapster.Desktop.Services.Screenshot;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update;
 using AGI.Kapster.Desktop.Views;
@@ -18,17 +18,17 @@ public class HotkeyManager : IHotkeyManager
 {
     private readonly IHotkeyProvider _hotkeyProvider;
     private readonly ISettingsService _settingsService;
-    private readonly IScreenshotService _screenshotService;
+    private readonly IOverlayCoordinator _overlayCoordinator;
     private bool _escHotkeyRegistered = false;
 
     public HotkeyManager(
         IHotkeyProvider hotkeyProvider,
         ISettingsService settingsService,
-        IScreenshotService screenshotService)
+        IOverlayCoordinator overlayCoordinator)
     {
         _hotkeyProvider = hotkeyProvider ?? throw new ArgumentNullException(nameof(hotkeyProvider));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
+        _overlayCoordinator = overlayCoordinator ?? throw new ArgumentNullException(nameof(overlayCoordinator));
 
         // Subscribe to settings changes
         _settingsService.SettingsChanged += OnSettingsChanged;
@@ -118,7 +118,7 @@ public class HotkeyManager : IHotkeyManager
             {
                 Log.Debug("Capture region hotkey triggered");
                 // Prevent reentry if a screenshot is already active
-                if (_screenshotService.IsActive)
+                if (_overlayCoordinator.HasActiveSession)
                 {
                     Log.Debug("Capture hotkey ignored - screenshot is already active");
                     return;
@@ -127,7 +127,7 @@ public class HotkeyManager : IHotkeyManager
                 // Dispatch async call to UI thread (hotkey callbacks occur on system thread)
                 Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                 {
-                    await _screenshotService.TakeScreenshotAsync();
+                    await _overlayCoordinator.StartSessionAsync();
                     RegisterEscapeHotkey();
                 });
             });
@@ -152,7 +152,7 @@ public class HotkeyManager : IHotkeyManager
                 Log.Debug("Open settings hotkey triggered");
 
                 // Check if screenshot is currently in progress
-                if (_screenshotService.IsActive)
+                if (_overlayCoordinator.HasActiveSession)
                 {
                     Log.Debug("Settings hotkey ignored - screenshot is active");
                     return;
@@ -333,7 +333,7 @@ public class HotkeyManager : IHotkeyManager
         var success = _hotkeyProvider.RegisterHotkey("overlay_escape", HotkeyModifiers.None, 0x1B, () =>
         {
             Log.Debug("ESC hotkey triggered, cancelling screenshot");
-            _screenshotService.Cancel();
+            _overlayCoordinator.CloseCurrentSession();
 
             // Unregister ESC hotkey after cancelling screenshot
             UnregisterEscapeHotkey();

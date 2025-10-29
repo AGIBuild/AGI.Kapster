@@ -5,7 +5,7 @@ using Xunit;
 using Xunit.Abstractions;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Hotkeys;
-using AGI.Kapster.Desktop.Services.Screenshot;
+using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Tests.TestHelpers;
 
@@ -15,16 +15,16 @@ public class HotkeyManagerTests : TestBase
 {
     private readonly IHotkeyProvider _hotkeyProvider;
     private readonly ISettingsService _settingsService;
-    private readonly IScreenshotService _screenshotService;
+    private readonly IOverlayCoordinator _overlayCoordinator;
     private readonly HotkeyManager _hotkeyManager;
 
     public HotkeyManagerTests(ITestOutputHelper output) : base(output)
     {
         _hotkeyProvider = Substitute.For<IHotkeyProvider>();
         _settingsService = Substitute.For<ISettingsService>();
-        _screenshotService = Substitute.For<IScreenshotService>();
+        _overlayCoordinator = Substitute.For<IOverlayCoordinator>();
 
-        _hotkeyManager = new HotkeyManager(_hotkeyProvider, _settingsService, _screenshotService);
+        _hotkeyManager = new HotkeyManager(_hotkeyProvider, _settingsService, _overlayCoordinator);
     }
 
     [Fact]

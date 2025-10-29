@@ -29,11 +29,26 @@ public class ToolbarPositionCalculator : IToolbarPositionCalculator
         var spaceBelow = screenBounds.Bottom - context.Selection.Bottom;
         var spaceAbove = context.Selection.Top - screenBounds.Top;
 
+        // Check if selection is very large (near or exceeds screen bounds)
+        // This handles full-screen/full-virtual-screen captures
+        var isLargeSelection = 
+            context.Selection.Bottom >= screenBounds.Bottom - context.Margin ||
+            context.Selection.Top <= screenBounds.Top + context.Margin ||
+            spaceBelow < context.ToolbarSize.Height + context.Margin && spaceAbove < context.ToolbarSize.Height + context.Margin;
+
         // Determine position with priority: below -> above -> inside
         Point position;
         double rightAlign = context.Selection.Right - context.ToolbarSize.Width;
 
-        if (spaceBelow >= context.ToolbarSize.Height + context.Margin)
+        if (isLargeSelection)
+        {
+            // For large selections (e.g., full virtual screen), always place toolbar inside at bottom-right
+            position = new Point(
+                context.Selection.Right - context.ToolbarSize.Width - context.Margin,
+                context.Selection.Bottom - context.ToolbarSize.Height - context.Margin);
+            Log.Debug("Toolbar: inside selection (bottom-right) - large selection detected");
+        }
+        else if (spaceBelow >= context.ToolbarSize.Height + context.Margin)
         {
             // Priority: below selection (outside)
             position = new Point(rightAlign, context.Selection.Bottom + context.Margin);
@@ -54,9 +69,31 @@ public class ToolbarPositionCalculator : IToolbarPositionCalculator
             Log.Debug("Toolbar: inside selection (bottom-right)");
         }
 
-        // Clamp to screen bounds
-        var finalX = Math.Clamp(position.X, screenBounds.Left, screenBounds.Right - context.ToolbarSize.Width);
-        var finalY = Math.Clamp(position.Y, screenBounds.Top, screenBounds.Bottom - context.ToolbarSize.Height);
+        // Clamp to screen bounds (ensure max >= min to avoid ArgumentException)
+        double maxX, maxY;
+        if (screenBounds.Right - screenBounds.Left < context.ToolbarSize.Width)
+        {
+            // Toolbar wider than screen, clamp to left edge
+            maxX = screenBounds.Left;
+            Log.Warning("Toolbar width ({ToolbarWidth}) exceeds screen width ({ScreenWidth}). Positioning at left edge.", context.ToolbarSize.Width, screenBounds.Right - screenBounds.Left);
+        }
+        else
+        {
+            maxX = screenBounds.Right - context.ToolbarSize.Width;
+        }
+        if (screenBounds.Bottom - screenBounds.Top < context.ToolbarSize.Height)
+        {
+            // Toolbar taller than screen, clamp to top edge
+            maxY = screenBounds.Top;
+            Log.Warning("Toolbar height ({ToolbarHeight}) exceeds screen height ({ScreenHeight}). Positioning at top edge.", context.ToolbarSize.Height, screenBounds.Bottom - screenBounds.Top);
+        }
+        else
+        {
+            maxY = screenBounds.Bottom - context.ToolbarSize.Height;
+        }
+        
+        var finalX = Math.Clamp(position.X, screenBounds.Left, maxX);
+        var finalY = Math.Clamp(position.Y, screenBounds.Top, maxY);
 
         Log.Debug("Toolbar final position: ({X}, {Y})", finalX, finalY);
         return new Point(finalX, finalY);

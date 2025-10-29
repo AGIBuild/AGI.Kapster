@@ -130,14 +130,12 @@ public sealed class NewAnnotationOverlay : Canvas
     {
         base.OnKeyDown(e);
 
-        Log.Debug("OnKeyDown called with key: {Key}, modifiers: {Modifiers}", e.Key, e.KeyModifiers);
-
         try
         {
             // If currently editing text, don't handle tool hotkeys
             if (_editingTextBox != null)
             {
-                Log.Debug("Text editing active, skipping tool hotkey handling for key: {Key}", e.Key);
+                Log.Debug("Tool hotkeys skipped because text editing is active.");
                 return;
             }
             switch (e.Key)
@@ -262,47 +260,38 @@ public sealed class NewAnnotationOverlay : Canvas
 
                 // Tool hotkeys (only when no modifiers are pressed)
                 case Key.S when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey S pressed - switching to Select tool");
                     _annotationService.CurrentTool = AnnotationToolType.None; // None is used for selection tool
                     e.Handled = true;
                     break;
                 case Key.A when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey A pressed - switching to Arrow tool");
                     _annotationService.CurrentTool = AnnotationToolType.Arrow;
                     e.Handled = true;
                     break;
                 case Key.R when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey R pressed - switching to Rectangle tool");
                     _annotationService.CurrentTool = AnnotationToolType.Rectangle;
                     e.Handled = true;
                     break;
                 case Key.E when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey E pressed - switching to Ellipse tool");
                     _annotationService.CurrentTool = AnnotationToolType.Ellipse;
                     e.Handled = true;
                     break;
                 case Key.T when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey T pressed - switching to Text tool");
                     _annotationService.CurrentTool = AnnotationToolType.Text;
                     e.Handled = true;
                     break;
                 case Key.F when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey F pressed - switching to Freehand tool");
                     _annotationService.CurrentTool = AnnotationToolType.Freehand;
                     e.Handled = true;
                     break;
                 case Key.M when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey M pressed - switching to Mosaic tool");
                     _annotationService.CurrentTool = AnnotationToolType.Mosaic;
                     e.Handled = true;
                     break;
                 case Key.J when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Tool hotkey J pressed - switching to Emoji tool");
                     _annotationService.CurrentTool = AnnotationToolType.Emoji;
                     e.Handled = true;
                     break;
                 case Key.C when !e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Alt) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift):
-                    Log.Debug("Color picker hotkey C pressed - triggering color picker event");
                     ColorPickerRequested?.Invoke();
                     e.Handled = true;
                     break;

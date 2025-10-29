@@ -94,6 +94,30 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
             if (process.ExitCode == 0)
             {
                 _logger.Information("PKG installation completed successfully");
+                
+                // Launch the updated application after successful installation
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000); // Wait 1 second for installation to complete
+                    try
+                    {
+                        var appPath = "/Applications/AGI Kapster.app";
+                        if (File.Exists(appPath))
+                        {
+                            Process.Start("open", appPath);
+                            _logger.Information("Launched updated application: {AppPath}", appPath);
+                        }
+                        else
+                        {
+                            _logger.Warning("Updated application not found at expected path: {AppPath}", appPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error(ex, "Failed to launch updated application");
+                    }
+                });
+                
                 return true;
             }
             else
@@ -145,6 +169,28 @@ public class MacOSUpdateInstaller : IMacOSUpdateInstaller
                 await CopyDirectoryAsync(sourceApp, targetApp);
 
                 _logger.Information("Application replaced successfully: {TargetApp}", targetApp);
+                
+                // Launch the updated application after successful installation
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000); // Wait 1 second for installation to complete
+                    try
+                    {
+                        Process.Start("open", targetApp);
+                        _logger.Information("Launched updated application: {AppPath}", targetApp);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error(ex, "Failed to launch updated application: {AppPath}", targetApp);
+                    }
+                }).ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                    {
+                        _logger.Error(t.Exception, "Unhandled exception in background application launch task.");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
+                
                 return true;
             }
             finally

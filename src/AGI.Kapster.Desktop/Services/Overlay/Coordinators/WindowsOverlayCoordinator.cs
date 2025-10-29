@@ -61,16 +61,11 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
         window.Width = virtualBounds.Width;
         window.Height = virtualBounds.Height;
 
-        // Associate window with session
-        window.SetSession(session);
+        // Configure window
         window.SetScreens(screens);
         window.SetMaskSize(virtualBounds.Width, virtualBounds.Height);
 
-        // Subscribe to events
-        window.RegionSelected += OnRegionSelected;
-        window.Cancelled += OnCancelled;
-
-        // Add window to session (convert to Window)
+        // Add window to session (session will subscribe to window events automatically)
         session.AddWindow(window.AsWindow());
 
         // Asynchronously load background in parallel (non-blocking)

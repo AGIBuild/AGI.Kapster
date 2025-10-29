@@ -306,6 +306,21 @@ public class UpdateService : IUpdateService, IDisposable
             }
 
             _pendingInstallerPath = null;
+            
+            // For Windows MSI installers, exit the application to allow update installation
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && 
+                string.Equals(Path.GetExtension(installerPath), ".msi", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.Information("MSI installer launched, exiting application for update installation");
+                
+                // Give the installer a moment to start, then exit
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000); // Wait 2 seconds for installer to start
+                    Environment.Exit(0); // Exit application to allow MSI to replace files
+                });
+            }
+            
             return true;
         }
         catch (Exception ex)

@@ -139,12 +139,8 @@ class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
-        // Register all application services using extension methods
-        builder.Services
-            .AddCoreServices()
-            .AddStartupServices()
-            .AddHotkeyServices()
-            .AddCaptureServices(); // Includes all capture, overlay, and screenshot services
+        // Register all application services using unified extension method
+        builder.Services.AddKapsterServices();
 
         var host = builder.Build();
 

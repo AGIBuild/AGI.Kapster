@@ -159,8 +159,8 @@
 			<!-- Before installation: Terminate running processes -->
 			<Custom Action="CA_KillProcess" Before="InstallValidate" Condition="NOT Installed" />
 
-			<!-- After installation: Launch application by default -->
-			<Custom Action="CA_LaunchApplication" After="InstallFinalize" Condition="NOT Installed" />
+			<!-- After installation: Launch application for both fresh installs and updates -->
+			<Custom Action="CA_LaunchApplication" After="InstallFinalize" />
 		</InstallExecuteSequence>
 
 		<!-- Property definitions -->
