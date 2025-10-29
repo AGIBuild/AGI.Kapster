@@ -312,8 +312,7 @@ internal sealed class CaptureHandler
 
     private async Task<IStorageFile?> ShowSaveFileDialogAsync(ExportSettings settings)
     {
-        var storageProvider = TopLevel.GetTopLevel(_window)?.StorageProvider;
-        if (storageProvider == null)
+        if (TopLevel.GetTopLevel(_window)?.StorageProvider is not { } storageProvider)
         {
             Log.Error("Cannot access storage provider for file dialog");
             return null;
