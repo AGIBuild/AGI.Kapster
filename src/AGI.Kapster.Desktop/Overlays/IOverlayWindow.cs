@@ -64,13 +64,6 @@ public interface IOverlayWindow
     void SetMaskSize(double width, double height);
     
     /// <summary>
-    /// Sets the overlay session for state management
-    /// Must be called before showing the window
-    /// </summary>
-    /// <param name="session">The overlay session managing this window</param>
-    void SetSession(AGI.Kapster.Desktop.Services.Overlay.State.IOverlaySession? session);
-    
-    /// <summary>
     /// Sets the screens information for coordinate mapping
     /// Used for DPI scaling and multi-monitor support
     /// </summary>

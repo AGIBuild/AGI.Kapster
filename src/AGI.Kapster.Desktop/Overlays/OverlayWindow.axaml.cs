@@ -55,9 +55,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
 
     // Mask size is set by overlay controller based on platform strategy
     private Size _maskSize;
-    
-    // Session for this overlay (scoped state management)
-    private IOverlaySession? _session;
     private IReadOnlyList<Screen>? _screens;
 
 	// Frozen background (snapshot at overlay activation)
@@ -342,16 +339,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
         _maskSize = new Size(width, height);
         Log.Debug("Mask size set to: {Width}x{Height}", width, height);
     }
-    
-    /// <summary>
-    /// Set the overlay session for this window (called by controller before Show())
-    /// </summary>
-    public void SetSession(IOverlaySession? session)
-    {
-        _session = session;
-        Log.Debug("Overlay session set");
-    }
-
     public void SetScreens(IReadOnlyList<Screen>? screens)
     {
         _screens = screens;
@@ -364,11 +351,6 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// Required for IOverlaySession.AddWindow(Window) compatibility
     /// </summary>
     public Window AsWindow() => this;
-    
-    /// <summary>
-    /// Get the current overlay session
-    /// </summary>
-    internal IOverlaySession? GetSession() => _session;
 
     private void SetupSelectionHandlerEvents()
     {
