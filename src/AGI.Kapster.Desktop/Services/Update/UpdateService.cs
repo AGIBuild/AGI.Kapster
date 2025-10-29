@@ -314,11 +314,7 @@ public class UpdateService : IUpdateService, IDisposable
                 _logger.Information("MSI installer launched, exiting application for update installation");
                 
                 // Give the installer a moment to start, then exit
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(2000); // Wait 2 seconds for installer to start
-                    Environment.Exit(0); // Exit application to allow MSI to replace files
-                });
+                _ = Task.Delay(2000).ContinueWith(_ => Environment.Exit(0));
             }
             
             return true;
