@@ -43,7 +43,7 @@ public class UpdateInstallationTests : TestBase
         // Assert
         // Note: In test environment, Process.Start may fail for non-existent files
         // The important thing is that the method doesn't throw and handles the case gracefully
-        Assert.True(result || !result); // Always true - just checking it doesn't crash
+        // No assertion needed; test will fail if an exception is thrown
         
         // Note: In a real test, we'd need to verify Environment.Exit(0) is called
         // This is difficult to test without actually exiting the test process
