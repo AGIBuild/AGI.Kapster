@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AGI.Kapster.Desktop.Overlays"
         x:Class="AGI.Kapster.Desktop.Overlays.OverlayWindow"
-        SystemDecorations="None"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
         CanResize="False"

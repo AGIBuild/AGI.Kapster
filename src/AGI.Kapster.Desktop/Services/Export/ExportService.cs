@@ -203,65 +203,48 @@ public class ExportService : IExportService
             var pixelScaleX = pixelWidth / selectionRect.Width;
             var pixelScaleY = pixelHeight / selectionRect.Height;
             
+            // Render annotations in PHYSICAL PIXELS to match background exactly
+            // Create a canvas sized in pixel units (mapped 1:1 at 96 DPI)
             var canvas = new Canvas
             {
-                Width = selectionRect.Width,
-                Height = selectionRect.Height,
+                Width = pixelWidth,    // pixels mapped as DIPs at 96 DPI
+                Height = pixelHeight,  // pixels mapped as DIPs at 96 DPI
                 Background = Brushes.Transparent
             };
 
             var annotationList = annotations.ToList();
             if (annotationList.Any())
             {
-                var offsetAnnotations = new List<IAnnotationItem>();
-                var offsetX = -selectionRect.X;
-                var offsetY = -selectionRect.Y;
-                
+                // Convert annotations from window DIPs to screenshot PHYSICAL PIXELS
+                var pixelAnnotations = new List<IAnnotationItem>();
+                var offsetX = -selectionRect.X * pixelScaleX;
+                var offsetY = -selectionRect.Y * pixelScaleY;
+
                 foreach (var annotation in annotationList)
                 {
-                    var offsetAnnotation = CreateOffsetAnnotation(annotation, offsetX, offsetY);
-                    offsetAnnotations.Add(offsetAnnotation);
+                    var scaled = CreateScaledOffsetAnnotation(annotation, offsetX, offsetY, pixelScaleX, pixelScaleY);
+                    pixelAnnotations.Add(scaled);
                 }
 
-                _renderer.RenderAll(canvas, offsetAnnotations);
+                _renderer.RenderAll(canvas, pixelAnnotations);
             }
 
-            // Force layout pass before rendering
-            canvas.Measure(new Size(selectionRect.Width, selectionRect.Height));
-            canvas.Arrange(new Rect(0, 0, selectionRect.Width, selectionRect.Height));
+            // Force layout pass before rendering (already in pixel units)
+            canvas.Measure(new Size(pixelWidth, pixelHeight));
+            canvas.Arrange(new Rect(0, 0, pixelWidth, pixelHeight));
 
-            // Apply scale transform for high-DPI rendering
-            canvas.RenderTransform = new ScaleTransform(pixelScaleX, pixelScaleY);
-
-            // Calculate effective DPI for rendering quality
-            // Use target screen's actual DPI scaling if provided, otherwise derive from pixel scale
-            double screenScaling;
-            if (targetScreen != null)
-            {
-                // Use real screen DPI scaling for multi-monitor support
-                screenScaling = targetScreen.Scaling;
-                Log.Debug("Using target screen DPI scaling: {Scaling}", screenScaling);
-            }
-            else
-            {
-                // Fallback: derive from pixel/DIP ratio (handles single monitor or unknown screen)
-                screenScaling = pixelScaleX; // Assume uniform scaling
-                Log.Debug("No target screen specified, deriving DPI from pixel scale: {Scale}", screenScaling);
-            }
+            // CRITICAL FIX for Retina/High-DPI screens:
+            // Always use 96 DPI for RenderTargetBitmap to avoid double-scaling.
+            // The RenderTransform already handles pixel scaling from DIP to physical pixels.
+            // Using targetScreen.Scaling * 96 would cause annotations to be scaled twice on high-DPI displays.
+            const double renderDpi = 96.0;
             
-            var effectiveDpiX = 96 * screenScaling;
-            var effectiveDpiY = 96 * screenScaling;
-            
-            // Cap DPI to reasonable limit (300 DPI) to avoid excessive memory usage
-            effectiveDpiX = Math.Min(300, effectiveDpiX);
-            effectiveDpiY = Math.Min(300, effectiveDpiY);
-            
-            Log.Debug("Rendering annotations at {DpiX}x{DpiY} DPI for screen scaling {Scaling} (pixel scale: {PixelScaleX}x{PixelScaleY})",
-                effectiveDpiX, effectiveDpiY, screenScaling, pixelScaleX, pixelScaleY);
+            Log.Debug("Rendering annotations at {DpiX}x{DpiY} DPI with RenderTransform scale {ScaleX}x{ScaleY} (targetScreen scaling: {Scaling})",
+                renderDpi, renderDpi, pixelScaleX, pixelScaleY, targetScreen?.Scaling ?? 1.0);
 
             var annotationBitmap = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(effectiveDpiX, effectiveDpiY));
+                new Vector(renderDpi, renderDpi));
 
             // Clear with transparent background before rendering
             using (var clearCtx = annotationBitmap.CreateDrawingContext())
@@ -270,12 +253,11 @@ public class ExportService : IExportService
             }
 
             annotationBitmap.Render(canvas);
-            canvas.RenderTransform = null;
 
-            // Create final composite with high DPI for maximum quality
+            // Create final composite with standard 96 DPI
             var composite = new RenderTargetBitmap(
                 new PixelSize(pixelWidth, pixelHeight),
-                new Vector(effectiveDpiX, effectiveDpiY));
+                new Vector(renderDpi, renderDpi));
 
             using var context = composite.CreateDrawingContext();
 
@@ -292,7 +274,7 @@ public class ExportService : IExportService
             }
             
             Log.Debug("Composite image created at {Width}x{Height} with {DpiX}x{DpiY} DPI",
-                pixelWidth, pixelHeight, effectiveDpiX, effectiveDpiY);
+                pixelWidth, pixelHeight, renderDpi, renderDpi);
                 
             return Task.FromResult<Bitmap>(composite);
         }
