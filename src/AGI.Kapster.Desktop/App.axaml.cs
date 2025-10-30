@@ -150,34 +150,50 @@ public partial class App : Application
             }
 
             // Use lock to prevent race conditions when checking and creating window
+            SettingsWindow? windowToShow;
+            bool isNewWindow;
+            
             lock (_settingsWindowLock)
             {
                 // Check if settings window already exists
                 if (_settingsWindow != null)
                 {
                     Log.Debug("Settings window already open, bringing to focus");
-                    _settingsWindow.Activate();
-                    return;
+                    windowToShow = _settingsWindow;
+                    isNewWindow = false;
                 }
-
-                var settingsService = Services!.GetRequiredService<ISettingsService>();
-                var applicationController = Services!.GetRequiredService<IApplicationController>();
-                var updateService = Services!.GetRequiredService<IUpdateService>();
-                _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
-                
-                // Clear reference when window is closed
-                _settingsWindow.Closed += (s, args) =>
+                else
                 {
-                    lock (_settingsWindowLock)
+                    var settingsService = Services!.GetRequiredService<ISettingsService>();
+                    var applicationController = Services!.GetRequiredService<IApplicationController>();
+                    var updateService = Services!.GetRequiredService<IUpdateService>();
+                    _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
+                    
+                    // Clear reference when window is closed
+                    _settingsWindow.Closed += (s, args) =>
                     {
-                        _settingsWindow = null;
-                        Log.Debug("Settings window closed, reference cleared");
-                    }
-                };
-                
-                _settingsWindow.Show();
-                _settingsWindow.Activate();
+                        lock (_settingsWindowLock)
+                        {
+                            _settingsWindow = null;
+                            Log.Debug("Settings window closed, reference cleared");
+                        }
+                    };
+                    
+                    windowToShow = _settingsWindow;
+                    isNewWindow = true;
+                }
+            }
+            
+            // Perform UI operations outside the lock to avoid potential deadlocks
+            if (isNewWindow)
+            {
+                windowToShow.Show();
+                windowToShow.Activate();
                 Log.Debug("Settings window opened");
+            }
+            else
+            {
+                windowToShow.Activate();
             }
         }
         catch (Exception ex)
