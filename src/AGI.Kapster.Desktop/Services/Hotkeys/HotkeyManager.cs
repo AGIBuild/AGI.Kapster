@@ -177,15 +177,11 @@ public class HotkeyManager : IHotkeyManager
     {
         try
         {
-            // Get services from DI container
-            var settingsService = App.Services?.GetService(typeof(ISettingsService)) as ISettingsService
-                ?? throw new InvalidOperationException("ISettingsService not found in DI container. Ensure services are properly registered in CoreServiceExtensions.AddCoreServices()");
-            
-            var applicationController = App.Services?.GetService(typeof(IApplicationController)) as IApplicationController;
-            var updateService = App.Services?.GetService(typeof(IUpdateService)) as IUpdateService;
-
-            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
-            settingsWindow.Show();
+            // Dispatch to UI thread to ensure proper window management
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                App.ShowSettingsWindow();
+            });
         }
         catch (Exception ex)
         {

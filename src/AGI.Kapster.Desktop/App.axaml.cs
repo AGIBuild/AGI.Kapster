@@ -23,6 +23,7 @@ namespace AGI.Kapster.Desktop;
 public partial class App : Application
 {
     public static IServiceProvider? Services { get; internal set; }
+    private static SettingsWindow? _settingsWindow;
 
     public override void Initialize()
     {
@@ -129,6 +130,14 @@ public partial class App : Application
 
     private void OnOpenSettingsRequested(object? sender, EventArgs e)
     {
+        ShowSettingsWindow();
+    }
+
+    /// <summary>
+    /// Shows the settings window. If a settings window is already open, brings it to focus instead of creating a new one.
+    /// </summary>
+    public static void ShowSettingsWindow()
+    {
         try
         {
             // Check if screenshot is currently in progress
@@ -139,12 +148,28 @@ public partial class App : Application
                 return;
             }
 
+            // Check if settings window already exists
+            if (_settingsWindow != null)
+            {
+                Log.Debug("Settings window already open, bringing to focus");
+                _settingsWindow.Activate();
+                return;
+            }
+
             var settingsService = Services!.GetRequiredService<ISettingsService>();
             var applicationController = Services!.GetRequiredService<IApplicationController>();
             var updateService = Services!.GetRequiredService<IUpdateService>();
-            var settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
-            settingsWindow.Show();
-            settingsWindow.Activate();
+            _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
+            
+            // Clear reference when window is closed
+            _settingsWindow.Closed += (s, args) =>
+            {
+                _settingsWindow = null;
+                Log.Debug("Settings window closed, reference cleared");
+            };
+            
+            _settingsWindow.Show();
+            _settingsWindow.Activate();
             Log.Debug("Settings window opened");
         }
         catch (Exception ex)
