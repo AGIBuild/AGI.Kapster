@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -139,6 +140,13 @@ public partial class App : Application
     /// </summary>
     public static void ShowSettingsWindow()
     {
+        // Ensure all window operations run on UI thread to avoid duplicates and crashes
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(ShowSettingsWindow);
+            return;
+        }
+
         try
         {
             // Ensure we're on the UI thread
