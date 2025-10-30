@@ -114,8 +114,9 @@ public class UpdateInstallationTests : TestBase
             Assert.StartsWith("linux-", identifier);
         }
         
-        // Should include architecture
-        Assert.Contains("x64", identifier);
+        // Should include architecture (x64 or arm64)
+        var hasValidArchitecture = identifier.Contains("x64") || identifier.Contains("arm64");
+        Assert.True(hasValidArchitecture, $"Identifier '{identifier}' should contain 'x64' or 'arm64'");
     }
 
     [Fact]

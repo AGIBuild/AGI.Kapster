@@ -88,8 +88,12 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             // Create window immediately for instant display
             var window = _windowFactory.Create();
             window.Position = new Avalonia.PixelPoint((int)screenBounds.X, (int)screenBounds.Y);
-            window.Width = screenBounds.Width;
-            window.Height = screenBounds.Height;
+            
+            // Switch to macOS full screen to ensure complete coverage (menu bar/Dock/Spaces)
+            var avaloniaWindow = window.AsWindow();
+            avaloniaWindow.ShowInTaskbar = false; // redundant with XAML, ensure at runtime
+            avaloniaWindow.Topmost = true;        // redundant with XAML, ensure at runtime
+            avaloniaWindow.WindowState = WindowState.FullScreen;
 
             // Configure window
             window.SetScreens(new[] { screen }); // Single screen for this window
@@ -103,14 +107,26 @@ public class MacOverlayCoordinator : OverlayCoordinatorBase
             {
                 try
                 {
-                    var background = await PrecaptureBackgroundAsync(screenBounds, screen);
+                    // Prefer full screen capture for the matched screen to avoid DPI mismatch
+                    Bitmap? background = null;
+                    if (_captureStrategy != null)
+                    {
+                        var sk = await _captureStrategy.CaptureFullScreenAsync(screen);
+                        background = BitmapConverter.ConvertToAvaloniaBitmapFast(sk);
+                    }
+                    else
+                    {
+                        background = await PrecaptureBackgroundAsync(screenBounds, screen);
+                    }
+
                     if (background != null)
                     {
                         // Update background on UI thread
                         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             window.SetPrecapturedAvaloniaBitmap(background);
-                            Log.Debug("[{Platform}] Background loaded for screen at {Position}", PlatformName, screenBounds.Position);
+                            Log.Debug("[{Platform}] Background loaded for screen at {Position} size {W}x{H} (pixels)", 
+                                PlatformName, screenBounds.Position, background.PixelSize.Width, background.PixelSize.Height);
                         });
                     }
                 }

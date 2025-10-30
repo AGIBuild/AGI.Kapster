@@ -138,6 +138,30 @@ dotnet run --project src/AGI.Kapster.Desktop
 ./build.ps1 Test -Coverage
 ```
 
+## 🤝 Community & Feedback
+
+### Platform Support Notice
+
+AGI.Kapster is a personal open-source project developed with passion and care. While we strive to provide the best experience across all platforms, please note:
+
+- **Primary Testing**: Most testing is conducted on **Windows** and **macOS** platforms
+- **Linux Support**: Linux functionality is implemented but may receive less extensive testing
+- **Known Limitations**: Some platform-specific features or edge cases may not be fully covered
+
+We appreciate your understanding that as a personal project, resources for comprehensive cross-platform testing are limited. Your experience and feedback help make AGI.Kapster better for everyone!
+
+### How You Can Help
+
+We warmly welcome contributions from the community:
+
+- 🐛 **Report Issues**: Found a bug? Please [open an issue](../../issues/new) on GitHub
+- 💡 **Share Feedback**: Tell us about your experience on different platforms
+- 🔧 **Contribute Code**: Pull requests are always welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
+- 📖 **Improve Documentation**: Help us make the docs better
+- ⭐ **Star the Project**: Show your support by starring the repository
+
+**Your platform experience matters!** Whether you're on Windows, macOS, or Linux, we'd love to hear from you. Every issue report and suggestion helps improve the tool for the entire community.
+
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
