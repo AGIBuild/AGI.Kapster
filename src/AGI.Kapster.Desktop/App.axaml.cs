@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -139,8 +140,22 @@ public partial class App : Application
     /// </summary>
     public static void ShowSettingsWindow()
     {
+        // Ensure all window operations run on UI thread to avoid duplicates and crashes
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(ShowSettingsWindow);
+            return;
+        }
+
         try
         {
+            // Ensure we're on the UI thread
+            if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowSettingsWindow());
+                return;
+            }
+
             // Check if screenshot is currently in progress
             var overlayCoordinator = Services!.GetRequiredService<IOverlayCoordinator>();
             if (overlayCoordinator.HasActiveSession)
@@ -150,34 +165,53 @@ public partial class App : Application
             }
 
             // Use lock to prevent race conditions when checking and creating window
+            SettingsWindow? windowToShow;
+            bool isNewWindow;
+            
             lock (_settingsWindowLock)
             {
                 // Check if settings window already exists
+                // Since we're on UI thread now, if _settingsWindow exists, it's either:
+                // 1. Already shown and visible
+                // 2. Just created but not yet shown (in which case we should reuse it)
                 if (_settingsWindow != null)
                 {
-                    Log.Debug("Settings window already open, bringing to focus");
-                    _settingsWindow.Activate();
-                    return;
+                    Log.Debug("Settings window already exists, bringing to focus");
+                    windowToShow = _settingsWindow;
+                    isNewWindow = false;
                 }
-
-                var settingsService = Services!.GetRequiredService<ISettingsService>();
-                var applicationController = Services!.GetRequiredService<IApplicationController>();
-                var updateService = Services!.GetRequiredService<IUpdateService>();
-                _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
-                
-                // Clear reference when window is closed
-                _settingsWindow.Closed += (s, args) =>
+                else
                 {
-                    lock (_settingsWindowLock)
+                    var settingsService = Services!.GetRequiredService<ISettingsService>();
+                    var applicationController = Services!.GetRequiredService<IApplicationController>();
+                    var updateService = Services!.GetRequiredService<IUpdateService>();
+                    _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
+                    
+                    // Clear reference when window is closed
+                    _settingsWindow.Closed += (s, args) =>
                     {
-                        _settingsWindow = null;
-                        Log.Debug("Settings window closed, reference cleared");
-                    }
-                };
-                
-                _settingsWindow.Show();
-                _settingsWindow.Activate();
+                        lock (_settingsWindowLock)
+                        {
+                            _settingsWindow = null;
+                            Log.Debug("Settings window closed, reference cleared");
+                        }
+                    };
+                    
+                    windowToShow = _settingsWindow;
+                    isNewWindow = true;
+                }
+            }
+            
+            // Perform UI operations - safe because we're on UI thread and lock protects the check
+            if (isNewWindow)
+            {
+                windowToShow.Show();
+                windowToShow.Activate();
                 Log.Debug("Settings window opened");
+            }
+            else
+            {
+                windowToShow.Activate();
             }
         }
         catch (Exception ex)
