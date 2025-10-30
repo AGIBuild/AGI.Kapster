@@ -106,8 +106,37 @@ internal sealed class CaptureHandler
                     return baseScreenshot;
                 }
 
-                // Determine target screen for correct DPI handling
-                var targetScreen = GetScreenForSelection(region);
+                // CRITICAL: Calculate the actual scale between frozen background and window DIP
+                // This accounts for the fact that frozen background is physical pixels
+                double backgroundToWindowScaleX = 1.0;
+                double backgroundToWindowScaleY = 1.0;
+                var frozenBackground = _getFrozenBackground();
+                if (frozenBackground != null)
+                {
+                    var windowWidth = Math.Max(1.0, _window.Bounds.Width);
+                    var windowHeight = Math.Max(1.0, _window.Bounds.Height);
+                    backgroundToWindowScaleX = frozenBackground.PixelSize.Width / windowWidth;
+                    backgroundToWindowScaleY = frozenBackground.PixelSize.Height / windowHeight;
+                    
+                    Log.Debug("Background-to-Window scale: X={ScaleX:F4}, Y={ScaleY:F4}", 
+                        backgroundToWindowScaleX, backgroundToWindowScaleY);
+                }
+                
+                // Use the average scale as the effective scaling for annotation rendering
+                var effectiveScaling = (backgroundToWindowScaleX + backgroundToWindowScaleY) / 2.0;
+                
+                // Create a screen with the effective scaling
+                var screens = _getScreens();
+                Screen? targetScreen = null;
+                if (screens != null && screens.Count > 0)
+                {
+                    var originalScreen = screens[0];
+                    targetScreen = new Screen(effectiveScaling, originalScreen.Bounds, originalScreen.WorkingArea, originalScreen.IsPrimary);
+                }
+                else
+                {
+                    targetScreen = new Screen(effectiveScaling, new PixelRect(0, 0, 1920, 1080), new PixelRect(0, 0, 1920, 1080), true);
+                }
 
                 var exportService = new ExportService();
                 return await exportService.CreateCompositeImageWithAnnotationsAsync(
@@ -155,8 +184,16 @@ internal sealed class CaptureHandler
 
         var totalDipWidth = Math.Max(1.0, _window.Bounds.Width);
         var totalDipHeight = Math.Max(1.0, _window.Bounds.Height);
+        // Prefer ClientSize as it reflects the drawable area in many cases
+        if (_window.ClientSize.Width > 0 && _window.ClientSize.Height > 0)
+        {
+            totalDipWidth = _window.ClientSize.Width;
+            totalDipHeight = _window.ClientSize.Height;
+        }
         var scaleX = frozenBackground.PixelSize.Width / totalDipWidth;
         var scaleY = frozenBackground.PixelSize.Height / totalDipHeight;
+        Log.Debug("[CaptureHandler] ExtractRegion scaleX={SX:F4}, scaleY={SY:F4}, frozenPixels={W}x{H}, totalDIP={DW}x{DH}", 
+            scaleX, scaleY, frozenBackground.PixelSize.Width, frozenBackground.PixelSize.Height, totalDipWidth, totalDipHeight);
 
         // Calculate source rectangle in physical pixels
         var sourceRect = new Rect(

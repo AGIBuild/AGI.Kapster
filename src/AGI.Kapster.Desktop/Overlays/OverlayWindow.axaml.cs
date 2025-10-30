@@ -17,6 +17,7 @@ using Avalonia.Threading;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AGI.Kapster.Desktop.Overlays;
@@ -253,6 +254,12 @@ public partial class OverlayWindow : Window, IOverlayWindow
         {
             if (bitmap != null && _backgroundImage != null)
             {
+                Log.Debug("[OverlayWindow] Applying frozen background: pixels={W}x{H}, windowBounds={BW}x{BH} DIP, clientSize={CW}x{CH}, renderScaling={RS}, screen scaling={SS}", 
+                    bitmap.PixelSize.Width, bitmap.PixelSize.Height, 
+                    this.Bounds.Width, this.Bounds.Height,
+                    this.ClientSize.Width, this.ClientSize.Height,
+                    this.RenderScaling,
+                    _screens?.FirstOrDefault()?.Scaling ?? 0);
                 _backgroundImage.Source = bitmap;
                 _frozenBackground = bitmap;
                 await Task.Delay(OverlayConstants.StandardUiDelay); // Small delay to ensure window is fully ready
