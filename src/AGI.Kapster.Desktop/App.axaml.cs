@@ -141,6 +141,13 @@ public partial class App : Application
     {
         try
         {
+            // Ensure we're on the UI thread
+            if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowSettingsWindow());
+                return;
+            }
+
             // Check if screenshot is currently in progress
             var overlayCoordinator = Services!.GetRequiredService<IOverlayCoordinator>();
             if (overlayCoordinator.HasActiveSession)
@@ -156,9 +163,12 @@ public partial class App : Application
             lock (_settingsWindowLock)
             {
                 // Check if settings window already exists
+                // Since we're on UI thread now, if _settingsWindow exists, it's either:
+                // 1. Already shown and visible
+                // 2. Just created but not yet shown (in which case we should reuse it)
                 if (_settingsWindow != null)
                 {
-                    Log.Debug("Settings window already open, bringing to focus");
+                    Log.Debug("Settings window already exists, bringing to focus");
                     windowToShow = _settingsWindow;
                     isNewWindow = false;
                 }
@@ -184,7 +194,7 @@ public partial class App : Application
                 }
             }
             
-            // Perform UI operations outside the lock to avoid potential deadlocks
+            // Perform UI operations - safe because we're on UI thread and lock protects the check
             if (isNewWindow)
             {
                 windowToShow.Show();

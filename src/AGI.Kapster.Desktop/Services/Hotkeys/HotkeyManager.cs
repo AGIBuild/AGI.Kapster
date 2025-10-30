@@ -177,11 +177,8 @@ public class HotkeyManager : IHotkeyManager
     {
         try
         {
-            // Dispatch to UI thread to ensure proper window management
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                App.ShowSettingsWindow();
-            });
+            // App.ShowSettingsWindow() now handles UI thread dispatch internally
+            App.ShowSettingsWindow();
         }
         catch (Exception ex)
         {
