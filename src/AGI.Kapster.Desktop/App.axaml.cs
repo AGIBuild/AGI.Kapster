@@ -24,6 +24,7 @@ public partial class App : Application
 {
     public static IServiceProvider? Services { get; internal set; }
     private static SettingsWindow? _settingsWindow;
+    private static readonly object _settingsWindowLock = new object();
 
     public override void Initialize()
     {
@@ -148,29 +149,36 @@ public partial class App : Application
                 return;
             }
 
-            // Check if settings window already exists
-            if (_settingsWindow != null)
+            // Use lock to prevent race conditions when checking and creating window
+            lock (_settingsWindowLock)
             {
-                Log.Debug("Settings window already open, bringing to focus");
-                _settingsWindow.Activate();
-                return;
-            }
+                // Check if settings window already exists
+                if (_settingsWindow != null)
+                {
+                    Log.Debug("Settings window already open, bringing to focus");
+                    _settingsWindow.Activate();
+                    return;
+                }
 
-            var settingsService = Services!.GetRequiredService<ISettingsService>();
-            var applicationController = Services!.GetRequiredService<IApplicationController>();
-            var updateService = Services!.GetRequiredService<IUpdateService>();
-            _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
-            
-            // Clear reference when window is closed
-            _settingsWindow.Closed += (s, args) =>
-            {
-                _settingsWindow = null;
-                Log.Debug("Settings window closed, reference cleared");
-            };
-            
-            _settingsWindow.Show();
-            _settingsWindow.Activate();
-            Log.Debug("Settings window opened");
+                var settingsService = Services!.GetRequiredService<ISettingsService>();
+                var applicationController = Services!.GetRequiredService<IApplicationController>();
+                var updateService = Services!.GetRequiredService<IUpdateService>();
+                _settingsWindow = new SettingsWindow(settingsService, applicationController, updateService);
+                
+                // Clear reference when window is closed
+                _settingsWindow.Closed += (s, args) =>
+                {
+                    lock (_settingsWindowLock)
+                    {
+                        _settingsWindow = null;
+                        Log.Debug("Settings window closed, reference cleared");
+                    }
+                };
+                
+                _settingsWindow.Show();
+                _settingsWindow.Activate();
+                Log.Debug("Settings window opened");
+            }
         }
         catch (Exception ex)
         {
