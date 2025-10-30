@@ -291,11 +291,13 @@ public class AnnotationRenderer : IAnnotationRenderer
         bodyPath.Data = result.Geometry;
         bodyPath.Fill = result.Fill;
         bodyPath.Stroke = null;
+        bodyPath.UseLayoutRounding = false;
 
         shadowPath.Data = result.Geometry;
         shadowPath.Fill = result.ShadowFill;
         shadowPath.Stroke = null;
         shadowPath.RenderTransform = result.ShadowTransform;
+        shadowPath.UseLayoutRounding = false;
 
         canvas.Children.Add(arrowCanvas);
         controls.Add(arrowCanvas);
@@ -326,6 +328,8 @@ public class AnnotationRenderer : IAnnotationRenderer
         path.StrokeThickness = rectangle.Style.StrokeWidth;
         path.Fill = rectangle.Style.FillMode != FillMode.None ? CreateBrush(rectangle.Style.FillColor) : Brushes.Transparent;
         path.Opacity = rectangle.Style.Opacity;
+        path.StrokeLineCap = PenLineCap.Round;
+        path.UseLayoutRounding = false;
         Canvas.SetLeft(path, rectangle.Rectangle.X);
         Canvas.SetTop(path, rectangle.Rectangle.Y);
         canvas.Children.Add(path);
@@ -361,6 +365,8 @@ public class AnnotationRenderer : IAnnotationRenderer
         path.StrokeThickness = ellipse.Style.StrokeWidth;
         path.Fill = ellipse.Style.FillMode != FillMode.None ? CreateBrush(ellipse.Style.FillColor) : Brushes.Transparent;
         path.Opacity = ellipse.Style.Opacity;
+        path.StrokeLineCap = PenLineCap.Round;
+        path.UseLayoutRounding = false;
         
         // Position the ellipse: BoundingRect is top-left corner, but EllipseGeometry's Rect is centered
         // So we need to position at BoundingRect top-left directly
@@ -883,6 +889,7 @@ public class AnnotationRenderer : IAnnotationRenderer
         path.StrokeThickness = freehand.Style.StrokeWidth;
         path.Opacity = freehand.Style.Opacity;
         path.StrokeLineCap = PenLineCap.Round;
+        path.UseLayoutRounding = false;
 
         canvas.Children.Add(path);
         controls.Add(path);
