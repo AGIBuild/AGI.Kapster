@@ -375,7 +375,6 @@ jobs:
         name: AGI.Kapster ${{ needs.prepare-release.outputs.version }}
         prerelease: ${{ needs.prepare-release.outputs.is-prerelease }}
         generate_release_notes: true  # Use GitHub's automatic changelog generation
-        body_path: custom-release-body.md
         token: ${{ secrets.GH_PAT }}
 
   cleanup:
