@@ -18,6 +18,7 @@ using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Update;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Views;
+using AGI.Kapster.Desktop.Services.Platforms;
 
 namespace AGI.Kapster.Desktop;
 
@@ -69,6 +70,17 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Apply platform-specific appearance customizations (e.g., hide Dock on macOS)
+            try
+            {
+                var appearance = Services!.GetRequiredService<IAppAppearanceService>();
+                appearance.ApplyOnAppStartup();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to apply platform appearance at startup (non-critical)");
+            }
+
             // Create and set ScreenMonitorWindow as MainWindow
             // This hidden window monitors screen changes and provides IScreenMonitorService
             var monitorWindow = new Services.ScreenMonitorWindow();

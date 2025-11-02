@@ -38,7 +38,7 @@
     <CFBundlePackageType>APPL</CFBundlePackageType>
     <CFBundleSignature>????</CFBundleSignature>
     <CFBundleExecutable>AGI.Kapster.Desktop</CFBundleExecutable>
-    <CFBundleIconFile>logo.incs</CFBundleIconFile>
+    <CFBundleIconFile>logo.icns</CFBundleIconFile>
     <NSHighResolutionCapable>true</NSHighResolutionCapable>
     <LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
   </PropertyGroup>

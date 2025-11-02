@@ -63,9 +63,11 @@ MimeType=image/png;image/jpeg;image/bmp;image/tiff;
 Keywords=screenshot;annotation;capture;
 EOF
 
-# 复制图标
-if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
-    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" "$RPM_ROOT/usr/share/pixmaps/agi-kapster.png"
+# 复制图标（PNG，建议512x512）
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.png" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.png" "$RPM_ROOT/usr/share/pixmaps/agi-kapster.png"
+else
+    echo "⚠️  未找到 logo.png。请在 src/AGI.Kapster.Desktop/logo.png 生成。"
 fi
 
 # 创建spec文件

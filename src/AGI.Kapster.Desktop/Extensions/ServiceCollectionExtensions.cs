@@ -22,6 +22,8 @@ using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Startup;
 using AGI.Kapster.Desktop.Services.UI;
 using AGI.Kapster.Desktop.Services.Update;
+using AGI.Kapster.Desktop.Services.Platforms;
+using AGI.Kapster.Desktop.Services.Platforms.Mac;
 using AGI.Kapster.Desktop.Rendering.Overlays;
 using AGI.Kapster.Desktop.Views;
 
@@ -73,6 +75,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IErrorHandler, ErrorHandler>();
+
+        // Platform appearance service (hide Dock on macOS, no-op elsewhere)
+#pragma warning disable CA1416
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            services.AddSingleton<IAppAppearanceService, MacAppAppearanceService>();
+        }
+        else
+        {
+            services.AddSingleton<IAppAppearanceService, NoOpAppAppearanceService>();
+        }
+#pragma warning restore CA1416
         
         // UI windows
         services.AddTransient<SettingsWindow>();
