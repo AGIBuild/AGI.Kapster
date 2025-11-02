@@ -98,6 +98,8 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <string>10.15</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSRequiresAquaSystemAppearance</key>
     <false/>
     <key>LSApplicationCategoryType</key>
@@ -108,11 +110,12 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-# Copy icon (if exists)
-if [ -f "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" ]; then
-    cp "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
-elif [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
-    echo "⚠️  Found .ico file but .icns file is needed, please convert icon format"
+# Copy icon (.icns is required)
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.icns" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
+else
+    echo "❌ Missing logo.icns. Please generate it at src/AGI.Kapster.Desktop/logo.icns before packaging."
+    exit 1
 fi
 
 # Application signing (if signing identity provided)

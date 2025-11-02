@@ -67,9 +67,11 @@ MimeType=image/png;image/jpeg;image/bmp;image/tiff;
 Keywords=screenshot;annotation;capture;
 EOF
 
-# Copy icon (if exists)
-if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
-    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" "$DEB_DIR/usr/share/pixmaps/agi-kapster.png"
+# Copy icon (PNG, 512x512 recommended)
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.png" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.png" "$DEB_DIR/usr/share/pixmaps/agi-kapster.png"
+else
+    echo "⚠️  logo.png not found. Please generate it at src/AGI.Kapster.Desktop/logo.png"
 fi
 
 # Create control file

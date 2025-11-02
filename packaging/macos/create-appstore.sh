@@ -79,6 +79,8 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
     <string>10.15</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSRequiresAquaSystemAppearance</key>
     <false/>
     <key>LSApplicationCategoryType</key>
@@ -105,11 +107,12 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-# 复制图标（如果存在）
-if [ -f "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" ]; then
-    cp "$SCRIPT_DIR/../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
-elif [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.ico" ]; then
-    echo "⚠️  找到.ico文件但需要.icns文件，App Store版本需要正确的图标格式"
+# 复制图标（必须是 .icns）
+if [ -f "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.icns" ]; then
+    cp "$SCRIPT_DIR/../../src/AGI.Kapster.Desktop/logo.icns" "$APP_DIR/Contents/Resources/"
+else
+    echo "❌ 缺少 logo.icns，请先在 src/AGI.Kapster.Desktop/logo.icns 生成后再打包 App Store 版本"
+    exit 1
 fi
 
 echo "🔐 使用entitlements进行App Store签名..."
