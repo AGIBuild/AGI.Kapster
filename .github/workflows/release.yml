@@ -359,11 +359,12 @@ jobs:
         $manifest = "SHASUMS-$version.txt"
         $manifestPath = Join-Path $releaseDir $manifest
         if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
-        $checksums = Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
+        $checksums = @()
+        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
           $hash = Get-FileHash $_.FullName -Algorithm SHA256
-          "$($hash.Hash)  $($_.Name)"
+          $checksums += "$($hash.Hash)  $($_.Name)"
         }
-        $checksums | Out-File -FilePath $manifestPath -Encoding utf8 -NoNewline:$false
+        $checksums | Out-File -FilePath $manifestPath -Encoding utf8
         Write-Host "✅ Generated checksums for $($checksums.Count) files"
         Write-Host "🔎 (Optional) Verifying Authenticode signatures if signtool available..."
         if (Get-Command signtool -ErrorAction SilentlyContinue) {
