@@ -293,6 +293,22 @@ jobs:
         path: release-artifacts/
         pattern: "*-release"
         
+    - name: 🔍 Debug - List downloaded artifacts
+      shell: pwsh
+      run: |
+        Write-Host "📂 Checking downloaded artifacts..."
+        if (Test-Path "release-artifacts") {
+          Write-Host "✅ release-artifacts directory exists"
+          Get-ChildItem "release-artifacts" -Recurse | ForEach-Object {
+            Write-Host "  📁 $($_.FullName)"
+          }
+        } else {
+          Write-Host "❌ release-artifacts directory DOES NOT exist!"
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Files in current directory:"
+          Get-ChildItem | ForEach-Object { Write-Host "  - $($_.Name)" }
+        }
+        
     - name: 📋 Prepare release assets
       shell: pwsh
       run: |
