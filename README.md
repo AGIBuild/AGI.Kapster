@@ -14,16 +14,13 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 
 ## 📹 Demo
 
-> **📺 [Watch Demo Video](docs/kapster_demo.mp4)** (Click to download and view)
+<div align="center">
+  
+![AGI.Kapster Demo](docs/kapster_demo_preview.gif)
 
-<!-- 
-To embed video directly in GitHub README:
-1. Go to https://github.com/AGIBuild/AGI.Kapster/edit/main/README.md
-2. Drag and drop docs/kapster_demo.mp4 into the editor below
-3. GitHub will generate a URL like: https://github.com/user-attachments/assets/...
-4. Replace this comment with that URL on a single line
-5. The video will display inline with native controls
--->
+</div>
+
+> **📺 [Watch Full Demo Video](docs/kapster_demo.mp4)** (2:07, click to download)
 
 *Quick demonstration of AGI.Kapster's capture and annotation capabilities*
 
