@@ -325,13 +325,26 @@ jobs:
         $releaseDir = "final-release"
         New-Item -ItemType Directory -Path $releaseDir -Force
         Write-Host "🎯 Processing release artifacts for version: $version"
-        Get-ChildItem "release-artifacts" -Directory | ForEach-Object {
-          $platformDir = $_.FullName
-          Write-Host "📂 Processing: $($_.Name)"
+        
+        # actions/download-artifact@v4 creates: release-artifacts/<artifact-name>/<files>
+        # We need to check if release-artifacts exists and has content
+        if (-not (Test-Path "release-artifacts")) {
+          Write-Host "❌ release-artifacts directory not found"
+          exit 1
+        }
+        
+        $artifactDirs = Get-ChildItem "release-artifacts" -Directory
+        if ($artifactDirs.Count -eq 0) {
+          Write-Host "❌ No artifact directories found in release-artifacts/"
+          exit 1
+        }
+        
+        foreach ($artifactDir in $artifactDirs) {
+          Write-Host "📂 Processing artifact: $($artifactDir.Name)"
           # Copy all files except build/debug artifacts like .wixpdb
-          Get-ChildItem "$platformDir" -File -Recurse | Where-Object { $_.Extension -ne '.wixpdb' } | ForEach-Object {
+          Get-ChildItem $artifactDir.FullName -File -Recurse | Where-Object { $_.Extension -ne '.wixpdb' } | ForEach-Object {
               $file = $_
-              Copy-Item $file.FullName "$releaseDir/$($file.Name)"
+              Copy-Item $file.FullName "$releaseDir/$($file.Name)" -Force
               Write-Host "  ✅ $($file.Name)"
             }
         }
@@ -378,6 +391,9 @@ jobs:
         Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object { 
           Write-Host "  • $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
         }
+        
+        # Explicitly exit with success to avoid inheriting previous command's exit code
+        exit 0
     
     - name: 🚀 Update GitHub Release
       uses: softprops/action-gh-release@v2
