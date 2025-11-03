@@ -321,7 +321,6 @@ jobs:
     - name: 📋 Prepare release assets
       shell: pwsh
       run: |
-        $ErrorActionPreference = 'Stop'
         $version = "${{ needs.prepare-release.outputs.version }}"
         $releaseDir = "final-release"
         New-Item -ItemType Directory -Path $releaseDir -Force
