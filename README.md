@@ -15,11 +15,12 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 ## 📹 Demo
 
 <div align="center">
-  <video src="docs/kapster_demo.mp4" width="800" controls>
-    Your browser does not support the video tag. 
-    <a href="docs/kapster_demo.mp4">Watch the demo video</a>
-  </video>
+  
+![AGI.Kapster Demo](docs/kapster_demo_preview.gif)
+
 </div>
+
+> **📺 [Watch Full Demo Video](docs/kapster_demo.mp4)** (2:07, click to download)
 
 *Quick demonstration of AGI.Kapster's capture and annotation capabilities*
 

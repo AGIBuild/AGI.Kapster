@@ -12,6 +12,18 @@
 
 [English](README.md) | [贡献指南](CONTRIBUTING.md) | [测试指南](TESTING.md)
 
+## 📹 演示
+
+<div align="center">
+  
+![AGI.Kapster 演示](docs/kapster_demo_preview.gif)
+
+</div>
+
+> **📺 [观看完整演示视频](docs/kapster_demo.mp4)** (2:07，点击下载)
+
+*快速演示 AGI.Kapster 的截图和标注功能*
+
 ## ✨ 主要特性
 
 ### 🎯 智能截图
