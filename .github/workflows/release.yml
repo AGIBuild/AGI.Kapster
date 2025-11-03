@@ -296,6 +296,7 @@ jobs:
     - name: 📋 Prepare release assets
       shell: pwsh
       run: |
+        $ErrorActionPreference = 'Stop'
         $version = "${{ needs.prepare-release.outputs.version }}"
         $releaseDir = "final-release"
         New-Item -ItemType Directory -Path $releaseDir -Force
@@ -333,10 +334,12 @@ jobs:
         $manifest = "SHASUMS-$version.txt"
         $manifestPath = Join-Path $releaseDir $manifest
         if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
-        Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
+        $checksums = Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object {
           $hash = Get-FileHash $_.FullName -Algorithm SHA256
           "$($hash.Hash)  $($_.Name)"
-        } | Out-File -FilePath $manifestPath -Encoding ASCII
+        }
+        $checksums | Out-File -FilePath $manifestPath -Encoding utf8 -NoNewline:$false
+        Write-Host "✅ Generated checksums for $($checksums.Count) files"
         Write-Host "🔎 (Optional) Verifying Authenticode signatures if signtool available..."
         if (Get-Command signtool -ErrorAction SilentlyContinue) {
           Get-ChildItem $releaseDir -Filter *.msi -File | ForEach-Object {
@@ -345,7 +348,7 @@ jobs:
           }
         } else { Write-Host "ℹ️ signtool not present on this runner (expected on Windows only)" }
         Write-Host "🧾 Wrote checksum manifest: $manifest"
-        Get-Content $manifestPath | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
+        Get-Content $manifestPath | ForEach-Object { Write-Host "  $_" }
         Write-Host "📋 Final release assets:"
         Get-ChildItem $releaseDir -File | Where-Object { $_.Extension -ne '.wixpdb' } | Sort-Object Name | ForEach-Object { 
           Write-Host "  • $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
