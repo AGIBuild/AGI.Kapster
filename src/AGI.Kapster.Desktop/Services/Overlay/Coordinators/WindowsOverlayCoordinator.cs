@@ -64,7 +64,7 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
 
         // Windows-specific: Remove system decorations to ensure client area matches window size
         var avaloniaWindow = window.AsWindow();
-        avaloniaWindow.SystemDecorations = Avalonia.Controls.SystemDecorations.None;
+        avaloniaWindow.SystemDecorations = SystemDecorations.None;
 
         // Configure window
         window.SetScreens(screens);
