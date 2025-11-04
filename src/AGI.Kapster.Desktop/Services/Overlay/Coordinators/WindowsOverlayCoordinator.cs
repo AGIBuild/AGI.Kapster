@@ -9,6 +9,7 @@ using AGI.Kapster.Desktop.Services.Clipboard;
 using AGI.Kapster.Desktop.Services.Export.Imaging;
 using AGI.Kapster.Desktop.Services.Overlay.State;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Serilog;
@@ -60,6 +61,10 @@ public class WindowsOverlayCoordinator : OverlayCoordinatorBase
         window.Position = new Avalonia.PixelPoint((int)virtualBounds.X, (int)virtualBounds.Y);
         window.Width = virtualBounds.Width;
         window.Height = virtualBounds.Height;
+
+        // Windows-specific: Remove system decorations to ensure client area matches window size
+        var avaloniaWindow = window.AsWindow();
+        avaloniaWindow.SystemDecorations = SystemDecorations.None;
 
         // Configure window
         window.SetScreens(screens);
