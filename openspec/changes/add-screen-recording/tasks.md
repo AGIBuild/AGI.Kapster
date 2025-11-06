@@ -14,10 +14,36 @@
 
 - [ ] 2.1 Define `IScreenRecordingService` interface
   ```csharp
+  /// <summary>
+  /// Starts a new screen recording session for the specified region with the given settings.
+  /// </summary>
+  /// <param name="region">The screen region to record.</param>
+  /// <param name="settings">The recording settings to use.</param>
+  /// <returns>A task that returns the created <see cref="RecordingSession"/>.</returns>
   Task<RecordingSession> StartRecordingAsync(Rect region, RecordingSettings settings);
+
+  /// <summary>
+  /// Pauses the current recording session.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation.</returns>
   Task PauseRecordingAsync();
+
+  /// <summary>
+  /// Resumes a paused recording session.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation.</returns>
   Task ResumeRecordingAsync();
+
+  /// <summary>
+  /// Stops the current recording session and finalizes the output file.
+  /// </summary>
+  /// <returns>A task that returns the path to the recorded file.</returns>
   Task<string> StopRecordingAsync();
+
+  /// <summary>
+  /// Cancels the current recording session and discards any recorded data.
+  /// </summary>
+  /// <returns>A task representing the asynchronous operation.</returns>
   Task CancelRecordingAsync();
   ```
 - [ ] 2.2 Implement `ScreenRecordingService` class
