@@ -130,13 +130,16 @@
 
 ## 9. Overlay Integration
 
-- [ ] 9.1 Create `RecordingOverlay.cs` for region selection
-- [ ] 9.2 Extend `OverlayCoordinator` to support recording mode
-- [ ] 9.3 Add countdown timer overlay (3-2-1 countdown)
-- [ ] 9.4 Reuse existing `SelectionHandler` for region selection
-- [ ] 9.5 Add visual indicator for recording region border
-- [ ] 9.6 Implement recording indicator (red dot on screen border)
-- [ ] 9.7 Add preview window overlay (optional)
+- [ ] 9.1 Create namespace `AGI.Kapster.Desktop.RecordingOverlays/*`
+- [ ] 9.2 Implement `RecordingOverlayWindow` (transparent, topmost, per-screen)
+- [ ] 9.3 Implement `RecordingSelectionOverlay` (selection-only, no toolbar/annotation)
+- [ ] 9.4 Implement `RecordingBorderOverlay` (outer-border during recording, persistent)
+- [ ] 9.5 Implement `IRecordingOverlayCoordinator` + platform coordinators (Win/Mac/Linux)
+- [ ] 9.6 Persist overlays during recording; hide/dispose on stop; handle screen/DPI changes
+- [ ] 9.7 Draw border strictly outside ROI (DPI-aware); +1px safety margin; zero overlap guarantee
+- [ ] 9.8 Windows: apply `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` when available; graceful fallback
+- [ ] 9.9 Validation: Automated pixel test (no border color inside ROI), multi-monitor, mixed DPI
+- [ ] 9.10 Add countdown overlay pre-recording (3-2-1), ensure not captured
 
 ## 10. Hotkey Integration
 
@@ -156,6 +159,7 @@
 - [ ] 11.5 Add "Cancel Recording" context menu item (when recording)
 - [ ] 11.6 Show toast notification on recording start/stop
 - [ ] 11.7 Update tooltip with recording duration
+- [ ] 11.8 Recording control panel must never overlap ROI; auto-reposition to safe area; fallback to tray-only when ROI covers available space
 
 ## 12. Mouse Effects
 

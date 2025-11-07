@@ -76,7 +76,242 @@ AGI.Kapster currently provides high-quality screenshot capture and annotation ca
 
 ---
 
-### Decision 2: Audio Capture Strategy
+### Decision 2: FFmpeg Deployment and Version Management
+
+**Choice**: Bundle matched-version FFmpeg binaries with application
+
+**Version Compatibility**:
+- `FFmpeg.AutoGen 7.0.0` requires `FFmpeg 7.0.x`
+- Version mismatch causes ABI incompatibility, runtime crashes, or encoding errors
+- Tight coupling between binding version and native library version
+
+**Alternatives Considered**:
+
+1. **Depend on system-installed FFmpeg**
+   - ❌ Uncontrollable version - user's FFmpeg may not match
+   - ❌ Poor user experience - requires manual installation
+   - ❌ High support burden - "recording doesn't work" issues
+   - ❌ Difficult to debug - environment differences
+   - ✅ Smaller installer size
+
+2. **Use third-party NuGet packages** (e.g., FFmpeg.Native)
+   - ❌ Limited platform support (missing macOS ARM64)
+   - ❌ Delayed updates from third-party maintainers
+   - ⚠️ Still ~50-70MB download
+   - ✅ Automated dependency management
+
+3. **Bundle matched-version binaries** (Selected)
+   - ✅ **Full version control** - dev/prod environments match
+   - ✅ **Zero external dependencies** - works out-of-box
+   - ✅ **Cross-platform consistency** - same version everywhere
+   - ✅ **Easy testing** - test environment = production
+   - ⚠️ Installer size +50-70MB per platform
+   - ⚠️ Maintain multi-platform binaries
+
+**Rationale**: Bundling binaries ensures version compatibility, eliminates user installation requirements, and provides consistent behavior across all platforms. The ~50-70MB size increase is acceptable for enterprise-grade reliability.
+
+**Implementation Strategy**:
+
+**Directory Structure**:
+```
+AGI.Kapster/
+├── packaging/
+│   └── ffmpeg/
+│       ├── windows/
+│       │   ├── x64/
+│       │   │   ├── avcodec-61.dll
+│       │   │   ├── avformat-61.dll
+│       │   │   ├── avutil-59.dll
+│       │   │   ├── swscale-8.dll
+│       │   │   └── swresample-5.dll
+│       │   └── arm64/ (future)
+│       ├── macos/
+│       │   ├── x64/
+│       │   │   └── lib*.dylib files
+│       │   └── arm64/
+│       │       └── lib*.dylib files
+│       └── linux/
+│           └── x64/
+│               └── lib*.so files
+```
+
+**FFmpeg Loader Implementation**:
+```csharp
+// Services/Recording/FFmpegLoader.cs
+public static class FFmpegLoader
+{
+    private static bool _initialized = false;
+    private static readonly object _lock = new();
+    private const int RequiredMajorVersion = 61; // FFmpeg 7.x = libavcodec 61.x
+    
+    public static void Initialize()
+    {
+        lock (_lock)
+        {
+            if (_initialized) return;
+            
+            // 1. Try bundled FFmpeg (primary)
+            var bundledPath = GetBundledFFmpegPath();
+            if (TryLoadFFmpeg(bundledPath, "bundled"))
+            {
+                _initialized = true;
+                return;
+            }
+            
+            // 2. Fallback to system FFmpeg (if version matches)
+            var systemPath = FindSystemFFmpeg();
+            if (systemPath != null && TryLoadFFmpeg(systemPath, "system"))
+            {
+                Log.Warning("Using system FFmpeg. Bundled version preferred.");
+                _initialized = true;
+                return;
+            }
+            
+            throw new FFmpegNotFoundException(
+                "FFmpeg 7.x not found. Recording features unavailable.");
+        }
+    }
+    
+    private static bool TryLoadFFmpeg(string path, string source)
+    {
+        if (!Directory.Exists(path)) return false;
+        
+        try
+        {
+            ffmpeg.RootPath = path;
+            var codecVersion = ffmpeg.avcodec_version();
+            var major = codecVersion >> 24;
+            
+            if (major != RequiredMajorVersion)
+            {
+                Log.Warning($"FFmpeg version mismatch at {path}: " +
+                           $"found {major}.x, require {RequiredMajorVersion}.x");
+                return false;
+            }
+            
+            var versionInfo = Marshal.PtrToStringAnsi(ffmpeg.av_version_info());
+            Log.Information($"FFmpeg loaded from {source}: {versionInfo}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, $"Failed to load FFmpeg from {path}");
+            return false;
+        }
+    }
+    
+    private static string GetBundledFFmpegPath()
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var platform = GetPlatform();
+        var architecture = RuntimeInformation.ProcessArchitecture
+            .ToString().ToLower();
+        
+        return Path.Combine(baseDir, "ffmpeg", platform, architecture);
+    }
+    
+    private static string? FindSystemFFmpeg()
+    {
+        // Platform-specific system FFmpeg detection
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return FindWindowsSystemFFmpeg();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return "/usr/lib/x86_64-linux-gnu"; // Common path
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return "/usr/local/lib"; // Homebrew path
+        return null;
+    }
+    
+    private static string GetPlatform()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return "windows";
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return "macos";
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return "linux";
+        throw new PlatformNotSupportedException();
+    }
+}
+```
+
+**Version Locking in Project**:
+```xml
+<!-- Directory.Build.props -->
+<PropertyGroup>
+  <FFmpegVersion>7.0.1</FFmpegVersion>
+  <FFmpegAutoGenVersion>7.0.0</FFmpegAutoGenVersion>
+</PropertyGroup>
+
+<ItemGroup>
+  <PackageReference Include="FFmpeg.AutoGen" 
+                    Version="$(FFmpegAutoGenVersion)" />
+</ItemGroup>
+```
+
+**CI/CD Validation**:
+```powershell
+# tools/validate-ffmpeg-versions.ps1
+$autoGenVersion = "7.0.0"
+$expectedFFmpegMajor = 61 # libavcodec major version for FFmpeg 7.x
+
+# Validate bundled binaries match AutoGen version
+foreach ($platform in @("windows", "macos", "linux")) {
+    $binaryPath = "packaging/ffmpeg/$platform"
+    if (Test-Path $binaryPath) {
+        Write-Host "Validating FFmpeg binaries for $platform..."
+        # Version validation logic here
+    }
+}
+```
+
+**Update Strategy**:
+1. **Quarterly Review**: Check for FFmpeg.AutoGen updates
+2. **Matching Download**: Get corresponding FFmpeg binaries for all platforms
+3. **Regression Testing**: Full recording feature test suite
+4. **Documentation**: Update LICENSE and version docs
+
+**LGPL Compliance**:
+```
+AGI.Kapster/
+├── LICENSE                          # Main project license
+├── THIRD-PARTY-LICENSES/
+│   └── FFMPEG-LICENSE.txt          # FFmpeg LGPL 2.1+ license
+└── docs/
+    └── ffmpeg-replacement-guide.md # User instructions
+```
+
+**Replacement Guide Template**:
+```markdown
+# Replacing FFmpeg Binaries
+
+AGI.Kapster bundles FFmpeg 7.0.x for recording features.
+
+## Version Requirements
+- FFmpeg 7.0.x or 7.1.x compatible
+- libavcodec major version 61
+
+## Replacement Steps
+1. Navigate to: `<install-dir>/ffmpeg/<platform>/<arch>/`
+2. Backup existing binaries
+3. Replace with compatible FFmpeg libraries
+4. Restart AGI.Kapster
+
+## Verification
+Settings → Recording → "Test Recording" button
+```
+
+**Binary Size Impact**:
+- Windows x64: ~60MB
+- macOS ARM64: ~50MB
+- macOS x64: ~55MB
+- Linux x64: ~55MB
+- **Per-platform installer**: +50-60MB
+- **All-platform package**: +220MB (dev only)
+
+---
+
+### Decision 3: Audio Capture Strategy
 
 **Choice**: Platform-specific implementations with unified interface
 
@@ -111,7 +346,7 @@ public interface IAudioCaptureService
 
 ---
 
-### Decision 3: Recording Architecture Pattern
+### Decision 4: Recording Architecture Pattern
 
 **Choice**: State Machine with Event-Driven Pipeline
 
@@ -140,7 +375,7 @@ RecordingSession (State Machine)
 
 **State Machine States**:
 - `Idle` → User not recording
-- `RegionSelection` → User selecting recording area (reuses overlay)
+- `RegionSelection` → User selecting recording area (independent per-screen recording overlay)
 - `Countdown` → 3-second countdown before recording
 - `Recording` → Active recording
 - `Paused` → Recording paused
@@ -166,7 +401,7 @@ public enum RecordingEvent
 
 ---
 
-### Decision 4: Frame Capture Strategy
+### Decision 5: Frame Capture Strategy
 
 **Choice**: Polling-based capture with adaptive frame rate
 
@@ -204,7 +439,7 @@ while (state == RecordingState.Recording)
 
 ---
 
-### Decision 5: Hardware Acceleration
+### Decision 6: Hardware Acceleration
 
 **Choice**: Automatic detection with graceful fallback
 
@@ -238,7 +473,7 @@ public VideoEncoderType DetectBestEncoder()
 
 ---
 
-### Decision 6: UI Component Design
+### Decision 7: UI Component Design
 
 **Choice**: Minimal floating control panel with system tray integration
 
@@ -248,7 +483,7 @@ public VideoEncoderType DetectBestEncoder()
    - Position: Top-right corner, draggable
    - Content: Timer, pause/resume, stop buttons
    - Size: 200x80 pixels (compact)
-   - Behavior: Always on top, semi-transparent when idle
+   - Behavior: Always on top; never overlaps the recording ROI; auto-reposition to a safe area or another screen; if ROI covers all available space, fallback to tray-only; semi-transparent when idle (only when outside ROI)
 
 2. **System Tray Indicator**
    - Icon: Animated red dot during recording
@@ -272,7 +507,7 @@ public VideoEncoderType DetectBestEncoder()
 
 ---
 
-### Decision 7: File Output Strategy
+### Decision 8: File Output Strategy
 
 **Choice**: Streaming write with atomic finalization
 
@@ -294,6 +529,31 @@ File.Move(tempFile, finalFile);
 - Streaming write prevents memory exhaustion on long recordings
 - Temporary file prevents corrupted output on crashes
 - Atomic rename ensures file consistency
+
+---
+
+### Decision 9: Recording Overlay — Independent and Persistent (Per-Screen)
+
+**Choice**: Independent per-screen overlay that persists during recording. After recording starts, only an outer border is rendered; the capture region (ROI) never contains overlay pixels.
+
+**Behaviors**:
+- Per-screen transparent topmost windows; selection stage has no toolbar/annotation.
+- Recording stage keeps overlays alive but shows only an outer border; no interactive UI.
+- Border is drawn strictly outside ROI with thickness t (2–3 px, DPI-aware), never overlapping ROI.
+
+**Cross-Platform**:
+- Windows: per-monitor window; prefer `WDA_EXCLUDEFROMCAPTURE` when available; otherwise rely on outer-border guarantee.
+- macOS: one NSWindow per NSScreen; full-screen transparent window; outer-border guarantee。
+- Linux: top-level transparent per output; outer-border guarantee（不依赖合成器排除特性）。
+
+**Lifecycle**: Start → Selecting → Confirm → Recording (persistent border) → Stop/Dispose. Hotkeys control the recording service; overlays remain passive.
+
+**Validation**: Pixel test（ROI 内不存在边框色）+ 多屏/混合 DPI 手工验证。
+
+**Deliverables**:
+- Namespace: `AGI.Kapster.Desktop.RecordingOverlays/*`
+- Components: `RecordingOverlayWindow` (per screen), `RecordingSelectionOverlay` (selection only), `RecordingBorderOverlay` (recording border)
+- Coordinators: `IRecordingOverlayCoordinator` + Win/Mac/Linux platform implementations
 
 ---
 
@@ -358,27 +618,85 @@ public class RecordingSession
 
 ## Risks / Trade-offs
 
-### Risk 1: FFmpeg Binary Size (~50MB)
-**Impact**: Increases installer size by ~50MB
+### Risk 1: FFmpeg Binary Size (~50-60MB per platform)
+**Impact**: Increases installer size significantly per platform
+
+**Per-Platform Binary Sizes**:
+- Windows x64: ~60MB (5 DLL files)
+- macOS ARM64: ~50MB (dylib files)
+- macOS x64: ~55MB (dylib files)
+- Linux x64: ~55MB (shared objects)
+
+**Installer Impact**:
+- Single-platform installer: +50-60MB
+- Multi-platform package (dev): +220MB total
+- After compression: -30% to -40% reduction
 
 **Mitigation**:
-- Separate FFmpeg download on first use (optional)
-- Compress binaries in installer
-- Document size increase in release notes
+- **Bundled approach** (recommended): Include FFmpeg in platform-specific installers
+  - Windows MSI: Include only Windows x64 binaries (~60MB compressed to ~40MB)
+  - macOS PKG: Include only macOS ARM64/x64 binaries (~50-55MB compressed to ~35MB)
+  - Linux DEB/RPM: Include only Linux x64 binaries (~55MB compressed to ~38MB)
+  
+- **On-demand download** (alternative): Download FFmpeg on first recording use
+  - ❌ Requires network connectivity
+  - ❌ Poor offline experience
+  - ❌ Additional error handling complexity
+  - ✅ Smaller initial installer (~0MB FFmpeg)
 
-**Trade-off**: Accept larger installer for comprehensive codec support and hardware acceleration.
+- **Compression strategies**:
+  - Use installer compression (LZMA, ZIP)
+  - Strip debug symbols from FFmpeg builds (-30% size)
+  - Include only essential codecs (H.264, VP9, AAC)
+
+- **Documentation**:
+  - Clearly state installer size in release notes
+  - Explain size increase is for professional recording features
+  - Provide "lite" version without recording (optional future work)
+
+**Trade-off**: Accept +40-60MB compressed installer size per platform for comprehensive codec support, hardware acceleration, and zero-configuration user experience. Professional video recording justifies the size increase.
 
 ---
 
 ### Risk 2: LGPL License Compliance
-**Impact**: FFmpeg is LGPL 2.1+, requires dynamic linking
+**Impact**: FFmpeg is LGPL 2.1+, requires dynamic linking and license disclosure
 
-**Mitigation**:
-- Ship FFmpeg as separate native binaries (not statically linked)
-- Document FFmpeg usage in LICENSE file
-- Provide instructions for users to replace FFmpeg binaries
+**Mitigation Strategy**:
 
-**Trade-off**: Accept LGPL dependency for best-in-class encoding. Alternative libraries have significant limitations.
+1. **Dynamic Linking (LGPL Requirement)**
+   - FFmpeg libraries loaded at runtime via P/Invoke (FFmpeg.AutoGen)
+   - No static linking - binaries remain separate
+   - Users can replace FFmpeg binaries with compatible versions
+
+2. **License Documentation**
+   - Include `THIRD-PARTY-LICENSES/FFMPEG-LICENSE.txt` with full LGPL 2.1+ text
+   - Add FFmpeg attribution to main LICENSE file
+   - Document FFmpeg usage in About dialog and README
+
+3. **User Replacement Instructions**
+   - Provide `docs/ffmpeg-replacement-guide.md` with step-by-step instructions
+   - Document version compatibility requirements (FFmpeg 7.0.x)
+   - Include verification steps to test custom FFmpeg builds
+
+4. **Binary Distribution**
+   - FFmpeg binaries in separate `ffmpeg/` subdirectory (not embedded in .exe)
+   - Clear separation between AGI.Kapster code and FFmpeg libraries
+   - Installer creates distinct directory structure
+
+5. **Source Code Availability**
+   - Link to FFmpeg source: https://github.com/FFmpeg/FFmpeg
+   - Link to FFmpeg.AutoGen source: https://github.com/Ruslan-B/FFmpeg.AutoGen
+   - Document exact FFmpeg version used (e.g., 7.0.1)
+
+**Compliance Checklist**:
+- [ ] FFmpeg binaries dynamically loaded (not statically linked)
+- [ ] LGPL license text included in distribution
+- [ ] FFmpeg version and source clearly documented
+- [ ] User replacement instructions provided
+- [ ] Binary directory structure allows easy replacement
+- [ ] Legal review completed (if required by organization)
+
+**Trade-off**: Accept LGPL dependency for best-in-class encoding. Alternative libraries have significant limitations. Dynamic linking ensures full compliance while maintaining enterprise-grade functionality.
 
 ---
 
