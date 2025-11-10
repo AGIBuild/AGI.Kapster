@@ -475,3 +475,380 @@ The system SHALL persist recording settings across application restarts.
 - **AND** settings UI reflects loaded values
 - **AND** default settings are used if file is missing or invalid
 
+---
+
+### Requirement: Platform Permission Management
+
+The system SHALL request and validate platform-specific permissions before recording.
+
+#### Scenario: Check screen recording permission on macOS
+- **WHEN** user initiates recording on macOS 10.14+
+- **AND** app lacks screen recording permission
+- **THEN** system shows macOS permission dialog
+- **AND** guides user to System Preferences if denied
+- **AND** recording is cancelled with clear error message "Screen recording permission required"
+
+#### Scenario: Check microphone permission
+- **WHEN** user enables microphone audio
+- **AND** app lacks microphone permission
+- **THEN** system requests permission via platform dialog
+- **AND** shows "Grant microphone access" guidance if denied
+- **AND** offers option to continue without audio
+
+#### Scenario: Linux Wayland portal permission
+- **WHEN** user starts recording on Wayland session
+- **THEN** system uses xdg-desktop-portal for screen capture
+- **AND** shows native Wayland permission dialog
+- **AND** respects user's window/monitor selection from portal
+
+#### Scenario: Permission granted successfully
+- **WHEN** all required permissions are granted
+- **THEN** recording proceeds normally
+- **AND** no permission dialogs shown on subsequent recordings
+
+---
+
+### Requirement: Resource Monitoring Before Recording
+
+The system SHALL check system resources before starting recording.
+
+#### Scenario: Insufficient memory detected
+- **WHEN** user initiates recording
+- **AND** available memory < estimated usage + 500MB
+- **THEN** error dialog displays "Insufficient memory. Close other applications."
+- **AND** recording does not start
+
+#### Scenario: Low disk space detected
+- **WHEN** user initiates recording
+- **AND** available disk space < 1GB
+- **THEN** error dialog displays "Insufficient disk space. Need at least 1GB free."
+- **AND** recording does not start
+
+#### Scenario: Low disk space warning
+- **WHEN** user initiates recording
+- **AND** available disk space between 1GB and 5GB
+- **THEN** warning notification displays "Low disk space: Xgb remaining"
+- **AND** user can choose to proceed or cancel
+
+#### Scenario: High CPU usage warning
+- **WHEN** user initiates recording
+- **AND** current CPU usage > 80%
+- **THEN** warning displays "High CPU usage detected. Recording may drop frames."
+- **AND** user can choose to proceed or cancel
+
+#### Scenario: Hardware encoder unavailable
+- **WHEN** user has hardware acceleration enabled
+- **AND** hardware encoder fails to initialize
+- **THEN** system automatically falls back to software encoding
+- **AND** warning displays "Hardware encoder unavailable. Using software encoding (slower)."
+
+---
+
+### Requirement: Runtime Resource Monitoring
+
+The system SHALL monitor resources during recording and handle failures gracefully.
+
+#### Scenario: Disk full during recording
+- **WHEN** recording is active
+- **AND** available disk space drops below 100MB
+- **THEN** recording stops automatically
+- **AND** saves what has been recorded so far
+- **AND** notification displays "Recording stopped: disk full"
+
+#### Scenario: High frame drop rate detected
+- **WHEN** recording is active
+- **AND** frame drop rate exceeds 5%
+- **THEN** warning notification displays "High frame drops detected. Consider lowering quality."
+- **AND** recording continues
+
+#### Scenario: Encoding queue overflow
+- **WHEN** recording is active
+- **AND** encoding queue depth exceeds 10 seconds of backlog
+- **THEN** system drops oldest frames to prevent memory overflow
+- **AND** logs warning "Encoding queue overflow. Dropping frames."
+
+#### Scenario: Audio device disconnected during recording
+- **WHEN** recording with microphone enabled
+- **AND** microphone is unplugged or fails
+- **THEN** recording continues with video only
+- **AND** warning displays "Microphone disconnected. Continuing video-only."
+
+#### Scenario: FFmpeg encoder crash during recording
+- **WHEN** FFmpeg process crashes during recording
+- **THEN** system attempts to save partial recording
+- **AND** error dialog displays "Recording failed: encoder error. Partial recording may be saved."
+- **AND** detailed error is logged for troubleshooting
+
+---
+
+### Requirement: Platform-Specific Capture Technology
+
+The system SHALL use platform-optimized screen capture APIs.
+
+#### Scenario: Windows Graphics Capture API (Windows 10 1903+)
+- **WHEN** recording on Windows 10 version 1903 or later
+- **THEN** system uses Windows.Graphics.Capture API
+- **AND** provides GPU acceleration for capture
+- **AND** automatically handles DPI scaling
+- **AND** can exclude own windows from capture
+
+#### Scenario: GDI+ fallback (Windows 10 < 1903)
+- **WHEN** recording on Windows 10 versions earlier than 1903
+- **THEN** system falls back to GDI+ BitBlt capture
+- **AND** manually handles DPI scaling
+- **AND** logs "Using legacy GDI+ capture. Consider upgrading Windows for better performance."
+
+#### Scenario: macOS ScreenCaptureKit (macOS 12.3+)
+- **WHEN** recording on macOS 12.3 or later
+- **THEN** system uses ScreenCaptureKit API
+- **AND** captures system audio natively
+- **AND** provides GPU-accelerated capture
+- **AND** respects system privacy controls
+
+#### Scenario: macOS AVFoundation fallback (macOS 10.15-12.2)
+- **WHEN** recording on macOS 10.15 to 12.2
+- **THEN** system uses AVFoundation AVCaptureScreen
+- **AND** supports microphone audio only
+- **AND** system audio requires manual BlackHole setup
+- **AND** info message displays "System audio requires BlackHole driver (optional)"
+
+#### Scenario: Linux Wayland xdg-desktop-portal
+- **WHEN** recording on Linux with Wayland session
+- **THEN** system uses xdg-desktop-portal-screencast
+- **AND** shows native permission dialog
+- **AND** supports PipeWire audio capture
+
+#### Scenario: Linux X11 direct capture
+- **WHEN** recording on Linux with X11 session
+- **THEN** system uses X11 XGetImage or XShm
+- **AND** captures directly without permissions
+- **AND** supports PulseAudio/PipeWire audio
+
+---
+
+### Requirement: Audio Stack Detection (Linux)
+
+The system SHALL detect and use the appropriate Linux audio stack.
+
+#### Scenario: PipeWire detected (modern Linux)
+- **WHEN** recording on Linux
+- **AND** PipeWire is available
+- **THEN** system uses PipeWire for audio capture
+- **AND** logs "Using PipeWire for audio capture"
+- **AND** benefits from low latency and Wayland support
+
+#### Scenario: PulseAudio fallback
+- **WHEN** recording on Linux
+- **AND** PipeWire is not available
+- **AND** PulseAudio is available
+- **THEN** system uses PulseAudio for audio capture
+- **AND** logs "Using PulseAudio for audio capture"
+
+#### Scenario: ALSA fallback
+- **WHEN** recording on Linux
+- **AND** neither PipeWire nor PulseAudio are available
+- **THEN** system uses ALSA for audio capture
+- **AND** logs "Using ALSA for audio capture (may conflict with other apps)"
+
+---
+
+### Requirement: Codec Selection and License Compliance
+
+The system SHALL use license-compliant codecs to avoid GPL contamination.
+
+#### Scenario: Hardware encoder selected (preferred)
+- **WHEN** hardware encoder is available (NVENC/QSV/AMF)
+- **AND** user selects MP4 format
+- **THEN** system uses hardware H.264 encoder
+- **AND** logs "Using [NVENC|QSV|AMF] hardware encoder"
+- **AND** no GPL libraries are linked
+
+#### Scenario: OpenH264 software fallback (BSD licensed)
+- **WHEN** no hardware encoder is available
+- **AND** user selects MP4 format
+- **THEN** system uses OpenH264 software encoder (BSD license)
+- **AND** logs "Using OpenH264 software encoder"
+- **AND** NEVER uses libx264 (GPL)
+
+#### Scenario: VP9 for WebM format (BSD licensed)
+- **WHEN** user selects WebM format
+- **THEN** system uses libvpx VP9 encoder (BSD license)
+- **AND** logs "Using VP9 encoder for WebM"
+
+#### Scenario: GPL codec detection
+- **WHEN** FFmpeg binaries are loaded
+- **THEN** system verifies FFmpeg is built with LGPL-only configuration
+- **AND** logs error if GPL codecs (x264/x265) are detected
+- **AND** refuses to use GPL-contaminated builds
+
+---
+
+### Requirement: FFmpeg Dynamic Download
+
+The system SHALL download FFmpeg binaries on first use rather than bundling.
+
+#### Scenario: First-time recording (FFmpeg not cached)
+- **WHEN** user initiates recording for the first time
+- **AND** FFmpeg is not cached locally
+- **THEN** system shows "Downloading FFmpeg (~50MB)..." dialog with progress bar
+- **AND** downloads FFmpeg 7.0.2 from GitHub Releases or CDN
+- **AND** extracts to local cache directory
+- **AND** proceeds with recording after download completes
+
+#### Scenario: FFmpeg already cached
+- **WHEN** user initiates recording
+- **AND** FFmpeg 7.0.2 is already cached locally
+- **THEN** system uses cached FFmpeg immediately
+- **AND** no download occurs
+
+#### Scenario: FFmpeg download failure
+- **WHEN** FFmpeg download fails (network error, server unavailable)
+- **THEN** system tries system-installed FFmpeg as fallback
+- **AND** shows error "FFmpeg download failed. Recording unavailable." if fallback also fails
+- **AND** logs detailed error for troubleshooting
+
+#### Scenario: FFmpeg version validation
+- **WHEN** system loads FFmpeg binaries
+- **THEN** validates FFmpeg version is 7.0.x (major version 61)
+- **AND** refuses to use mismatched versions
+- **AND** logs error "FFmpeg version mismatch" if validation fails
+
+---
+
+### Requirement: Hotkey Conflict Detection
+
+The system SHALL detect and prevent hotkey conflicts.
+
+#### Scenario: Default hotkeys changed to avoid conflicts
+- **WHEN** user views recording hotkey settings
+- **THEN** default Start/Stop hotkey is Ctrl+Shift+R (not Alt+R)
+- **AND** default Pause/Resume hotkey is Ctrl+Shift+P (not Alt+P)
+- **AND** avoids conflicts with browser and IDE shortcuts
+
+#### Scenario: Hotkey conflict with own app
+- **WHEN** user assigns hotkey already used by another AGI.Kapster feature
+- **THEN** error displays "Hotkey already assigned to [feature name]"
+- **AND** hotkey assignment is rejected
+
+#### Scenario: Hotkey conflict with system or other apps
+- **WHEN** user assigns hotkey
+- **AND** hotkey is already registered by system or another application
+- **THEN** warning displays "Hotkey may be in use by another application"
+- **AND** user can test hotkey to verify it works
+
+#### Scenario: Customizable hotkeys
+- **WHEN** user opens recording settings
+- **THEN** user can click on hotkey field to customize
+- **AND** press new key combination to assign
+- **AND** system validates hotkey before saving
+
+#### Scenario: Test hotkey functionality
+- **WHEN** user clicks "Test Hotkey" button in settings
+- **THEN** system attempts to register hotkey temporarily
+- **AND** shows success message if hotkey is available
+- **AND** shows conflict warning if unavailable
+
+---
+
+### Requirement: Accessibility Support
+
+The system SHALL support keyboard navigation and screen readers for recording controls.
+
+#### Scenario: Keyboard navigation in control panel
+- **WHEN** recording control panel is visible
+- **AND** user presses Tab key
+- **THEN** focus cycles through Pause, Stop, Cancel buttons
+- **AND** focused button has visible focus indicator
+- **AND** user can press Space or Enter to activate button
+
+#### Scenario: Screen reader announcements
+- **WHEN** recording state changes
+- **THEN** screen reader announces new state
+- **EXAMPLE**: "Recording started", "Recording paused", "Recording stopped"
+
+#### Scenario: High contrast mode support
+- **WHEN** system is in high contrast mode
+- **THEN** control panel colors adjust automatically
+- **AND** all buttons remain distinguishable
+- **AND** text contrast meets WCAG AA standards
+
+#### Scenario: Keyboard shortcut discoverability
+- **WHEN** user hovers over control panel buttons
+- **THEN** tooltip shows button function and associated hotkey
+- **EXAMPLE**: "Stop Recording (Ctrl+Shift+R)"
+
+---
+
+### Requirement: Platform Testing Matrix
+
+The system SHALL be validated across specified platform configurations.
+
+#### Scenario: Windows 10 22H2 validation
+- **WHEN** testing on Windows 10 22H2
+- **THEN** validates 1080p SDR recording with WASAPI audio
+- **AND** tests NVIDIA GPU hardware acceleration
+- **AND** achieves <1% frame drop rate at 30 FPS
+
+#### Scenario: Windows 11 23H2 validation
+- **WHEN** testing on Windows 11 23H2
+- **THEN** validates 4K HDR recording support
+- **AND** tests Intel Arc hardware acceleration
+- **AND** achieves <3% frame drop rate at 60 FPS
+
+#### Scenario: macOS 13 Ventura validation (M1)
+- **WHEN** testing on macOS 13 Ventura with M1 chip
+- **THEN** validates Retina display recording
+- **AND** tests AVFoundation audio capture
+- **AND** achieves <1% frame drop rate at 30 FPS
+
+#### Scenario: macOS 14 Sonoma validation (M3)
+- **WHEN** testing on macOS 14 Sonoma with M3 chip
+- **THEN** validates ScreenCaptureKit with native system audio
+- **AND** achieves <1% frame drop rate at 60 FPS
+- **AND** tests privacy permission flows
+
+#### Scenario: Ubuntu 22.04 LTS validation
+- **WHEN** testing on Ubuntu 22.04 LTS
+- **THEN** validates 1080p recording with PulseAudio
+- **AND** tests AMD GPU hardware acceleration
+- **AND** achieves <3% frame drop rate at 30 FPS
+
+#### Scenario: Ubuntu 24.04 LTS validation (Wayland)
+- **WHEN** testing on Ubuntu 24.04 LTS with Wayland
+- **THEN** validates 4K recording via xdg-desktop-portal
+- **AND** tests PipeWire audio capture
+- **AND** validates permission dialog flow
+- **AND** achieves <3% frame drop rate at 30 FPS
+
+---
+
+### Requirement: Performance Benchmarks
+
+The system SHALL meet specified performance targets.
+
+#### Scenario: Frame drop rate target
+- **WHEN** recording at 30 FPS
+- **THEN** frame drop rate SHALL be <1%
+- **WHEN** recording at 60 FPS
+- **THEN** frame drop rate SHALL be <3%
+
+#### Scenario: CPU usage with hardware acceleration
+- **WHEN** recording with hardware encoder
+- **THEN** CPU usage SHALL be <15% on modern CPU
+- **AND** GPU usage handles encoding workload
+
+#### Scenario: CPU usage with software encoding
+- **WHEN** recording with software encoder (OpenH264)
+- **THEN** CPU usage SHALL be <40% on modern CPU
+
+#### Scenario: Memory usage limits
+- **WHEN** recording at 1080p 30FPS
+- **THEN** additional memory usage SHALL be <500MB
+- **WHEN** recording at 4K 30FPS
+- **THEN** additional memory usage SHALL be <800MB
+
+#### Scenario: Encoding latency
+- **WHEN** user stops recording
+- **THEN** file finalization SHALL complete within 2 seconds for recordings <10 minutes
+- **AND** user sees "Recording saved" notification promptly
+

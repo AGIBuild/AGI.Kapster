@@ -2,13 +2,16 @@
 
 ## 1. Project Setup and Infrastructure
 
-- [ ] 1.1 Add FFmpeg.AutoGen NuGet package to AGI.Kapster.Desktop.csproj
-- [ ] 1.2 Add NAudio NuGet package (Windows audio capture)
-- [ ] 1.3 Add PortAudio bindings for Linux audio capture
-- [ ] 1.4 Create FFmpeg native binaries distribution package
-- [ ] 1.5 Update .gitignore to exclude FFmpeg binaries from source control
-- [ ] 1.6 Document FFmpeg LGPL compliance in LICENSE file
+- [ ] 1.1 Add FFmpeg.AutoGen 7.0.0 NuGet package to AGI.Kapster.Desktop.csproj
+- [ ] 1.2 Add NAudio NuGet package (Windows audio capture via WASAPI)
+- [ ] 1.3 **REMOVED** ~~Add PortAudio bindings~~ - Use native Linux APIs instead
+- [ ] 1.4 **CHANGED** Create FFmpeg 7.0.2 download infrastructure (GitHub Releases + version manifest)
+- [ ] 1.5 Update .gitignore to exclude FFmpeg cached binaries
+- [ ] 1.6 **UPDATED** Document FFmpeg LGPL compliance and OpenH264 (BSD) usage in LICENSE file
 - [ ] 1.7 Create recording services directory structure (`Services/Recording/`)
+- [ ] 1.8 **NEW** Create platform-specific capture strategy directory (`Services/Capture/Platforms/Recording/`)
+- [ ] 1.9 **NEW** Create permission service directory (`Services/Permissions/`)
+- [ ] 1.10 **NEW** Create resource monitoring directory (`Services/Recording/Monitoring/`)
 
 ## 2. Core Recording Service
 
@@ -54,15 +57,17 @@
 
 ## 3. Video Encoding Pipeline
 
-- [ ] 3.1 Define `IVideoEncoderService` interface
+- [ ] 3.1 Define `IVideoEncoderService` interface with codec selection
 - [ ] 3.2 Implement `VideoEncoderService` using FFmpeg.AutoGen
 - [ ] 3.3 Implement frame capture loop with adaptive timing
-- [ ] 3.4 Add support for H.264 encoding (MP4 format)
-- [ ] 3.5 Add support for VP9 encoding (WebM format)
+- [ ] 3.4 **UPDATED** Add support for H.264 encoding using OpenH264 (BSD, NOT x264/GPL)
+- [ ] 3.5 Add support for VP9 encoding (WebM format, BSD licensed)
 - [ ] 3.6 Add support for MKV container format
 - [ ] 3.7 Implement GIF export using FFmpeg filters
 - [ ] 3.8 Add configurable bitrate and quality presets
-- [ ] 3.9 Implement frame buffer management (prevent memory leaks)
+- [ ] 3.9 Implement frame buffer management with pooling (prevent GC pressure)
+- [ ] 3.10 **NEW** Implement codec selector with license compliance validation
+- [ ] 3.11 **NEW** Add FFmpeg build verification (ensure no GPL codecs)
 
 ## 4. Hardware Acceleration
 
@@ -76,14 +81,20 @@
 
 ## 5. Audio Capture
 
-- [ ] 5.1 Define `IAudioCaptureService` interface
+- [ ] 5.1 Define `IAudioCaptureService` interface with platform detection
 - [ ] 5.2 Implement Windows audio capture using NAudio (WASAPI)
-- [ ] 5.3 Implement macOS audio capture using AVFoundation
-- [ ] 5.4 Implement Linux audio capture using PortAudio/PulseAudio
-- [ ] 5.5 Add audio source selection (System, Microphone, Both)
-- [ ] 5.6 Implement audio/video synchronization logic
-- [ ] 5.7 Add audio buffer management
-- [ ] 5.8 Handle audio capture failures gracefully (fall back to video-only)
+- [ ] 5.3 **SPLIT** Implement macOS ScreenCaptureKit audio (macOS 12.3+, supports system audio)
+- [ ] 5.4 **SPLIT** Implement macOS AVFoundation audio fallback (macOS 10.15-12.2, microphone only)
+- [ ] 5.5 **NEW** Add BlackHole detection and guidance UI for older macOS
+- [ ] 5.6 **UPDATED** Implement Linux PipeWire audio capture (modern, Wayland-compatible)
+- [ ] 5.7 **NEW** Implement Linux PulseAudio fallback (legacy support)
+- [ ] 5.8 **NEW** Implement Linux ALSA fallback (last resort)
+- [ ] 5.9 **NEW** Implement Linux audio stack detection (PipeWire > PulseAudio > ALSA)
+- [ ] 5.10 Add audio source selection (System, Microphone, Both)
+- [ ] 5.11 Implement audio/video synchronization with timestamp alignment
+- [ ] 5.12 Add audio buffer management with adaptive sizing
+- [ ] 5.13 **UPDATED** Handle audio capture failures gracefully with user notification
+- [ ] 5.14 **NEW** Implement audio device disconnect detection during recording
 
 ## 6. Data Models
 
@@ -231,81 +242,192 @@
 - [ ] 18.7 Test recording cancellation and cleanup
 - [ ] 18.8 Test settings persistence across app restarts
 
-## 19. Platform Testing
+## 19. Platform-Specific Capture Implementation
 
-- [ ] 19.1 Validate recording on Windows 10/11 (x64, ARM64)
-- [ ] 19.2 Validate recording on macOS 10.15+ (x64, ARM64)
-- [ ] 19.3 Validate recording on Ubuntu 20.04/22.04 (x64)
-- [ ] 19.4 Test audio capture on all platforms
-- [ ] 19.5 Test hardware acceleration on NVIDIA/AMD/Intel GPUs
-- [ ] 19.6 Verify output files playable in VLC, Windows Media Player, QuickTime
-- [ ] 19.7 Test multi-monitor scenarios on all platforms
+- [ ] 19.1 **NEW** Implement Windows.Graphics.Capture strategy (Windows 10 1903+)
+- [ ] 19.2 **NEW** Implement GDI+ fallback strategy (Windows 10 < 1903)
+- [ ] 19.3 **NEW** Implement macOS ScreenCaptureKit strategy (macOS 12.3+)
+- [ ] 19.4 **NEW** Implement macOS AVFoundation fallback (macOS 10.15-12.2)
+- [ ] 19.5 **NEW** Implement Linux Wayland xdg-desktop-portal strategy
+- [ ] 19.6 **NEW** Implement Linux X11 capture strategy (XGetImage/XShm)
+- [ ] 19.7 **NEW** Add platform detection and automatic strategy selection
+- [ ] 19.8 **NEW** Implement capture capability detection per platform
 
-## 20. Performance Testing
+## 20. Permission Management
 
-- [ ] 20.1 Benchmark frame rate stability (>95% target FPS)
-- [ ] 20.2 Measure CPU usage with hardware acceleration (<15%)
-- [ ] 20.3 Measure CPU usage with software encoding (<40%)
-- [ ] 20.4 Measure memory usage during 10-minute recording (<300MB)
-- [ ] 20.5 Measure encoding latency after stop (<2 seconds)
-- [ ] 20.6 Validate file size efficiency (<50MB per minute at High quality)
-- [ ] 20.7 Test recording stability over 60-minute duration
+- [ ] 20.1 **NEW** Define `IPermissionService` interface
+- [ ] 20.2 **NEW** Implement macOS permission service (screen recording, microphone)
+- [ ] 20.3 **NEW** Implement Windows permission service (microphone)
+- [ ] 20.4 **NEW** Implement Linux permission service (Wayland portal)
+- [ ] 20.5 **NEW** Add permission pre-flight checks before recording
+- [ ] 20.6 **NEW** Implement guided permission flows (open System Preferences)
+- [ ] 20.7 **NEW** Update macOS Info.plist with usage descriptions (NSCameraUsageDescription, NSMicrophoneUsageDescription, NSScreenCaptureUsageDescription)
+- [ ] 20.8 **NEW** Add permission denial handling with clear error messages
+- [ ] 20.9 **NEW** Implement "Continue without audio" option for microphone denial
 
-## 21. Documentation
+## 21. Resource Monitoring and Error Recovery
 
-- [ ] 21.1 Update README.md with screen recording section
-- [ ] 21.2 Add recording hotkeys to keyboard shortcuts table
-- [ ] 21.3 Create user guide for recording features
-- [ ] 21.4 Document recording settings and quality presets
-- [ ] 21.5 Add architecture diagram for recording pipeline
-- [ ] 21.6 Document FFmpeg LGPL compliance and binary distribution
-- [ ] 21.7 Add troubleshooting section for common recording issues
-- [ ] 21.8 Generate XML documentation for all public APIs
+- [ ] 21.1 **NEW** Implement `RecordingResourceMonitor` class
+- [ ] 21.2 **NEW** Add pre-recording resource checks (memory, disk, CPU)
+- [ ] 21.3 **NEW** Implement runtime resource monitoring (every 5 seconds)
+- [ ] 21.4 **NEW** Add disk full detection and auto-stop
+- [ ] 21.5 **NEW** Add frame drop rate monitoring with warnings
+- [ ] 21.6 **NEW** Implement encoding queue overflow protection
+- [ ] 21.7 **NEW** Add hardware encoder failure detection and fallback
+- [ ] 21.8 **NEW** Implement FFmpeg crash detection with partial save
+- [ ] 21.9 **NEW** Add audio device disconnect handling
+- [ ] 21.10 **NEW** Create user notification system (errors, warnings, info)
 
-## 22. Packaging and Distribution
+## 22. FFmpeg Dynamic Download
 
-- [ ] 22.1 Include FFmpeg binaries in installers (Windows MSI, macOS PKG, Linux DEB/RPM)
-- [ ] 22.2 Update installer size documentation (~50MB increase)
-- [ ] 22.3 Add post-install script to verify FFmpeg installation
-- [ ] 22.4 Update uninstaller to remove FFmpeg binaries
-- [ ] 22.5 Test installer on clean systems (no FFmpeg pre-installed)
-- [ ] 22.6 Update release notes with recording feature announcement
+- [ ] 22.1 **NEW** Implement `FFmpegDownloader` class
+- [ ] 22.2 **NEW** Create FFmpeg 7.0.2 release packages (win/mac/linux, x64/arm64)
+- [ ] 22.3 **NEW** Upload FFmpeg packages to GitHub Releases
+- [ ] 22.4 **NEW** Implement download progress UI with cancellation
+- [ ] 22.5 **NEW** Add local cache management (~AppData/AGI.Kapster/ffmpeg/)
+- [ ] 22.6 **NEW** Implement version validation and mismatch detection
+- [ ] 22.7 **NEW** Add system FFmpeg fallback detection
+- [ ] 22.8 **NEW** Handle download failures with user-friendly errors
+- [ ] 22.9 **NEW** Verify FFmpeg LGPL-only build (no GPL codecs)
 
-## 23. Finalization
+## 23. Hotkey Conflict Management
 
-- [ ] 23.1 Code review all recording-related changes
-- [ ] 23.2 Fix any linter errors or warnings
-- [ ] 23.3 Run full test suite and verify all tests pass
-- [ ] 23.4 Performance test on low-end hardware (identify minimum specs)
-- [ ] 23.5 User acceptance testing (internal dogfooding)
-- [ ] 23.6 Address all blocking bugs from testing
-- [ ] 23.7 Create GitHub release with feature announcement
-- [ ] 23.8 Update project version to 2.0.0 (major feature)
+- [ ] 23.1 **NEW** Update default recording hotkeys (Ctrl+Shift+R, Ctrl+Shift+P)
+- [ ] 23.2 **NEW** Implement `HotkeyConflictDetector` class
+- [ ] 23.3 **NEW** Add conflict detection against own app hotkeys
+- [ ] 23.4 **NEW** Add conflict detection against system/other apps
+- [ ] 23.5 **NEW** Implement hotkey customization UI in settings
+- [ ] 23.6 **NEW** Add "Test Hotkey" functionality
+- [ ] 23.7 **NEW** Show conflict warnings in settings UI
+- [ ] 23.8 **NEW** Persist custom hotkeys to settings
+
+## 24. Accessibility Features
+
+- [ ] 24.1 **NEW** Implement keyboard navigation for recording control panel
+- [ ] 24.2 **NEW** Add screen reader announcements for state changes
+- [ ] 24.3 **NEW** Implement high contrast mode support
+- [ ] 24.4 **NEW** Add tooltip hotkey hints on control panel buttons
+- [ ] 24.5 **NEW** Test with Windows Narrator and macOS VoiceOver
+- [ ] 24.6 **NEW** Ensure WCAG AA contrast standards for all UI
+
+## 25. Platform Testing
+
+- [ ] 25.1 **UPDATED** Validate Windows 10 22H2 (1080p SDR, WASAPI, NVIDIA GPU)
+- [ ] 25.2 **UPDATED** Validate Windows 11 23H2 (4K HDR, WASAPI, Intel Arc)
+- [ ] 25.3 **UPDATED** Validate macOS 13 Ventura M1 (Retina, AVFoundation, no system audio)
+- [ ] 25.4 **UPDATED** Validate macOS 14 Sonoma M3 (Retina, ScreenCaptureKit, native audio)
+- [ ] 25.5 **UPDATED** Validate Ubuntu 22.04 LTS (1080p, PulseAudio, AMD GPU)
+- [ ] 25.6 **NEW** Validate Ubuntu 24.04 LTS Wayland (4K, PipeWire, Portal API)
+- [ ] 25.7 Test audio capture on all platforms (system + microphone)
+- [ ] 25.8 Test hardware acceleration on NVIDIA/AMD/Intel GPUs
+- [ ] 25.9 Verify output files playable in VLC, Windows Media Player, QuickTime 
+- [ ] 25.10 Test multi-monitor scenarios on all platforms
+- [ ] 25.11 **NEW** Test permission flows on macOS and Linux Wayland
+- [ ] 25.12 **NEW** Validate BlackHole guidance for older macOS
+
+## 26. Performance Testing
+
+- [ ] 26.1 **UPDATED** Benchmark frame rate stability (<1% drops at 30 FPS, <3% at 60 FPS)
+- [ ] 26.2 Measure CPU usage with hardware acceleration (<15%)
+- [ ] 26.3 Measure CPU usage with OpenH264 software encoding (<40%)
+- [ ] 26.4 **UPDATED** Measure memory usage (1080p <500MB, 4K <800MB)
+- [ ] 26.5 Measure encoding latency after stop (<2 seconds for <10min recordings)
+- [ ] 26.6 Validate file size efficiency (<50MB per minute at High quality)     
+- [ ] 26.7 Test recording stability over 60-minute duration
+- [ ] 26.8 **NEW** Benchmark Windows.Graphics.Capture vs GDI+ performance
+- [ ] 26.9 **NEW** Benchmark ScreenCaptureKit performance on Apple Silicon
+- [ ] 26.10 **NEW** Test resource monitoring overhead (<1% CPU)
+
+## 27. Documentation
+
+- [ ] 27.1 Update README.md with screen recording section
+- [ ] 27.2 Add recording hotkeys to keyboard shortcuts table
+- [ ] 27.3 Create user guide for recording features
+- [ ] 27.4 Document recording settings and quality presets
+- [ ] 27.5 Add architecture diagram for recording pipeline
+- [ ] 27.6 **UPDATED** Document FFmpeg LGPL compliance, OpenH264 usage, and dynamic download
+- [ ] 27.7 **UPDATED** Add troubleshooting section (permissions, disk space, download failures)
+- [ ] 27.8 Generate XML documentation for all public APIs
+- [ ] 27.9 **NEW** Document platform-specific limitations (macOS system audio, Wayland portal)
+- [ ] 27.10 **NEW** Add FFmpeg build instructions for LGPL-only configuration
+- [ ] 27.11 **NEW** Document permission flows for each platform
+
+## 28. Packaging and Distribution
+
+- [ ] 28.1 **REMOVED** ~~Include FFmpeg binaries in installers~~ - Use dynamic download instead
+- [ ] 28.2 **UPDATED** Installer remains small (~5MB), FFmpeg downloaded on first use
+- [ ] 28.3 **NEW** Create FFmpeg 7.0.2 release packages and upload to GitHub Releases
+- [ ] 28.4 **NEW** Test dynamic download flow on clean systems
+- [ ] 28.5 Test installer on clean systems (verify download works)
+- [ ] 28.6 **UPDATED** Update release notes with recording feature and FFmpeg download notice
+- [ ] 28.7 **NEW** Add network requirements to system requirements documentation
+- [ ] 28.8 **NEW** Verify FFmpeg packages pass license audit (LGPL-only, no GPL)
+
+## 29. Finalization
+
+- [ ] 29.1 Code review all recording-related changes
+- [ ] 29.2 Fix any linter errors or warnings
+- [ ] 29.3 Run full test suite and verify all tests pass
+- [ ] 29.4 Performance test on low-end hardware (identify minimum specs)        
+- [ ] 29.5 User acceptance testing (internal dogfooding)
+- [ ] 29.6 Address all blocking bugs from testing
+- [ ] 29.7 **NEW** Validate all 11 risk mitigations addressed
+- [ ] 29.8 **NEW** Run accessibility testing (keyboard nav, screen readers)
+- [ ] 29.9 Create GitHub release with feature announcement
+- [ ] 29.10 Update project version to 2.0.0 (major feature)
 
 ---
 
-## Estimated Timeline
+## Estimated Timeline (UPDATED)
 
-- **Weeks 1-3**: Tasks 1-6 (Infrastructure, Core Services, Encoding, Audio)
-- **Weeks 4-6**: Tasks 7-11 (UI Components, Overlays, Hotkeys, System Tray)
-- **Weeks 7-9**: Tasks 12-16 (Mouse Effects, File Output, Service Registration, Error Handling, Optimization)
-- **Weeks 10-11**: Tasks 17-20 (Testing - Unit, Integration, Platform, Performance)
-- **Week 12**: Tasks 21-23 (Documentation, Packaging, Finalization)
+- **Weeks 1-2**: Tasks 1-6 (Infrastructure, Core Services, Data Models)
+- **Weeks 3-4**: Tasks 3-4, 19, 22 (Encoding, Hardware Accel, Platform Capture, FFmpeg Download)
+- **Weeks 5-7**: Tasks 5, 20 (Audio Capture with platform detection, Permissions)
+- **Weeks 8-10**: Tasks 7-11, 23 (UI, Overlays, Hotkeys, Conflict Detection)
+- **Week 11**: Tasks 12-16, 21 (Mouse Effects, File Output, Error Handling, Resource Monitoring)
+- **Week 12**: Tasks 24 (Accessibility Features)
+- **Weeks 13-14**: Tasks 17-18 (Unit Tests, Integration Tests)
+- **Week 15**: Tasks 25 (Platform Testing - 6 configurations)
+- **Week 16**: Tasks 26 (Performance Testing and Optimization)
+- **Week 17**: Tasks 27-29 (Documentation, Packaging, Finalization)
 
-**Total**: 12 weeks (3 months)
+**Total**: 17 weeks (~4 months) - **Increased from 12 weeks due to additional platform-specific work**
 
-## Dependencies
+## Dependencies (UPDATED)
 
-- External: FFmpeg.AutoGen, NAudio, PortAudio binaries
-- Internal: Existing capture services, overlay system, hotkey manager, settings service
+- External: 
+  - FFmpeg.AutoGen 7.0.0 NuGet package
+  - NAudio NuGet package (Windows WASAPI)
+  - FFmpeg 7.0.2 binaries (LGPL-only build with OpenH264, downloaded dynamically)
+  - System APIs: Windows.Graphics.Capture, macOS ScreenCaptureKit, xdg-desktop-portal
+- Internal: 
+  - Existing capture services, overlay system, hotkey manager, settings service
+  - Toast notification system, dialog system
+- Infrastructure:
+  - GitHub Releases for FFmpeg binary hosting
+  - macOS developer account (for permission APIs and code signing)
 - Blocking: None (fully additive feature)
 
-## Success Criteria
+## Success Criteria (UPDATED)
 
-- ✅ All 200+ tasks completed
+- ✅ All 300+ tasks completed (increased from 200+ due to platform-specific implementations)
 - ✅ All tests passing (>80% coverage)
-- ✅ Performance targets met (FPS, CPU, memory)
-- ✅ Cross-platform validation complete
+- ✅ Performance targets met:
+  - Frame drop rate: <1% at 30 FPS, <3% at 60 FPS
+  - CPU usage: <15% with HW accel, <40% with OpenH264
+  - Memory usage: <500MB for 1080p, <800MB for 4K
+- ✅ Cross-platform validation complete:
+  - Windows 10 22H2, Windows 11 23H2
+  - macOS 13 Ventura (M1), macOS 14 Sonoma (M3)
+  - Ubuntu 22.04 LTS, Ubuntu 24.04 LTS (Wayland)
+- ✅ Platform-specific features validated:
+  - Windows.Graphics.Capture on Windows 10 1903+
+  - ScreenCaptureKit with native audio on macOS 12.3+
+  - xdg-desktop-portal + PipeWire on modern Linux
+- ✅ Permission flows tested on all platforms
+- ✅ FFmpeg dynamic download working reliably
+- ✅ License compliance verified (LGPL-only, no GPL contamination)
+- ✅ Accessibility features working (keyboard nav, screen readers)
 - ✅ Documentation complete and accurate
-- ✅ Zero critical bugs in testing
+- ✅ Zero critical bugs, <5 minor bugs in testing
 

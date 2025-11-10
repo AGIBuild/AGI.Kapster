@@ -95,9 +95,11 @@ This change introduces a comprehensive screen recording capability with the foll
 
 #### External Dependencies (New)
 - **FFmpeg.AutoGen** (LGPL 2.1+) - FFmpeg bindings for .NET
-- **NAudio** (MIT) - Audio capture for Windows
-- **PortAudio** (MIT) - Cross-platform audio library
-- **FFmpeg native binaries** (~50MB, dynamically linked for LGPL compliance)
+- **NAudio** (MIT) - Audio capture for Windows via WASAPI
+- **AVFoundation** (System) - macOS screen/audio capture via ScreenCaptureKit (macOS 12.3+)
+- **PipeWire/PulseAudio** (System) - Linux audio capture with fallback chain
+- **FFmpeg native binaries with OpenH264** (~50-70MB per platform, BSD licensed, dynamically linked for LGPL compliance)
+- **BlackHole** (Optional, GPL) - macOS system audio capture for older versions (user-installed)
 
 ### Database/Storage Impact
 - Add recording settings to `appsettings.json`:
@@ -146,8 +148,18 @@ This change introduces a comprehensive screen recording capability with the foll
 - **Total**: 12 weeks (3 months)
 
 ### Risk Assessment
-- **Medium Risk**: FFmpeg integration complexity and LGPL license compliance
-- **Medium Risk**: Cross-platform audio capture variations
+- **HIGH Risk**: macOS system audio capture requires ScreenCaptureKit (macOS 12.3+) or manual BlackHole setup
+  - **Mitigation**: Feature detection, clear user guidance, macOS 12.3+ recommended
+- **HIGH Risk**: Linux Wayland requires xdg-desktop-portal, PipeWire migration ongoing
+  - **Mitigation**: Portal API integration, PipeWire/PulseAudio/ALSA fallback chain
+- **Medium Risk**: FFmpeg binary distribution and version management (~200-300MB total)
+  - **Mitigation**: Dynamic download on first use, version validation, CDN hosting
+- **Medium Risk**: Platform-specific permission models (screen recording, microphone, disk access)
+  - **Mitigation**: Permission detection, guided user flows, graceful degradation
+- **Medium Risk**: Hotkey conflicts with system/application shortcuts
+  - **Mitigation**: Conflict detection, customizable hotkeys, alternative defaults
+- **Medium Risk**: GPL codec contamination (x264/x265) vs LGPL compliance
+  - **Mitigation**: Use OpenH264 (BSD) or hardware encoders only, license auditing
 - **Low Risk**: Performance impact on low-end hardware
-- **Mitigation**: Extensive platform testing, hardware acceleration fallbacks, quality presets
+  - **Mitigation**: Hardware acceleration, quality presets, resource monitoring
 

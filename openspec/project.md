@@ -130,6 +130,127 @@ To reduce complexity in large UI components:
 - **State-Driven**: Handlers manage specific state slices
 - **Example**: `OverlayWindow` delegates to `SelectionHandler`, `AnnotationHandler`, `ElementDetectionHandler`, etc.
 
+### OpenSpec Change Documentation
+
+#### Required Files
+Every change proposal under `openspec/changes/[change-id]/` must include:
+- **`proposal.md`** - Business case, rationale, and impact analysis
+- **`tasks.md`** - Detailed implementation checklist with time estimates
+- **`specs/[capability]/spec.md`** - Requirements deltas (ADDED/MODIFIED/REMOVED)
+
+#### Optional Files (Add When Appropriate)
+- **`design.md`** - Technical decisions and architecture patterns
+  - **When to add**: Complex changes with 3+ major design decisions
+  - **Content**: Technical alternatives, rationale, trade-offs, implementation patterns
+  
+- **`DESIGN_REVIEW.md`** - Design review and problem analysis report
+  - **When to add**:
+    - Refactoring existing specs with significant design changes
+    - Discovered critical flaws in original design (security, performance, compatibility)
+    - Timeline changes > 30% or scope changes > 50%
+    - License/compliance/security issues requiring audit trail
+    - Complex platform-specific implementations (3+ platform strategies)
+  - **Content**: 
+    - Executive summary of issues found
+    - Detailed problem analysis with evidence
+    - Applied fixes and mitigations
+    - Impact metrics (timeline, scope, risk)
+    - Validation results and recommendations
+  
+- **`ANALYSIS.md`** - Problem domain analysis (use for exploratory work)
+  - **When to add**: Unclear requirements, research-heavy features
+  - **Content**: Problem space exploration, user research, competitive analysis
+  
+- **`DECISION_LOG.md`** - Architecture decision record (ADR)
+  - **When to add**: Multiple alternative solutions considered
+  - **Content**: Decision history, context, consequences
+  
+- **`docs/`** - Supporting documentation directory
+  - **When to add**: Large changes requiring multiple auxiliary documents
+  - **Content**: Diagrams, API specs, migration guides, platform-specific notes
+
+#### Document Naming Conventions
+- Use **SCREAMING_SNAKE_CASE** for top-level review/analysis documents (e.g., `DESIGN_REVIEW.md`, `ANALYSIS.md`)
+- Use **kebab-case** for supporting docs in `docs/` subdirectory (e.g., `platform-compatibility.md`)
+- Always include `.md` extension
+
+#### Decision Criteria: When to Add DESIGN_REVIEW.md
+
+Use this checklist to determine if a design review document is warranted:
+
+| Criteria | Threshold | Add DESIGN_REVIEW.md? |
+|----------|-----------|----------------------|
+| **Design Changes** | 3+ major technical decisions | ✅ Yes |
+| **Timeline Impact** | Change > 30% | ✅ Yes |
+| **Scope Impact** | Change > 50% | ✅ Yes |
+| **Risk Level** | HIGH or CRITICAL risks identified | ✅ Yes |
+| **Platform Strategies** | 3+ platform-specific implementations | ✅ Yes |
+| **Compliance Issues** | License/security/regulatory concerns | ✅ REQUIRED |
+| **Refactoring** | Rewriting existing architecture | ✅ Yes |
+| **Knowledge Transfer** | Complex domain requiring documentation | ⚠️ Consider |
+| **Simple Features** | Straightforward additions | ❌ No (use design.md) |
+| **Bug Fixes** | Restoring spec behavior | ❌ No |
+
+#### Example Structure: DESIGN_REVIEW.md
+
+```markdown
+# [Feature Name] - Design Review
+
+**Date**: YYYY-MM-DD
+**Status**: [Draft|Under Review|Approved]
+**Reviewers**: [Names]
+
+## Executive Summary
+- Brief overview (2-3 sentences)
+- Key issues found (count)
+- Impact summary (timeline, scope, risk)
+
+## Issues Found and Fixes Applied
+
+### Issue 1: [Title]
+**Problem**: [Description]
+**Impact**: [Severity and consequences]
+**Fix**: [Solution applied]
+**Files Updated**: [List]
+
+[Repeat for each issue]
+
+## Updated Metrics
+
+| Metric | Original | Updated | Change |
+|--------|----------|---------|--------|
+| Timeline | X weeks | Y weeks | +Z% |
+| Task Count | A | B | +C |
+
+## Validation Results
+- OpenSpec validation: [PASS/FAIL]
+- [Other validations]
+
+## Recommendations
+- Priority 1: [Must-have items]
+- Priority 2: [Should-have items]
+- Priority 3: [Nice-to-have items]
+
+## Conclusion
+[Final recommendation: APPROVE/REVISE/REJECT]
+```
+
+#### Integration with OpenSpec Workflow
+
+**Stage 1 (Creating Changes)**:
+1. Create standard files (`proposal.md`, `tasks.md`, `specs/`)
+2. If complexity criteria met, add `DESIGN_REVIEW.md`
+3. Validate with `openspec validate [change-id] --strict`
+4. Review documents trigger approval gate
+
+**Stage 2 (Implementing Changes)**:
+- `DESIGN_REVIEW.md` serves as reference for implementation decisions
+- Update document if new issues discovered during implementation
+
+**Stage 3 (Archiving)**:
+- Archive all documents including `DESIGN_REVIEW.md`
+- Preserved as historical record for future reference
+
 ### Testing Strategy
 
 #### Test Categories

@@ -76,9 +76,51 @@ AGI.Kapster currently provides high-quality screenshot capture and annotation ca
 
 ---
 
-### Decision 2: FFmpeg Deployment and Version Management
+### Decision 2: Screen Capture Technology per Platform
 
-**Choice**: Bundle matched-version FFmpeg binaries with application
+**Choice**: Platform-specific native APIs with graceful fallbacks
+
+**Platform Matrix**:
+
+| Platform | Primary API | Fallback API | Features |
+|----------|-------------|--------------|----------|
+| Windows 11/10 1903+ | **Windows.Graphics.Capture** | GDI+ BitBlt | GPU acceleration, auto-DPI, window exclusion |
+| Windows 10 < 1903 | GDI+ BitBlt | N/A | Software capture, manual DPI handling |
+| macOS 12.3+ | **ScreenCaptureKit** | AVFoundation | Native audio, GPU textures, privacy controls |
+| macOS 10.15-12.2 | AVFoundation AVCaptureScreen | CGDisplayStream | Microphone only, software capture |
+| Linux Wayland | **xdg-desktop-portal** | X11 fallback | User permission dialog, secure capture |
+| Linux X11 | X11 XGetImage/XShm | N/A | Direct capture, no permissions |
+
+**Rationale**: 
+- Modern Windows.Graphics.Capture provides zero-copy GPU path to hardware encoders (NVENC/QSV)
+- macOS ScreenCaptureKit is the only way to capture system audio without kernel extensions
+- Linux Wayland mandates portal usage (security requirement)
+- Fallbacks ensure compatibility with older systems
+
+**Implementation Notes**:
+```csharp
+public interface IScreenCaptureStrategy
+{
+    bool SupportsGpuAcceleration { get; }
+    bool SupportsSystemAudio { get; }
+    bool RequiresPermissions { get; }
+    Task<CaptureCapabilities> DetectCapabilitiesAsync();
+}
+
+#if WINDOWS10_0_17763_0_OR_GREATER
+public class WindowsGraphicsCaptureStrategy : IScreenCaptureStrategy
+{
+    // Direct3D11CaptureFrame -> ID3D11Texture2D -> Hardware Encoder
+    public bool SupportsGpuAcceleration => true;
+}
+#endif
+```
+
+---
+
+### Decision 3: FFmpeg Deployment and Version Management
+
+**Choice**: Dynamic download on first use with local caching (changed from bundling)
 
 **Version Compatibility**:
 - `FFmpeg.AutoGen 7.0.0` requires `FFmpeg 7.0.x`
@@ -94,21 +136,35 @@ AGI.Kapster currently provides high-quality screenshot capture and annotation ca
    - ❌ Difficult to debug - environment differences
    - ✅ Smaller installer size
 
-2. **Use third-party NuGet packages** (e.g., FFmpeg.Native)
+2. **Bundle matched-version binaries in installer**
+   - ❌ Installer size +50-70MB per platform (~200-300MB total)
+   - ❌ macOS App Store limits binary size
+   - ❌ Every FFmpeg update requires full app repackaging
+   - ❌ All users download binaries even if never recording
+   - ✅ Zero network dependency after install
+   - ✅ Works offline immediately
+
+3. **Use third-party NuGet packages** (e.g., FFmpeg.Native)
    - ❌ Limited platform support (missing macOS ARM64)
    - ❌ Delayed updates from third-party maintainers
    - ⚠️ Still ~50-70MB download
    - ✅ Automated dependency management
 
-3. **Bundle matched-version binaries** (Selected)
-   - ✅ **Full version control** - dev/prod environments match
-   - ✅ **Zero external dependencies** - works out-of-box
-   - ✅ **Cross-platform consistency** - same version everywhere
-   - ✅ **Easy testing** - test environment = production
-   - ⚠️ Installer size +50-70MB per platform
-   - ⚠️ Maintain multi-platform binaries
+4. **Dynamic download on first use** (Selected)
+   - ✅ **Small initial installer** - download only when needed
+   - ✅ **Easy updates** - update FFmpeg independently of app
+   - ✅ **Version pinning** - download exact required version
+   - ✅ **CDN delivery** - fast, reliable downloads
+   - ✅ **Offline mode** - cache locally after first download
+   - ⚠️ Requires network on first recording
+   - ⚠️ Need CDN infrastructure or GitHub Releases hosting
 
-**Rationale**: Bundling binaries ensures version compatibility, eliminates user installation requirements, and provides consistent behavior across all platforms. The ~50-70MB size increase is acceptable for enterprise-grade reliability.
+**Rationale**: Dynamic download provides the best balance:
+- Keeps installer small (~5MB app vs ~200MB with bundled FFmpeg)
+- Only users who record pay the download cost
+- FFmpeg security updates don't require full app re-release
+- Can leverage GitHub Releases or CDN for reliable delivery
+- Cached locally after first download for offline use
 
 **Implementation Strategy**:
 
@@ -143,33 +199,89 @@ public static class FFmpegLoader
     private static bool _initialized = false;
     private static readonly object _lock = new();
     private const int RequiredMajorVersion = 61; // FFmpeg 7.x = libavcodec 61.x
+    private const string FFmpegVersion = "7.0.2";
+    private const string DownloadBaseUrl = "https://github.com/AGI-Build/AGI.Kapster/releases/download/ffmpeg-7.0.2";
     
-    public static void Initialize()
+    public static async Task<bool> EnsureFFmpegAsync(IProgress<double>? progress = null)
     {
         lock (_lock)
         {
-            if (_initialized) return;
-            
-            // 1. Try bundled FFmpeg (primary)
-            var bundledPath = GetBundledFFmpegPath();
-            if (TryLoadFFmpeg(bundledPath, "bundled"))
-            {
-                _initialized = true;
-                return;
-            }
-            
-            // 2. Fallback to system FFmpeg (if version matches)
-            var systemPath = FindSystemFFmpeg();
-            if (systemPath != null && TryLoadFFmpeg(systemPath, "system"))
-            {
-                Log.Warning("Using system FFmpeg. Bundled version preferred.");
-                _initialized = true;
-                return;
-            }
-            
-            throw new FFmpegNotFoundException(
-                "FFmpeg 7.x not found. Recording features unavailable.");
+            if (_initialized) return true;
         }
+        
+        // 1. Try cached local FFmpeg
+        var cachedPath = GetCachedFFmpegPath();
+        if (TryLoadFFmpeg(cachedPath, "cached"))
+        {
+            lock (_lock) { _initialized = true; }
+            return true;
+        }
+        
+        // 2. Try system FFmpeg (if version matches)
+        var systemPath = FindSystemFFmpeg();
+        if (systemPath != null && TryLoadFFmpeg(systemPath, "system"))
+        {
+            Log.Information("Using system FFmpeg (version matched)");
+            lock (_lock) { _initialized = true; }
+            return true;
+        }
+        
+        // 3. Download FFmpeg binaries
+        Log.Information("FFmpeg not found locally. Downloading version {Version}...", FFmpegVersion);
+        try
+        {
+            await DownloadFFmpegAsync(cachedPath, progress);
+            
+            if (TryLoadFFmpeg(cachedPath, "downloaded"))
+            {
+                lock (_lock) { _initialized = true; }
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to download FFmpeg");
+        }
+        
+        Log.Error("FFmpeg 7.x unavailable. Recording features disabled.");
+        return false;
+    }
+    
+    private static async Task DownloadFFmpegAsync(string targetPath, IProgress<double>? progress)
+    {
+        var platform = GetPlatform();
+        var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLower();
+        var fileName = $"ffmpeg-{FFmpegVersion}-{platform}-{arch}.zip";
+        var downloadUrl = $"{DownloadBaseUrl}/{fileName}";
+        
+        Directory.CreateDirectory(targetPath);
+        
+        using var client = new HttpClient();
+        using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        
+        var totalBytes = response.Content.Headers.ContentLength ?? 0;
+        var downloadedBytes = 0L;
+        
+        var zipPath = Path.Combine(Path.GetTempPath(), fileName);
+        await using (var fileStream = File.Create(zipPath))
+        await using (var downloadStream = await response.Content.ReadAsStreamAsync())
+        {
+            var buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = await downloadStream.ReadAsync(buffer)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                downloadedBytes += bytesRead;
+                progress?.Report((double)downloadedBytes / totalBytes);
+            }
+        }
+        
+        // Extract ZIP to target path
+        System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, targetPath);
+        File.Delete(zipPath);
+        
+        Log.Information("FFmpeg downloaded and extracted to {Path}", targetPath);
     }
     
     private static bool TryLoadFFmpeg(string path, string source)
@@ -200,14 +312,13 @@ public static class FFmpegLoader
         }
     }
     
-    private static string GetBundledFFmpegPath()
+    private static string GetCachedFFmpegPath()
     {
-        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var platform = GetPlatform();
-        var architecture = RuntimeInformation.ProcessArchitecture
-            .ToString().ToLower();
+        var architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLower();
         
-        return Path.Combine(baseDir, "ffmpeg", platform, architecture);
+        return Path.Combine(appDataPath, "AGI.Kapster", "ffmpeg", FFmpegVersion, platform, architecture);
     }
     
     private static string? FindSystemFFmpeg()
@@ -317,11 +428,14 @@ Settings → Recording → "Test Recording" button
 
 **Platform Implementations**:
 
-| Platform | Library | Rationale |
-|----------|---------|-----------|
-| Windows | NAudio (MIT) | Native WASAPI support, excellent Windows integration |
-| macOS | AVFoundation (native) | Built-in, no dependencies, high quality |
-| Linux | PulseAudio/ALSA via PortAudio (MIT) | Cross-distro compatibility |
+| Platform | Library | Rationale | Limitations |
+|----------|---------|-----------|-------------|
+| Windows 10+ | NAudio (MIT) | Native WASAPI support, excellent Windows integration | None |
+| macOS 12.3+ | ScreenCaptureKit (System) | **Native system audio capture**, zero config | Requires macOS 12.3+ |
+| macOS 10.15-12.2 | AVFoundation (System) | Microphone only, stable API | **No system audio** without BlackHole |
+| Linux (Modern) | PipeWire (System) | **Modern audio stack**, Wayland support, low latency | Requires PipeWire-enabled distro |
+| Linux (Legacy) | PulseAudio (System) | Broad compatibility, X11/Wayland | Higher latency than PipeWire |
+| Linux (Fallback) | ALSA (System) | Universal availability | Conflicts with other audio apps |
 
 **Alternatives Considered**:
 1. **Single cross-platform library** (e.g., OpenAL)
@@ -346,7 +460,77 @@ public interface IAudioCaptureService
 
 ---
 
-### Decision 4: Recording Architecture Pattern
+### Decision 4: Codec Selection and License Compliance
+
+**Choice**: Hardware encoders + OpenH264 for software fallback (avoiding GPL x264)
+
+**License Risk Analysis**:
+
+| Codec | License | Quality | Speed | Risk Level |
+|-------|---------|---------|-------|------------|
+| **libx264** | **GPL** | Excellent | Fast | ❌ HIGH - GPL contamination |
+| **libx265** | **GPL** | Excellent | Medium | ❌ HIGH - GPL contamination |
+| OpenH264 (Cisco) | BSD | Good | Medium | ✅ LOW - BSD compatible |
+| libvpx (VP9) | BSD | Excellent | Slow | ✅ LOW - BSD compatible |
+| NVENC (H.264/HEVC) | Proprietary | Excellent | Very Fast | ✅ LOW - Hardware, no linking |
+| Intel QSV (H.264/HEVC) | Proprietary | Good | Very Fast | ✅ LOW - Hardware, no linking |
+| AMD VCE (H.264/HEVC) | Proprietary | Good | Very Fast | ✅ LOW - Hardware, no linking |
+
+**Selected Encoding Priority**:
+1. **Hardware Encoders** (NVENC/QSV/VCE) - No GPL risk, best performance
+2. **OpenH264** (BSD) - Software fallback, LGPL-compatible
+3. **libvpx VP9** (BSD) - WebM format, LGPL-compatible
+
+**Rationale**:
+- libx264 (GPL) would force entire application to GPL, incompatible with proprietary code
+- Hardware encoders use driver APIs, no library linking, no license issues
+- OpenH264 quality sufficient for screen recording (not video production)
+- Most users (>70%) have GPU with hardware encoder
+
+**FFmpeg Build Requirements**:
+```bash
+# Build FFmpeg WITHOUT GPL codecs
+./configure \
+  --enable-gpl=no \
+  --enable-version3=no \
+  --enable-libopenh264 \
+  --enable-libvpx \
+  --enable-nvenc \
+  --enable-qsv \
+  --enable-amf \
+  --disable-libx264 \
+  --disable-libx265 \
+  --license=lgpl
+
+# Verify no GPL contamination
+./ffmpeg -version | grep "configuration:"
+# Should NOT contain: --enable-gpl, --enable-libx264, --enable-libx265
+```
+
+**Implementation**:
+```csharp
+public class CodecSelector
+{
+    public string SelectEncoder(RecordingFormat format, HardwareAcceleration hwAccel)
+    {
+        return (format, hwAccel) switch
+        {
+            (RecordingFormat.MP4, HardwareAcceleration.NVENC) => "h264_nvenc",
+            (RecordingFormat.MP4, HardwareAcceleration.QSV) => "h264_qsv",
+            (RecordingFormat.MP4, HardwareAcceleration.AMF) => "h264_amf",
+            (RecordingFormat.MP4, _) => "libopenh264",  // ✅ BSD, NOT x264
+            
+            (RecordingFormat.WebM, _) => "libvpx-vp9",  // ✅ BSD
+            
+            _ => throw new NotSupportedException($"Format {format} not supported")
+        };
+    }
+}
+```
+
+---
+
+### Decision 5: Recording Architecture Pattern
 
 **Choice**: State Machine with Event-Driven Pipeline
 
@@ -734,6 +918,463 @@ public class RecordingSession
 - Release buffers immediately after encoding
 
 **Trade-off**: Memory usage is acceptable for video recording workload.
+
+---
+
+### Decision 6: Resource Monitoring and Error Recovery
+
+**Choice**: Proactive resource checks with graceful degradation
+
+**Resource Risks**:
+- **Memory**: 1080p 60FPS requires ~475 MB/s uncompressed
+- **Disk I/O**: Continuous writes at 5-20 Mbps (depending on quality)
+- **CPU**: Real-time encoding under time pressure
+- **GPU**: Hardware encoder can crash or become unavailable
+
+**Implementation**:
+
+```csharp
+public class RecordingResourceMonitor
+{
+    private readonly ILogger<RecordingResourceMonitor> _logger;
+    
+    public ResourceCheckResult CheckResourcesBeforeRecording(RecordingSettings settings)
+    {
+        var result = new ResourceCheckResult();
+        
+        // 1. Check available memory
+        var availableMemory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        var estimatedUsage = EstimateMemoryUsage(settings);
+        
+        if (availableMemory < estimatedUsage + 500 * 1024 * 1024) // +500MB buffer
+        {
+            result.AddError("Insufficient memory. Close other applications.");
+            return result;
+        }
+        
+        if (availableMemory < estimatedUsage + 1024 * 1024 * 1024) // +1GB buffer
+        {
+            result.AddWarning("Low memory. Recording may be unstable.");
+        }
+        
+        // 2. Check disk space
+        var outputDir = settings.OutputDirectory;
+        var driveInfo = new DriveInfo(Path.GetPathRoot(outputDir));
+        var estimatedFileSize = EstimateFileSize(settings, estimatedDuration: TimeSpan.FromMinutes(10));
+        
+        if (driveInfo.AvailableFreeSpace < estimatedFileSize + 1024 * 1024 * 1024) // +1GB buffer
+        {
+            result.AddError($"Insufficient disk space. Need at least {(estimatedFileSize + 1024 * 1024 * 1024) / 1024 / 1024 / 1024}GB free.");
+            return result;
+        }
+        
+        if (driveInfo.AvailableFreeSpace < 5L * 1024 * 1024 * 1024) // <5GB
+        {
+            result.AddWarning($"Low disk space: {driveInfo.AvailableFreeSpace / 1024 / 1024 / 1024}GB remaining.");
+        }
+        
+        // 3. Check CPU usage
+        var cpuUsage = GetCurrentCpuUsage();
+        if (cpuUsage > 80)
+        {
+            result.AddWarning($"High CPU usage ({cpuUsage}%). Recording may drop frames.");
+        }
+        
+        // 4. Validate hardware encoder
+        if (settings.UseHardwareAcceleration)
+        {
+            var encoderAvailable = CheckHardwareEncoder(settings.Format);
+            if (!encoderAvailable)
+            {
+                result.AddWarning("Hardware encoder unavailable. Using software encoding (slower).");
+                settings.UseHardwareAcceleration = false; // Auto-fallback
+            }
+        }
+        
+        return result;
+    }
+    
+    // Runtime monitoring during recording
+    public async Task MonitorDuringRecordingAsync(RecordingSession session, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(5000, ct); // Check every 5 seconds
+            
+            // 1. Check disk space
+            var driveInfo = new DriveInfo(Path.GetPathRoot(session.OutputPath));
+            if (driveInfo.AvailableFreeSpace < 100 * 1024 * 1024) // <100MB
+            {
+                _logger.LogError("Disk full during recording. Auto-stopping.");
+                await session.StopAsync(reason: "Disk full");
+                break;
+            }
+            
+            // 2. Check frame drop rate
+            var dropRate = session.GetFrameDropRate();
+            if (dropRate > 0.05) // >5% frames dropped
+            {
+                _logger.LogWarning("High frame drop rate: {Rate:P}. Consider lowering quality.", dropRate);
+            }
+            
+            // 3. Check encoding queue depth
+            var queueDepth = session.GetEncodingQueueDepth();
+            if (queueDepth > 300) // >10 seconds of backlog at 30fps
+            {
+                _logger.LogWarning("Encoding queue overflow. Dropping frames.");
+                session.DropOldestFrames(count: 100);
+            }
+        }
+    }
+}
+
+public class ResourceCheckResult
+{
+    public List<string> Errors { get; } = new();
+    public List<string> Warnings { get; } = new();
+    public bool CanProceed => Errors.Count == 0;
+    
+    public void AddError(string message) => Errors.Add(message);
+    public void AddWarning(string message) => Warnings.Add(message);
+}
+```
+
+**Error Recovery Strategies**:
+
+| Error Scenario | Detection | Recovery Action |
+|----------------|-----------|-----------------|
+| **FFmpeg crash** | Process exit event | Save partial video, show error dialog |
+| **Disk full** | Monitor free space every 5s | Auto-stop, save what's recorded |
+| **Audio device disconnect** | Audio stream exception | Continue video-only, show warning |
+| **Hardware encoder failure** | Encoder init error | Fallback to software encoder |
+| **Memory pressure** | GC memory info | Lower quality, reduce buffer size |
+| **Frame drops >10%** | Frame timestamp gaps | Show warning, suggest quality reduction |
+| **Encoding lag** | Queue depth >10s | Drop oldest frames, log warning |
+
+**User Notification Strategy**:
+- **Errors** (blocking): Modal dialog, recording cannot start
+- **Warnings** (non-blocking): Toast notification, recording continues
+- **Info** (FYI): Status message in control panel
+
+---
+
+### Decision 7: Permission Management
+
+**Choice**: Explicit permission checks with guided user flows
+
+**Platform Permission Requirements**:
+
+| Platform | Permission | When Required | Request Method |
+|----------|-----------|---------------|----------------|
+| macOS 10.14+ | Screen Recording | Before recording | System dialog (automatic) |
+| macOS 10.14+ | Microphone | Before audio capture | System dialog (automatic) |
+| Windows 10+ | Microphone | Before audio capture | System Settings (manual guide) |
+| Linux Wayland | Screen Capture | Before recording | xdg-desktop-portal dialog |
+
+**Implementation**:
+
+```csharp
+public interface IPermissionService
+{
+    Task<PermissionStatus> CheckScreenRecordingPermissionAsync();
+    Task<PermissionStatus> CheckMicrophonePermissionAsync();
+    Task<bool> RequestScreenRecordingPermissionAsync();
+    Task<bool> RequestMicrophonePermissionAsync();
+    void OpenSystemPermissionSettings();
+}
+
+#if MACOS
+public class MacPermissionService : IPermissionService
+{
+    public async Task<PermissionStatus> CheckScreenRecordingPermissionAsync()
+    {
+        if (!OperatingSystem.IsMacOSVersionAtLeast(10, 15))
+            return PermissionStatus.Granted; // No restrictions on older versions
+        
+        // Use CGPreflightScreenCaptureAccess to check
+        var hasAccess = CGPreflightScreenCaptureAccess();
+        return hasAccess ? PermissionStatus.Granted : PermissionStatus.Denied;
+    }
+    
+    public async Task<bool> RequestScreenRecordingPermissionAsync()
+    {
+        if (OperatingSystem.IsMacOSVersionAtLeast(10, 15))
+        {
+            // CGRequestScreenCaptureAccess shows system dialog
+            var granted = CGRequestScreenCaptureAccess();
+            
+            if (!granted)
+            {
+                // Guide user to System Preferences
+                var result = await ShowPermissionGuideDialogAsync(
+                    "Screen Recording Permission Required",
+                    "AGI.Kapster needs permission to record your screen.\n\n" +
+                    "1. Open System Preferences > Security & Privacy > Privacy\n" +
+                    "2. Select 'Screen Recording' from the list\n" +
+                    "3. Check the box next to AGI.Kapster\n" +
+                    "4. Restart AGI.Kapster"
+                );
+                
+                if (result == DialogResult.OpenSettings)
+                    OpenSystemPermissionSettings();
+                
+                return false;
+            }
+            
+            return true;
+        }
+        
+        return true;
+    }
+    
+    public void OpenSystemPermissionSettings()
+    {
+        Process.Start("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+    }
+}
+#endif
+
+#if WINDOWS
+public class WindowsPermissionService : IPermissionService
+{
+    public async Task<PermissionStatus> CheckMicrophonePermissionAsync()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
+            return PermissionStatus.Granted; // No restrictions on older versions
+        
+        // Use Windows.Media.Capture.MediaCapture to check
+        var access = await Windows.Media.Capture.MediaCapture.RequestAccessAsync(
+            Windows.Media.Capture.StreamingCaptureMode.Audio);
+        
+        return access == Windows.Media.Capture.MediaCaptureAccessStatus.Allowed
+            ? PermissionStatus.Granted
+            : PermissionStatus.Denied;
+    }
+}
+#endif
+
+#if LINUX
+public class LinuxPermissionService : IPermissionService
+{
+    public async Task<bool> RequestScreenRecordingPermissionAsync()
+    {
+        // On Wayland, xdg-desktop-portal handles permissions automatically
+        if (Environment.GetEnvironmentVariable("WAYLAND_DISPLAY") != null)
+        {
+            // Portal will show dialog when we call CreateSession
+            return true; // Assume granted, will fail at capture time if denied
+        }
+        
+        // X11 has no permission system
+        return true;
+    }
+}
+#endif
+```
+
+**User Experience Flow**:
+
+1. **Pre-flight check** (before showing region selector):
+   ```csharp
+   if (!await _permissionService.CheckScreenRecordingPermissionAsync())
+   {
+       var granted = await _permissionService.RequestScreenRecordingPermissionAsync();
+       if (!granted)
+       {
+           ShowNotification("Screen recording permission denied. Please grant permission in settings.");
+           return;
+       }
+   }
+   ```
+
+2. **Audio permission** (when starting recording with audio enabled):
+   ```csharp
+   if (settings.AudioEnabled && !await _permissionService.CheckMicrophonePermissionAsync())
+   {
+       var granted = await _permissionService.RequestMicrophonePermissionAsync();
+       if (!granted)
+       {
+           var continueWithoutAudio = await ShowDialog(
+               "Microphone permission denied. Continue recording without audio?",
+               buttons: ["Yes", "No"]);
+           
+           if (continueWithoutAudio)
+               settings.AudioEnabled = false;
+           else
+               return;
+       }
+   }
+   ```
+
+**Info.plist Updates** (macOS):
+```xml
+<key>NSCameraUsageDescription</key>
+<string>AGI.Kapster can include your webcam in screen recordings (optional feature).</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>AGI.Kapster can record audio commentary with your screen recordings.</string>
+<key>NSScreenCaptureUsageDescription</key>
+<string>AGI.Kapster needs to access your screen to record videos and capture screenshots.</string>
+```
+
+---
+
+### Decision 8: Hotkey Management and Conflict Resolution
+
+**Choice**: Customizable hotkeys with conflict detection
+
+**Default Hotkey Assignment** (updated to avoid conflicts):
+
+| Action | Default | Alternative | Conflicts (Known) |
+|--------|---------|-------------|-------------------|
+| Start/Stop Recording | `Ctrl+Shift+R` | `Ctrl+Alt+R` | None |
+| Pause/Resume | `Ctrl+Shift+P` | `Ctrl+Alt+P` | None |
+| Cancel Recording | `Escape` | N/A | None (context-sensitive) |
+
+**Rationale for Change**:
+- Original `Alt+R` conflicts with browser "Reload" and IDE shortcuts
+- Original `Alt+P` conflicts with "Print Preview" in Office apps
+- `Ctrl+Shift+R` is commonly used for "Reload/Record" in dev tools and browsers (but in safe context)
+- Three-key combos reduce accidental triggering
+
+**Implementation**:
+
+```csharp
+public class HotkeyConflictDetector
+{
+    private readonly ILogger _logger;
+    
+    public ConflictCheckResult CheckForConflicts(Hotkey hotkey)
+    {
+        var result = new ConflictCheckResult();
+        
+        // 1. Check against own hotkeys
+        var existingHotkeys = GetRegisteredHotkeys();
+        if (existingHotkeys.Any(h => h.Equals(hotkey) && h.Action != hotkey.Action))
+        {
+            result.IsConflict = true;
+            result.Message = $"Already assigned to '{existingHotkeys.First(h => h.Equals(hotkey)).Action}'";
+            return result;
+        }
+        
+        // 2. Try to register (OS will fail if conflicting with another app)
+        try
+        {
+            var testHandle = NativeMethods.RegisterHotKey(IntPtr.Zero, GetHashCode(), 
+                hotkey.Modifiers, hotkey.Key);
+            
+            if (testHandle == IntPtr.Zero)
+            {
+                result.IsConflict = true;
+                result.Message = "Hotkey is already in use by another application";
+                return result;
+            }
+            
+            NativeMethods.UnregisterHotKey(IntPtr.Zero, GetHashCode());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to check hotkey conflict");
+        }
+        
+        // 3. Check against common system hotkeys (Windows)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            var systemHotkeys = new[]
+            {
+                new Hotkey(Modifiers.Win, Key.L), // Lock screen
+                new Hotkey(Modifiers.Win, Key.D), // Show desktop
+                new Hotkey(Modifiers.Alt, Key.Tab), // Task switcher
+                new Hotkey(Modifiers.Ctrl | Modifiers.Alt, Key.Delete), // Task manager
+            };
+            
+            if (systemHotkeys.Any(h => h.Equals(hotkey)))
+            {
+                result.IsWarning = true;
+                result.Message = "Conflicts with system hotkey. May not work reliably.";
+            }
+        }
+        
+        return result;
+    }
+}
+
+public class RecordingHotkeyManager
+{
+    private readonly IHotkeyManager _hotkeyManager;
+    private readonly HotkeyConflictDetector _conflictDetector;
+    
+    public async Task<bool> RegisterRecordingHotkeysAsync(RecordingSettings settings)
+    {
+        var hotkeys = new[]
+        {
+            (settings.StartStopHotkey, "Start/Stop Recording"),
+            (settings.PauseResumeHotkey, "Pause/Resume Recording"),
+        };
+        
+        var conflicts = new List<string>();
+        
+        foreach (var (hotkey, action) in hotkeys)
+        {
+            var conflictResult = _conflictDetector.CheckForConflicts(hotkey);
+            
+            if (conflictResult.IsConflict)
+            {
+                conflicts.Add($"{action}: {conflictResult.Message}");
+                continue;
+            }
+            
+            if (conflictResult.IsWarning)
+            {
+                _logger.LogWarning("{Action} hotkey warning: {Message}", action, conflictResult.Message);
+            }
+            
+            try
+            {
+                await _hotkeyManager.RegisterAsync(hotkey, () => HandleHotkeyAsync(action));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register hotkey for {Action}", action);
+                conflicts.Add($"{action}: Registration failed");
+            }
+        }
+        
+        if (conflicts.Any())
+        {
+            await ShowHotkeyConflictDialog(conflicts);
+            return false;
+        }
+        
+        return true;
+    }
+}
+```
+
+**Settings UI**:
+```csharp
+// Allow users to customize hotkeys
+public class RecordingSettingsViewModel : ViewModelBase
+{
+    [ObservableProperty]
+    private Hotkey _startStopHotkey = new(Modifiers.Ctrl | Modifiers.Shift, Key.R);
+    
+    [ObservableProperty]
+    private Hotkey _pauseResumeHotkey = new(Modifiers.Ctrl | Modifiers.Shift, Key.P);
+    
+    [RelayCommand]
+    private async Task TestHotkeyAsync()
+    {
+        var result = _conflictDetector.CheckForConflicts(StartStopHotkey);
+        
+        if (result.IsConflict)
+            await ShowErrorAsync($"Hotkey conflict: {result.Message}");
+        else if (result.IsWarning)
+            await ShowWarningAsync($"Hotkey warning: {result.Message}");
+        else
+            await ShowSuccessAsync("Hotkey is available");
+    }
+}
+```
 
 ---
 
