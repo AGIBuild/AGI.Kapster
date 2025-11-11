@@ -732,7 +732,7 @@ File.Move(tempFile, finalFile);
 
 **Lifecycle**: Start → Selecting → Confirm → Recording (persistent border) → Stop/Dispose. Hotkeys control the recording service; overlays remain passive.
 
-**Validation**: Pixel test（ROI 内不存在边框色）+ 多屏/混合 DPI 手工验证。
+**Validation**: Pixel test (no border color exists within ROI) + multi-monitor/mixed DPI manual verification.
 
 **Deliverables**:
 - Namespace: `AGI.Kapster.Desktop.RecordingOverlays/*`
