@@ -207,7 +207,7 @@ Use this checklist to determine if a design review document is warranted:
 
 ## Issues Found and Fixes Applied
 
-### Issue 1: [Title]
+### Issue 1: [Issue Title]
 **Problem**: [Description]
 **Impact**: [Severity and consequences]
 **Fix**: [Solution applied]
