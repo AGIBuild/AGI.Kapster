@@ -4,7 +4,6 @@
 
 - [ ] 1.1 Add FFmpeg.AutoGen 7.0.0 NuGet package to AGI.Kapster.Desktop.csproj
 - [ ] 1.2 Add NAudio NuGet package (Windows audio capture via WASAPI)
-- [ ] 1.3 **REMOVED** ~~Add PortAudio bindings~~ - Use native Linux APIs instead
 - [ ] 1.4 **CHANGED** Create FFmpeg 7.0.2 download infrastructure (GitHub Releases + version manifest)
 - [ ] 1.5 Update .gitignore to exclude FFmpeg cached binaries
 - [ ] 1.6 **UPDATED** Document FFmpeg LGPL compliance and OpenH264 (BSD) usage in LICENSE file
