@@ -728,7 +728,7 @@ File.Move(tempFile, finalFile);
 **Cross-Platform**:
 - Windows: per-monitor window; prefer `WDA_EXCLUDEFROMCAPTURE` when available; otherwise rely on outer-border guarantee.
 - macOS: one NSWindow per NSScreen; full-screen transparent window; outer-border guarantee。
-- Linux: top-level transparent per output; outer-border guarantee（不依赖合成器排除特性）。
+- Linux: top-level transparent per output; outer-border guarantee (does not rely on compositor exclusion features).
 
 **Lifecycle**: Start → Selecting → Confirm → Recording (persistent border) → Stop/Dispose. Hotkeys control the recording service; overlays remain passive.
 
