@@ -60,7 +60,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         var map = new Dictionary<KeyCode, uint>();
         foreach (var keyCode in Enum.GetValues<KeyCode>())
         {
-            // Build once; avoid ToString allocations on the hot path.
+            // Build once to avoid ToString allocations on the hot path.
             var vk = MapToWindowsVkFromName(keyCode.ToString());
             if (vk != 0)
             {
