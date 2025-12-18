@@ -240,7 +240,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
     {
         if (string.IsNullOrEmpty(keyName)) return 0;
 
-        // Letters/digits
+        // Map SharpHook KeyCode names (e.g., VcA, Vc1) to Windows virtual key codes for letters and digits
         if (keyName.Length == 3 && keyName.StartsWith("Vc", StringComparison.Ordinal))
         {
             char c = keyName[2];
