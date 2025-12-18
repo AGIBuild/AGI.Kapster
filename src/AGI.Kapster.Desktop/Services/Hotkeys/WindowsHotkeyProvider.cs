@@ -134,7 +134,7 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
 
     /// <summary>
     /// Wait until the global hook is actually running. This prevents a startup window where hotkeys are registered
-    /// but the hook thread hasn't begun processing events yet.
+    /// but the hook hasn't begun processing events yet.
     /// </summary>
     public async Task WaitUntilReadyAsync(TimeSpan timeout)
     {
