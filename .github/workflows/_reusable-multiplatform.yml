@@ -59,7 +59,7 @@ jobs:
         configuration: ${{ inputs.configuration }}
         package: ${{ inputs.create-packages }}
         
-    - name: ðŸ“¦ Upload artifacts
+    - name: 📦 Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: build-${{ matrix.platform }}
