@@ -154,7 +154,7 @@ public class HotkeyManager : IHotkeyManager
                 }
                 else
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(async () => await StartCaptureSessionAsync());
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => StartCaptureSessionAsync());
                 }
             });
 
