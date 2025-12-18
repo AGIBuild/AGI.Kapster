@@ -1,23 +1,45 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
+
 using Avalonia.Threading;
 using SharpHook;
-using SharpHook.Native;
+using SharpHook.Data;
 using Serilog;
 
 namespace AGI.Kapster.Desktop.Services.Hotkeys;
 
 /// <summary>
-/// Windows hotkey provider using SharpHook global hook
+/// Windows hotkey provider using SharpHook global hook.
 /// </summary>
 public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
 {
-    private readonly Dictionary<string, (HotkeyModifiers modifiers, uint keyCode, Action callback)> _registeredHotkeys = new();
-    private TaskPoolGlobalHook? _hook;
-    private bool _disposed = false;
     private readonly object _lockObject = new();
+
+    // Hotkey lookup (O(1))
+    private readonly Dictionary<(HotkeyModifiers Modifiers, uint KeyCode), Action> _hotkeysByChord = new();
+    private readonly Dictionary<string, (HotkeyModifiers Modifiers, uint KeyCode)> _chordById = new();
+
+    private EventLoopGlobalHook? _hook;
+    private readonly TaskCompletionSource _runRequestedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private bool _disposed = false;
     private HotkeyModifiers _currentModifiers = HotkeyModifiers.None;
+
+    private static readonly IReadOnlyDictionary<KeyCode, HotkeyModifiers> ModifierByKeyCode = new Dictionary<KeyCode, HotkeyModifiers>
+    {
+        { KeyCode.VcLeftControl, HotkeyModifiers.Control },
+        { KeyCode.VcRightControl, HotkeyModifiers.Control },
+        { KeyCode.VcLeftAlt, HotkeyModifiers.Alt },
+        { KeyCode.VcRightAlt, HotkeyModifiers.Alt },
+        { KeyCode.VcLeftShift, HotkeyModifiers.Shift },
+        { KeyCode.VcRightShift, HotkeyModifiers.Shift },
+        { KeyCode.VcLeftMeta, HotkeyModifiers.Win },
+        { KeyCode.VcRightMeta, HotkeyModifiers.Win },
+    };
+
+    private static readonly IReadOnlyDictionary<KeyCode, uint> VkByKeyCode = BuildVkByKeyCode();
 
     public bool IsSupported => OperatingSystem.IsWindows();
     public bool HasPermissions => true; // SharpHook handles permissions
@@ -33,26 +55,53 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         InitializeHook();
     }
 
+    private static IReadOnlyDictionary<KeyCode, uint> BuildVkByKeyCode()
+    {
+        var map = new Dictionary<KeyCode, uint>();
+        foreach (var keyCode in Enum.GetValues<KeyCode>())
+        {
+            // Build once to avoid ToString allocations on the hot path.
+            var vk = MapToWindowsVkFromName(keyCode.ToString());
+            if (vk != 0)
+            {
+                map[keyCode] = vk;
+            }
+        }
+
+        return map;
+    }
+
     private void InitializeHook()
     {
         try
         {
-            _hook = new TaskPoolGlobalHook();
+            _hook = new EventLoopGlobalHook();
+            _hook.HookEnabled += OnHookEnabled;
+            _hook.HookDisabled += OnHookDisabled;
             _hook.KeyPressed += OnKeyPressed;
             _hook.KeyReleased += OnKeyReleased;
 
-            // Start the global hook
-            Task.Run(async () =>
+            Task runTask;
+            try
             {
-                try
+                // Start the global hook (non-blocking). The returned task completes when the hook stops/disposes.
+                runTask = _hook.RunAsync();
+                _runRequestedTcs.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                _runRequestedTcs.TrySetResult();
+                Log.Error(ex, "Error starting SharpHook global hook");
+                return;
+            }
+
+            _ = runTask.ContinueWith(t =>
+            {
+                if (t.Exception != null)
                 {
-                    await _hook.RunAsync();
+                    Log.Error(t.Exception, "Error running SharpHook global hook");
                 }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error running SharpHook global hook");
-                }
-            });
+            }, TaskScheduler.Default);
 
             Log.Debug("SharpHook global hook initialized successfully");
         }
@@ -62,60 +111,105 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         }
     }
 
+    private void OnHookEnabled(object? sender, HookEventArgs e)
+    {
+        lock (_lockObject)
+        {
+            // Ensure a clean modifier state after startup/restart.
+            _currentModifiers = HotkeyModifiers.None;
+        }
+
+        Log.Debug("SharpHook global hook enabled");
+    }
+
+    private void OnHookDisabled(object? sender, HookEventArgs e)
+    {
+        lock (_lockObject)
+        {
+            _currentModifiers = HotkeyModifiers.None;
+        }
+
+        Log.Debug("SharpHook global hook disabled");
+    }
+
+    /// <summary>
+    /// Wait until the global hook is actually running. This prevents a startup window where hotkeys are registered
+    /// but the hook hasn't begun processing events yet.
+    /// </summary>
+    public async Task WaitUntilReadyAsync(TimeSpan timeout)
+    {
+        if (!IsSupported)
+        {
+            return;
+        }
+
+        // Ensure we at least attempted to start the hook.
+        await _runRequestedTcs.Task.ConfigureAwait(false);
+
+        var hook = _hook;
+        if (hook == null)
+        {
+            return;
+        }
+
+        var sw = Stopwatch.StartNew();
+        while (!hook.IsRunning && sw.Elapsed < timeout)
+        {
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+
+        if (!hook.IsRunning)
+        {
+            Log.Warning("SharpHook global hook not running after waiting {TimeoutMs}ms", (int)timeout.TotalMilliseconds);
+        }
+    }
+
     private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
     {
         try
         {
-            var keyName = e.Data.KeyCode.ToString();
+            var keyCode = e.Data.KeyCode;
 
-            // Do not trigger on pure modifier keys
-            if (IsModifierKeyName(keyName, out var modifierFlag))
+            // Do not trigger on pure modifier keys.
+            if (ModifierByKeyCode.TryGetValue(keyCode, out var modifierFlag))
             {
                 lock (_lockObject)
                 {
                     _currentModifiers |= modifierFlag;
                 }
+
                 return;
             }
 
-            // Non-modifier: combine with current modifiers and match
-            uint vk = MapToWindowsVkFromName(keyName);
-            if (vk == 0)
+            if (!VkByKeyCode.TryGetValue(keyCode, out var vk) || vk == 0)
             {
                 return;
             }
 
-            HotkeyModifiers modifiers;
+            Action? callback;
             lock (_lockObject)
             {
-                modifiers = _currentModifiers;
+                var modifiers = _currentModifiers;
+                _hotkeysByChord.TryGetValue((modifiers, vk), out callback);
             }
 
-            lock (_lockObject)
+            if (callback == null)
             {
-                foreach (var (id, (registeredModifiers, registeredKeyCode, callback)) in _registeredHotkeys)
+                return;
+            }
+
+            // Execute callback on UI thread.
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                try
                 {
-                    if (vk == registeredKeyCode && modifiers == registeredModifiers)
-                    {
-                        Log.Debug("Hotkey matched: {Id} -> {Modifiers}+{KeyCode}", id, modifiers, vk);
-
-                        // Execute callback on UI thread
-                        Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            try
-                            {
-                                callback();
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error(ex, "Error executing hotkey callback: {Id}", id);
-                            }
-                        });
-
-                        break;
-                    }
+                    callback();
                 }
-            }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error executing hotkey callback");
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -127,8 +221,8 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
     {
         try
         {
-            var keyName = e.Data.KeyCode.ToString();
-            if (IsModifierKeyName(keyName, out var modifierFlag))
+            var keyCode = e.Data.KeyCode;
+            if (ModifierByKeyCode.TryGetValue(keyCode, out var modifierFlag))
             {
                 lock (_lockObject)
                 {
@@ -142,23 +236,11 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         }
     }
 
-    private static bool IsModifierKeyName(string keyName, out HotkeyModifiers flag)
-    {
-        flag = HotkeyModifiers.None;
-
-        if (string.IsNullOrEmpty(keyName)) return false;
-        if (keyName is "VcLeftControl" or "VcRightControl") { flag = HotkeyModifiers.Control; return true; }
-        if (keyName is "VcLeftAlt" or "VcRightAlt") { flag = HotkeyModifiers.Alt; return true; }
-        if (keyName is "VcLeftShift" or "VcRightShift") { flag = HotkeyModifiers.Shift; return true; }
-        if (keyName is "VcLeftMeta" or "VcRightMeta") { flag = HotkeyModifiers.Win; return true; }
-        return false;
-    }
-
     private static uint MapToWindowsVkFromName(string keyName)
     {
         if (string.IsNullOrEmpty(keyName)) return 0;
 
-        // Letters A-Z
+        // Map SharpHook KeyCode names (e.g., VcA, Vc1) to Windows virtual key codes for letters and digits
         if (keyName.Length == 3 && keyName.StartsWith("Vc", StringComparison.Ordinal))
         {
             char c = keyName[2];
@@ -256,16 +338,19 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         {
             lock (_lockObject)
             {
-                // Remove existing if present
-                if (_registeredHotkeys.ContainsKey(id))
+                // Remove existing if present.
+                if (_chordById.TryGetValue(id, out var existingChord))
                 {
-                    _registeredHotkeys.Remove(id);
+                    _chordById.Remove(id);
+                    _hotkeysByChord.Remove(existingChord);
                     Log.Debug("Removed existing hotkey: {Id}", id);
                 }
 
-                // Register new hotkey
-                _registeredHotkeys[id] = (modifiers, keyCode, callback);
-                Log.Debug("✅ SharpHook hotkey registered: {Id} -> {Modifiers}+{KeyCode}", id, modifiers, keyCode);
+                var chord = (modifiers, keyCode);
+                _chordById[id] = chord;
+                _hotkeysByChord[chord] = callback;
+
+                Log.Debug("SharpHook hotkey registered: {Id} -> {Modifiers}+{KeyCode}", id, modifiers, keyCode);
                 return true;
             }
         }
@@ -282,11 +367,14 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         {
             lock (_lockObject)
             {
-                if (_registeredHotkeys.Remove(id))
+                if (_chordById.TryGetValue(id, out var chord))
                 {
+                    _chordById.Remove(id);
+                    _hotkeysByChord.Remove(chord);
                     Log.Debug("SharpHook hotkey unregistered: {Id}", id);
                     return true;
                 }
+
                 return false;
             }
         }
@@ -303,8 +391,9 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         {
             lock (_lockObject)
             {
-                var count = _registeredHotkeys.Count;
-                _registeredHotkeys.Clear();
+                var count = _chordById.Count;
+                _chordById.Clear();
+                _hotkeysByChord.Clear();
                 Log.Debug("All SharpHook hotkeys unregistered: {Count}", count);
             }
         }
@@ -322,13 +411,14 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
 
         try
         {
-            // 注销所有热键
             UnregisterAll();
 
-            // 停止并释放SharpHook
             if (_hook != null)
             {
+                _hook.HookEnabled -= OnHookEnabled;
+                _hook.HookDisabled -= OnHookDisabled;
                 _hook.KeyPressed -= OnKeyPressed;
+                _hook.KeyReleased -= OnKeyReleased;
                 _hook.Dispose();
                 _hook = null;
                 Log.Debug("SharpHook disposed");
@@ -342,3 +432,4 @@ public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
         }
     }
 }
+
