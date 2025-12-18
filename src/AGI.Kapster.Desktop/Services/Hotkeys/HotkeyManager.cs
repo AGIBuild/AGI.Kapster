@@ -55,25 +55,42 @@ public class HotkeyManager : IHotkeyManager
                 return;
             }
 
-            // Delay permission check (macOS accessibility)
-            await Task.Delay(500);
 
-            // Re-check permissions (macOS .app accessibility may need time)
-            if (!_hotkeyProvider.HasPermissions)
+            if (OperatingSystem.IsMacOS())
             {
-                Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
-                Log.Warning("Retrying permission check in 2 seconds...");
+                // Delay permission check (macOS accessibility).
+                await Task.Delay(500);
 
-                // Delay and retry
-                await Task.Delay(2000);
-
+                // Re-check permissions (macOS .app accessibility may need time).
                 if (!_hotkeyProvider.HasPermissions)
                 {
-                    Log.Error("Still no permissions after retry. Please check accessibility settings.");
+                    Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
+                    Log.Warning("Retrying permission check in 2 seconds...");
+
+                    // Delay and retry
+                    await Task.Delay(2000);
+
+                    if (!_hotkeyProvider.HasPermissions)
+                    {
+                        Log.Error("Still no permissions after retry. Please check accessibility settings.");
+                        return;
+                    }
+
+                    Log.Information("Permissions granted after retry");
+                }
+            }
+            else
+            {
+                if (!_hotkeyProvider.HasPermissions)
+                {
+                    Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
                     return;
                 }
+            }
 
-                Log.Information("Permissions granted after retry");
+            if (_hotkeyProvider is WindowsHotkeyProvider windowsProvider)
+            {
+                await windowsProvider.WaitUntilReadyAsync(TimeSpan.FromSeconds(2));
             }
 
             await ReloadHotkeysAsync();
@@ -110,6 +127,11 @@ public class HotkeyManager : IHotkeyManager
         return Task.CompletedTask;
     }
 
+    private async Task StartCaptureSessionAsync()
+    {
+        await _overlayCoordinator.StartSessionAsync();
+        RegisterEscapeHotkey();
+    }
     private void RegisterCaptureRegionHotkey(string combination)
     {
         if (ParseHotkeyString(combination, out var modifiers, out var keyCode))
@@ -124,12 +146,16 @@ public class HotkeyManager : IHotkeyManager
                     return;
                 }
                 
-                // Dispatch async call to UI thread (hotkey callbacks occur on system thread)
-                Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+
+                // Ensure the capture session starts on the UI thread.
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
                 {
-                    await _overlayCoordinator.StartSessionAsync();
-                    RegisterEscapeHotkey();
-                });
+                    _ = StartCaptureSessionAsync();
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(async () => await StartCaptureSessionAsync());
+                }
             });
 
             if (success)
