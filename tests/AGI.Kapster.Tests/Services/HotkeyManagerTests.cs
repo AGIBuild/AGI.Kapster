@@ -46,13 +46,13 @@ public class HotkeyManagerTests : TestBase
         {
             Hotkeys = new HotkeySettings
             {
-                CaptureRegion = "Ctrl+Shift+A",
-                OpenSettings = "Alt+S"
+                CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'A'),
+                OpenSettings = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'S')
             }
         };
         _settingsService.Settings.Returns(settings);
 
-        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<System.Action>())
+        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<System.Action>())
             .Returns(true);
 
         // Act
@@ -63,14 +63,20 @@ public class HotkeyManagerTests : TestBase
 
         _hotkeyProvider.Received(1).RegisterHotkey(
             "capture_region",
-            HotkeyModifiers.Control | HotkeyModifiers.Shift,
-            65,
+            Arg.Is<HotkeyGesture>(g =>
+                g.Modifiers == (HotkeyModifiers.Control | HotkeyModifiers.Shift) &&
+                g.KeySpec != null &&
+                g.KeySpec.GetType() == typeof(CharKeySpec) &&
+                ((CharKeySpec)g.KeySpec).Character == 'A'),
             Arg.Any<System.Action>());
 
         _hotkeyProvider.Received(1).RegisterHotkey(
             "open_settings",
-            HotkeyModifiers.Alt,
-            83,
+            Arg.Is<HotkeyGesture>(g =>
+                g.Modifiers == HotkeyModifiers.Alt &&
+                g.KeySpec != null &&
+                g.KeySpec.GetType() == typeof(CharKeySpec) &&
+                ((CharKeySpec)g.KeySpec).Character == 'S'),
             Arg.Any<System.Action>());
     }
 
@@ -80,7 +86,7 @@ public class HotkeyManagerTests : TestBase
         // Arrange
         _hotkeyProvider.IsSupported.Returns(true);
         _hotkeyProvider.HasPermissions.Returns(true);
-        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<System.Action>())
+        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<System.Action>())
             .Returns(true);
 
         // Act
@@ -89,8 +95,11 @@ public class HotkeyManagerTests : TestBase
         // Assert
         _hotkeyProvider.Received(1).RegisterHotkey(
             "overlay_escape",
-            HotkeyModifiers.None,
-            27, // Escape key code
+            Arg.Is<HotkeyGesture>(g =>
+                g.Modifiers == HotkeyModifiers.None &&
+                g.KeySpec != null &&
+                g.KeySpec.GetType() == typeof(NamedKeySpec) &&
+                ((NamedKeySpec)g.KeySpec).NamedKey == NamedKey.Escape),
             Arg.Any<System.Action>()
         );
     }
@@ -101,7 +110,7 @@ public class HotkeyManagerTests : TestBase
         // Arrange
         _hotkeyProvider.IsSupported.Returns(true);
         _hotkeyProvider.HasPermissions.Returns(true);
-        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<System.Action>())
+        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<System.Action>())
             .Returns(true);
 
         // Act
@@ -110,8 +119,7 @@ public class HotkeyManagerTests : TestBase
         // Assert
         _hotkeyProvider.Received(1).RegisterHotkey(
             Arg.Any<string>(),
-            Arg.Any<HotkeyModifiers>(),
-            Arg.Any<uint>(),
+            Arg.Any<HotkeyGesture>(),
             Arg.Any<System.Action>()
         );
     }
@@ -136,7 +144,7 @@ public class HotkeyManagerTests : TestBase
         // Arrange
         _hotkeyProvider.IsSupported.Returns(true);
         _hotkeyProvider.HasPermissions.Returns(true);
-        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<System.Action>())
+        _hotkeyProvider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<System.Action>())
             .Returns(true);
 
         // First register the hotkey
@@ -161,14 +169,13 @@ public class HotkeyManagerTests : TestBase
         // Assert
         _hotkeyProvider.DidNotReceive().RegisterHotkey(
             Arg.Any<string>(),
-            Arg.Any<HotkeyModifiers>(),
-            Arg.Any<uint>(),
+            Arg.Any<HotkeyGesture>(),
             Arg.Any<System.Action>()
         );
     }
 
     [Fact]
-    public void RegisterEscapeHotkey_WhenNoPermissions_ShouldNotRegister()
+    public void RegisterEscapeHotkey_WhenNoPermissions_ShouldStillRegister()
     {
         // Arrange
         _hotkeyProvider.IsSupported.Returns(true);
@@ -178,11 +185,9 @@ public class HotkeyManagerTests : TestBase
         _hotkeyManager.RegisterEscapeHotkey();
 
         // Assert
-        _hotkeyProvider.DidNotReceive().RegisterHotkey(
-            Arg.Any<string>(),
-            Arg.Any<HotkeyModifiers>(),
-            Arg.Any<uint>(),
-            Arg.Any<System.Action>()
-        );
+        _hotkeyProvider.Received(1).RegisterHotkey(
+            "overlay_escape",
+            Arg.Any<HotkeyGesture>(),
+            Arg.Any<System.Action>());
     }
 }

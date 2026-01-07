@@ -283,45 +283,6 @@
 
 									<TextBlock Text="Note: Focus the text box and press your desired key combination"
 											   FontSize="12" Foreground="Gray" Margin="0,10,0,0"/>
-
-									<!-- macOS Permission Status -->
-									<Border x:Name="MacPermissionPanel"
-											Classes="group"
-											Margin="0,15,0,0"
-											IsVisible="False">
-										<StackPanel Spacing="8">
-											<StackPanel Orientation="Horizontal" Spacing="8">
-												<TextBlock x:Name="PermissionStatusIcon"
-														   Text="[!]"
-														   FontSize="16"
-														   VerticalAlignment="Center"/>
-												<TextBlock x:Name="PermissionStatusText"
-														   Text="macOS Accessibility Permission: Not Granted"
-														   FontWeight="SemiBold"
-														   VerticalAlignment="Center"/>
-											</StackPanel>
-											<TextBlock Text="Global hotkeys require accessibility permission to function properly."
-													   FontSize="12"
-													   TextWrapping="Wrap"/>
-											<StackPanel Orientation="Horizontal" Spacing="10">
-												<Button x:Name="OpenPermissionGuideButton"
-														Content="Permission Guide"
-														Padding="8,4"
-														Click="ShowPermissionGuide"
-														Classes="action"/>
-												<Button x:Name="RefreshPermissionButton"
-														Content="Refresh Status"
-														Padding="8,4"
-														Click="RefreshPermissionStatus"
-														Classes="action"/>
-												<Button x:Name="DebugPermissionButton"
-														Content="Debug Info"
-														Padding="8,4"
-														Click="ShowPermissionDebugInfo"
-														Classes="action"/>
-											</StackPanel>
-										</StackPanel>
-									</Border>
 								</StackPanel>
 							</Border>
 

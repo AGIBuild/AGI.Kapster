@@ -54,21 +54,21 @@ mkdir -p "$APP_DIR/Contents/Resources"
 echo "Publish directory contents:"
 ls -la "$PUBLISH_DIR" || true
 
-# Copy executable file
-echo "Copying executable..."
+# Copy publish output into app bundle
+echo "Copying publish output..."
 if [ ! -f "$PUBLISH_DIR/AGI.Kapster.Desktop" ]; then
     echo "❌ Executable not found: $PUBLISH_DIR/AGI.Kapster.Desktop"
     exit 1
 fi
-cp "$PUBLISH_DIR/AGI.Kapster.Desktop" "$APP_DIR/Contents/MacOS/"
-chmod +x "$APP_DIR/Contents/MacOS/AGI.Kapster.Desktop"
 
-# Copy other files
-echo "Copying other files..."
-cp -r "$PUBLISH_DIR"/* "$APP_DIR/Contents/MacOS/" || {
+# Copy everything (including subdirectories) into Contents/MacOS
+cp -R "$PUBLISH_DIR"/. "$APP_DIR/Contents/MacOS/" || {
     echo "❌ Failed to copy files from $PUBLISH_DIR"
     exit 1
 }
+
+# Ensure executable bit on main binary
+chmod +x "$APP_DIR/Contents/MacOS/AGI.Kapster.Desktop"
 
 # Create Info.plist
 cat > "$APP_DIR/Contents/Info.plist" << EOF
@@ -121,7 +121,36 @@ fi
 # Application signing (if signing identity provided)
 if [ -n "$SIGN_IDENTITY" ]; then
     echo "🔐 Signing application..."
-    codesign --force --verify --verbose --sign "$SIGN_IDENTITY" "$APP_DIR"
+    ENTITLEMENTS="$SCRIPT_DIR/entitlements.plist"
+
+    # Sign native libraries first (must be done before main executable)
+    echo "Signing native libraries..."
+    find "$APP_DIR/Contents/MacOS" -name "*.dylib" -type f | while read dylib; do
+        echo "  Signing: $dylib"
+        # Native libraries should not receive app entitlements.
+        codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$dylib"
+    done
+
+    # Sign any other native libraries (.so, .dll just in case)
+    find "$APP_DIR/Contents/MacOS" -name "*.so" -type f | while read lib; do
+        echo "  Signing: $lib"
+        # Native libraries should not receive app entitlements.
+        codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$lib"
+    done
+
+    # Sign the main executable
+    echo "Signing main executable..."
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        --entitlements "$ENTITLEMENTS" "$APP_DIR/Contents/MacOS/AGI.Kapster.Desktop"
+
+    # Sign the entire app bundle
+    echo "Signing app bundle..."
+    codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        --entitlements "$ENTITLEMENTS" "$APP_DIR"
+
+    # Verify signature
+    echo "Verifying signature..."
+    codesign --verify --verbose=2 "$APP_DIR"
 fi
 
 echo "📦 Creating PKG installer..."

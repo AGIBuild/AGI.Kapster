@@ -119,7 +119,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IScreenCaptureStrategy, MacScreenCaptureStrategy>();
             services.AddSingleton<IClipboardStrategy, MacClipboardStrategy>();
             services.AddTransient<IScreenCoordinateMapper, MacCoordinateMapper>();
-            services.AddTransient<IImeController, NoOpImeController>();
+            services.AddTransient<IImeController, MacImeController>();
         }
         else
         {
@@ -200,13 +200,21 @@ public static class ServiceCollectionExtensions
     {
 #pragma warning disable CA1416 // Platform compatibility checked by RuntimeInformation.IsOSPlatform
 
+        // Register hotkey resolver (platform-specific, injected into providers)
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            services.AddSingleton<IHotkeyProvider, WindowsHotkeyProvider>();
+            services.AddSingleton<IHotkeyResolver, WindowsHotkeyResolver>();
+            services.AddSingleton<WindowsHotkeyProvider>(sp => new WindowsHotkeyProvider(sp.GetService<IHotkeyResolver>()));
+            services.AddSingleton<IHotkeyProvider>(sp => sp.GetRequiredService<WindowsHotkeyProvider>());
+            services.AddSingleton<IKeyboardLayoutMonitor>(sp => sp.GetRequiredService<WindowsHotkeyProvider>());
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            services.AddSingleton<IHotkeyProvider, MacHotkeyProvider>();
+            services.AddSingleton<IHotkeyResolver, MacHotkeyResolver>();
+            // Use Carbon provider for sandbox compatibility (no Input Monitoring required)
+            services.AddSingleton<MacCarbonHotkeyProvider>(sp => new MacCarbonHotkeyProvider(sp.GetService<IHotkeyResolver>()));
+            services.AddSingleton<IHotkeyProvider>(sp => sp.GetRequiredService<MacCarbonHotkeyProvider>());
+            services.AddSingleton<IKeyboardLayoutMonitor, MacKeyboardLayoutMonitor>();
         }
         else
         {

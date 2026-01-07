@@ -1,9 +1,7 @@
 using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Desktop.Services;
-using AGI.Kapster.Desktop.Services.Hotkeys;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update;
-using AGI.Kapster.Desktop.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
 using static Avalonia.Controls.Design;
@@ -55,6 +53,11 @@ public partial class SettingsWindow : Window
         LoadCurrentSettings();
     }
 
+    // Hotkey capture state: KeyDown gives us modifiers, TextInput gives us the printable character (esp. symbol keys).
+    private TextBox? _pendingHotkeyTextBox;
+    private HotkeyModifiers _pendingHotkeyModifiers;
+    private TextBox? _suppressNextTextInputForTextBox;
+
     private void InitializeComponent()
     {
         Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
@@ -84,15 +87,15 @@ public partial class SettingsWindow : Window
         // Hotkey text boxes with key capture
         if (this.FindControl<TextBox>("CaptureRegionHotkeyTextBox") is { } captureRegionText)
         {
-            captureRegionText.TextChanged += OnCaptureRegionHotkeyChanged;
             captureRegionText.KeyDown += OnHotkeyTextBoxKeyDown;
+            captureRegionText.TextInput += OnHotkeyTextBoxTextInput;
             captureRegionText.GotFocus += OnHotkeyTextBoxGotFocus;
         }
 
         if (this.FindControl<TextBox>("OpenSettingsHotkeyTextBox") is { } openSettingsText)
         {
-            openSettingsText.TextChanged += OnOpenSettingsHotkeyChanged;
             openSettingsText.KeyDown += OnHotkeyTextBoxKeyDown;
+            openSettingsText.TextInput += OnHotkeyTextBoxTextInput;
             openSettingsText.GotFocus += OnHotkeyTextBoxGotFocus;
         }
 
@@ -174,19 +177,16 @@ public partial class SettingsWindow : Window
                 }
             }
 
-            // Hotkeys
+            // Hotkeys - display using HotkeyGesture model
             if (this.FindControl<TextBox>("CaptureRegionHotkeyTextBox") is { } captureRegionText)
             {
-                captureRegionText.Text = _currentSettings.Hotkeys.CaptureRegion;
+                captureRegionText.Text = _currentSettings.Hotkeys.CaptureRegion?.ToDisplayString() ?? "Alt+A";
             }
 
             if (this.FindControl<TextBox>("OpenSettingsHotkeyTextBox") is { } openSettingsText)
             {
-                openSettingsText.Text = _currentSettings.Hotkeys.OpenSettings;
+                openSettingsText.Text = _currentSettings.Hotkeys.OpenSettings?.ToDisplayString() ?? "Alt+S";
             }
-
-            // Update macOS permission status
-            UpdateMacPermissionStatus();
 
             // Style settings
             if (this.FindControl<Slider>("TextFontSizeSlider") is { } textFontSize)
@@ -587,16 +587,8 @@ public partial class SettingsWindow : Window
                 _currentSettings.General.DefaultSaveFormat = selectedFormat.Content?.ToString() ?? "PNG";
             }
 
-            // Save hotkeys from text boxes
-            if (this.FindControl<TextBox>("CaptureRegionHotkeyTextBox") is { } captureRegionText)
-            {
-                _currentSettings.Hotkeys.CaptureRegion = captureRegionText.Text ?? "Alt+A";
-            }
-
-            if (this.FindControl<TextBox>("OpenSettingsHotkeyTextBox") is { } openSettingsText)
-            {
-                _currentSettings.Hotkeys.OpenSettings = openSettingsText.Text ?? "Alt+S";
-            }
+            // Hotkeys are already updated in real-time through UpdateHotkeyGesture
+            // No need to read from text boxes here
 
             // Save advanced settings
             SaveAdvancedSettings();
@@ -630,20 +622,31 @@ public partial class SettingsWindow : Window
 
 
 
-    private void OnCaptureRegionHotkeyChanged(object? sender, TextChangedEventArgs e)
+    /// <summary>
+    /// Handle text input for character-based hotkeys
+    /// </summary>
+    private void OnHotkeyTextBoxTextInput(object? sender, Avalonia.Input.TextInputEventArgs e)
     {
-        if (sender is TextBox textBox)
+        if (sender is not TextBox textBox) return;
+
+        e.Handled = true;
+
+        if (_suppressNextTextInputForTextBox == textBox)
         {
-            _currentSettings.Hotkeys.CaptureRegion = textBox.Text ?? "Alt+A";
+            _suppressNextTextInputForTextBox = null;
+            return;
         }
-    }
 
-
-    private void OnOpenSettingsHotkeyChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (sender is TextBox textBox)
+        if (e.Text != null && e.Text.Length == 1)
         {
-            _currentSettings.Hotkeys.OpenSettings = textBox.Text ?? "Alt+S";
+            var character = e.Text[0];
+            if (char.IsLetterOrDigit(character) || IsValidSymbolChar(character))
+            {
+                // Prefer modifiers captured from the preceding KeyDown for this same text box.
+                var modifiers = _pendingHotkeyTextBox == textBox ? _pendingHotkeyModifiers : HotkeyModifiers.None;
+                var gesture = HotkeyGesture.FromChar(modifiers, character);
+                UpdateHotkeyGesture(textBox, gesture);
+            }
         }
     }
 
@@ -672,54 +675,113 @@ public partial class SettingsWindow : Window
         // Ignore modifier keys by themselves
         if (IsModifierKey(e.Key))
         {
+            // Still record current modifier state for subsequent TextInput.
+            _pendingHotkeyTextBox = textBox;
+            _pendingHotkeyModifiers = GetModifiersFromKeyModifiers(e.KeyModifiers);
             return;
         }
 
-        // Build hotkey string with platform-specific mapping
-        var modifiers = new List<string>();
+        var modifiers = GetModifiersFromKeyModifiers(e.KeyModifiers);
+        _pendingHotkeyTextBox = textBox;
+        _pendingHotkeyModifiers = modifiers;
 
-        if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control))
-            modifiers.Add("Ctrl");
-        if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt))
+        // Handle named keys (F1-F12, Enter, Tab, Esc, arrows, etc.)
+        var namedKey = AvaloniaKeyToNamedKey(e.Key);
+        if (namedKey.HasValue)
         {
-            // On macOS, Alt key is Option key, use consistent naming
-            modifiers.Add("Alt");
-        }
-        if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift))
-            modifiers.Add("Shift");
-        if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta))
-        {
-            // On macOS, Meta is Command key, but we use Win for consistency
-            if (OperatingSystem.IsMacOS())
-                modifiers.Add("Cmd");
-            else
-                modifiers.Add("Win");
+            var gesture = HotkeyGesture.FromNamedKey(modifiers, namedKey.Value);
+            _suppressNextTextInputForTextBox = textBox;
+            UpdateHotkeyGesture(textBox, gesture);
+            return;
         }
 
-        // Add the main key
-        var keyName = GetKeyDisplayName(e.Key);
-        if (!string.IsNullOrEmpty(keyName))
+        // For character keys, handle letter/digit keys directly
+        if (e.Key >= Avalonia.Input.Key.A && e.Key <= Avalonia.Input.Key.Z)
         {
-            modifiers.Add(keyName);
+            var character = (char)('A' + (e.Key - Avalonia.Input.Key.A));
+            var gesture = HotkeyGesture.FromChar(modifiers, character);
+            _suppressNextTextInputForTextBox = textBox;
+            UpdateHotkeyGesture(textBox, gesture);
+        }
+        else if (e.Key >= Avalonia.Input.Key.D0 && e.Key <= Avalonia.Input.Key.D9)
+        {
+            var character = (char)('0' + (e.Key - Avalonia.Input.Key.D0));
+            var gesture = HotkeyGesture.FromChar(modifiers, character);
+            _suppressNextTextInputForTextBox = textBox;
+            UpdateHotkeyGesture(textBox, gesture);
+        }
+        // For symbol keys, wait for TextInput event (handled in OnHotkeyTextBoxTextInput)
+    }
+
+    private HotkeyModifiers GetModifiersFromKeyModifiers(Avalonia.Input.KeyModifiers keyModifiers)
+    {
+        var modifiers = HotkeyModifiers.None;
+        if (keyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control))
+            modifiers |= HotkeyModifiers.Control;
+        if (keyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt))
+            modifiers |= HotkeyModifiers.Alt;
+        if (keyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift))
+            modifiers |= HotkeyModifiers.Shift;
+        if (keyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta))
+            modifiers |= HotkeyModifiers.Win;
+        return modifiers;
+    }
+
+    private void UpdateHotkeyGesture(TextBox textBox, HotkeyGesture gesture)
+    {
+        textBox.Text = gesture.ToDisplayString();
+
+        // Update settings based on text box name
+        if (textBox.Name == "CaptureRegionHotkeyTextBox")
+        {
+            _currentSettings.Hotkeys.CaptureRegion = gesture;
+        }
+        else if (textBox.Name == "OpenSettingsHotkeyTextBox")
+        {
+            _currentSettings.Hotkeys.OpenSettings = gesture;
         }
 
-        if (modifiers.Count > 0)
+        textBox.Background = new SolidColorBrush(Color.FromArgb(64, 34, 68, 102)); // Reset background
+    }
+
+    private static NamedKey? AvaloniaKeyToNamedKey(Avalonia.Input.Key key)
+    {
+        return key switch
         {
-            var hotkeyString = string.Join("+", modifiers);
-            textBox.Text = hotkeyString;
+            Avalonia.Input.Key.F1 => NamedKey.F1,
+            Avalonia.Input.Key.F2 => NamedKey.F2,
+            Avalonia.Input.Key.F3 => NamedKey.F3,
+            Avalonia.Input.Key.F4 => NamedKey.F4,
+            Avalonia.Input.Key.F5 => NamedKey.F5,
+            Avalonia.Input.Key.F6 => NamedKey.F6,
+            Avalonia.Input.Key.F7 => NamedKey.F7,
+            Avalonia.Input.Key.F8 => NamedKey.F8,
+            Avalonia.Input.Key.F9 => NamedKey.F9,
+            Avalonia.Input.Key.F10 => NamedKey.F10,
+            Avalonia.Input.Key.F11 => NamedKey.F11,
+            Avalonia.Input.Key.F12 => NamedKey.F12,
+            Avalonia.Input.Key.Enter => NamedKey.Enter,
+            Avalonia.Input.Key.Tab => NamedKey.Tab,
+            Avalonia.Input.Key.Escape => NamedKey.Escape,
+            Avalonia.Input.Key.Space => NamedKey.Space,
+            Avalonia.Input.Key.Back => NamedKey.Backspace,
+            Avalonia.Input.Key.Delete => NamedKey.Delete,
+            Avalonia.Input.Key.Insert => NamedKey.Insert,
+            Avalonia.Input.Key.Home => NamedKey.Home,
+            Avalonia.Input.Key.End => NamedKey.End,
+            Avalonia.Input.Key.PageUp => NamedKey.PageUp,
+            Avalonia.Input.Key.PageDown => NamedKey.PageDown,
+            Avalonia.Input.Key.Up => NamedKey.Up,
+            Avalonia.Input.Key.Down => NamedKey.Down,
+            Avalonia.Input.Key.Left => NamedKey.Left,
+            Avalonia.Input.Key.Right => NamedKey.Right,
+            _ => null
+        };
+    }
 
-            // Update settings immediately
-            if (textBox.Name == "CaptureRegionHotkeyTextBox")
-            {
-                _currentSettings.Hotkeys.CaptureRegion = hotkeyString;
-            }
-            else if (textBox.Name == "OpenSettingsHotkeyTextBox")
-            {
-                _currentSettings.Hotkeys.OpenSettings = hotkeyString;
-            }
-
-            textBox.Background = new SolidColorBrush(Color.FromArgb(64, 34, 68, 102)); // Reset background
-        }
+    private static bool IsValidSymbolChar(char c)
+    {
+        return c is '-' or '=' or '[' or ']' or ';' or '\'' or ',' or '.' or '/' or '\\' or '`' or '+' or '*' or '&' or '%' or '$' or '#' or '@' or '!' or '?' or ':' or '"' or '<' or '>' or '{' or '}' or '|' or '~' or '^';
     }
 
     private static bool IsModifierKey(Avalonia.Input.Key key)
@@ -787,124 +849,6 @@ public partial class SettingsWindow : Window
             Avalonia.Input.Key.Tab => "Tab",
             _ => key.ToString()
         };
-    }
-
-    /// <summary>
-    /// Update macOS permission status display
-    /// </summary>
-    private void UpdateMacPermissionStatus()
-    {
-        try
-        {
-            var permissionPanel = this.FindControl<Border>("MacPermissionPanel");
-            var statusIcon = this.FindControl<TextBlock>("PermissionStatusIcon");
-            var statusText = this.FindControl<TextBlock>("PermissionStatusText");
-
-            if (permissionPanel == null || statusIcon == null || statusText == null)
-                return;
-
-            // Only show on macOS
-            if (!OperatingSystem.IsMacOS())
-            {
-                permissionPanel.IsVisible = false;
-                return;
-            }
-
-            var hasPermission = MacHotkeyProvider.HasAccessibilityPermissions;
-            permissionPanel.IsVisible = true;
-
-            if (hasPermission)
-            {
-                statusIcon.Text = "[✓]";
-                statusText.Text = "macOS Accessibility Permission: Granted";
-                statusText.Foreground = Brushes.Green;
-            }
-            else
-            {
-                statusIcon.Text = "[!]";
-                statusText.Text = "macOS Accessibility Permission: Not Granted";
-                statusText.Foreground = Brushes.DarkOrange;
-            }
-
-            Log.Debug("Updated macOS permission status: {HasPermission}", hasPermission);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to update macOS permission status");
-        }
-    }
-
-    /// <summary>
-    /// Show permission guide dialog
-    /// </summary>
-    private async void ShowPermissionGuide(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            await AccessibilityPermissionDialog.ShowAsync(this);
-
-            // Refresh status after dialog closes
-            UpdateMacPermissionStatus();
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to show permission guide");
-        }
-    }
-
-    /// <summary>
-    /// Refresh permission status
-    /// </summary>
-    private void RefreshPermissionStatus(object? sender, RoutedEventArgs e)
-    {
-        UpdateMacPermissionStatus();
-    }
-
-    /// <summary>
-    /// Show debug info for permission troubleshooting
-    /// </summary>
-    private async void ShowPermissionDebugInfo(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var pathInfo = MacHotkeyProvider.GetCurrentApplicationPath();
-            var hasPermission = MacHotkeyProvider.HasAccessibilityPermissions;
-
-            var debugInfo = $"Accessibility Permission Status: {(hasPermission ? "Granted" : "Not Granted")}\n\n" +
-                           $"Current Application Path Information:\n{pathInfo}\n\n" +
-                           $"Please ensure that the path added in System Preferences > Security & Privacy > Accessibility matches the currently running application path.";
-
-            Log.Debug("Permission debug info: {DebugInfo}", debugInfo);
-
-            // Show debug info dialog
-            var dialog = new Window
-            {
-                Title = "Permission Debug Info",
-                Width = 600,
-                Height = 400,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                CanResize = true
-            };
-
-            var scrollViewer = new ScrollViewer
-            {
-                Margin = new Thickness(10),
-                Content = new TextBlock
-                {
-                    Text = debugInfo,
-                    TextWrapping = TextWrapping.Wrap,
-                    FontFamily = "Consolas,Monaco,monospace",
-                    FontSize = 12
-                }
-            };
-
-            dialog.Content = scrollViewer;
-            await dialog.ShowDialog(this);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to show permission debug info");
-        }
     }
 
     // Updates tab event handlers

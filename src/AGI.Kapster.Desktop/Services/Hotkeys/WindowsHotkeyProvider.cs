@@ -1,435 +1,452 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Threading.Tasks;
-
+using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia.Threading;
-using SharpHook;
-using SharpHook.Data;
 using Serilog;
+using AGI.Kapster.Desktop.Models;
 
 namespace AGI.Kapster.Desktop.Services.Hotkeys;
 
 /// <summary>
-/// Windows hotkey provider using SharpHook global hook.
+/// Windows global hotkey provider using the system API RegisterHotKey (no global hooks).
+/// Also provides keyboard layout change notifications (WM_INPUTLANGCHANGE) via the same hidden window.
 /// </summary>
-public class WindowsHotkeyProvider : IHotkeyProvider, IDisposable
+public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMonitor
 {
-    private readonly object _lockObject = new();
+    private const int WM_HOTKEY = 0x0312;
+    private const int WM_INPUTLANGCHANGE = 0x0051;
+    private const int WM_CLOSE = 0x0010;
+    private const int WM_DESTROY = 0x0002;
 
-    // Hotkey lookup (O(1))
-    private readonly Dictionary<(HotkeyModifiers Modifiers, uint KeyCode), Action> _hotkeysByChord = new();
-    private readonly Dictionary<string, (HotkeyModifiers Modifiers, uint KeyCode)> _chordById = new();
+    private const int GWLP_WNDPROC = -4;
 
-    private EventLoopGlobalHook? _hook;
-    private readonly TaskCompletionSource _runRequestedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    // RegisterHotKey modifiers
+    private const uint MOD_ALT = 0x0001;
+    private const uint MOD_CONTROL = 0x0002;
+    private const uint MOD_SHIFT = 0x0004;
+    private const uint MOD_WIN = 0x0008;
+    private const uint MOD_NOREPEAT = 0x4000;
 
-    private bool _disposed = false;
-    private HotkeyModifiers _currentModifiers = HotkeyModifiers.None;
+    private const uint WS_OVERLAPPED = 0x00000000;
 
-    private static readonly IReadOnlyDictionary<KeyCode, HotkeyModifiers> ModifierByKeyCode = new Dictionary<KeyCode, HotkeyModifiers>
-    {
-        { KeyCode.VcLeftControl, HotkeyModifiers.Control },
-        { KeyCode.VcRightControl, HotkeyModifiers.Control },
-        { KeyCode.VcLeftAlt, HotkeyModifiers.Alt },
-        { KeyCode.VcRightAlt, HotkeyModifiers.Alt },
-        { KeyCode.VcLeftShift, HotkeyModifiers.Shift },
-        { KeyCode.VcRightShift, HotkeyModifiers.Shift },
-        { KeyCode.VcLeftMeta, HotkeyModifiers.Win },
-        { KeyCode.VcRightMeta, HotkeyModifiers.Win },
-    };
+    private readonly object _lock = new();
+    private readonly Dictionary<string, int> _nativeIdByStringId = new();
+    private readonly Dictionary<int, Action> _callbackByNativeId = new();
+    private int _nextNativeId = 1;
 
-    private static readonly IReadOnlyDictionary<KeyCode, uint> VkByKeyCode = BuildVkByKeyCode();
+    private bool _monitoringLayout;
+    private bool _disposed;
+
+    private Thread? _thread;
+    private uint _threadId;
+    private IntPtr _windowHandle;
+    private WndProcDelegate? _wndProc;
+    private GCHandle _wndProcHandle;
+    private IntPtr _oldWndProc;
+    private readonly ManualResetEventSlim _ready = new(false);
 
     public bool IsSupported => OperatingSystem.IsWindows();
-    public bool HasPermissions => true; // SharpHook handles permissions
+    public bool HasPermissions => OperatingSystem.IsWindows();
 
-    public WindowsHotkeyProvider()
+    public event EventHandler? LayoutChanged;
+    public bool IsMonitoring => _monitoringLayout;
+
+    private readonly IHotkeyResolver? _resolver;
+
+    public WindowsHotkeyProvider(IHotkeyResolver? resolver = null)
     {
+        _resolver = resolver;
         if (!IsSupported)
         {
             Log.Warning("WindowsHotkeyProvider created on non-Windows platform");
             return;
         }
 
-        InitializeHook();
+        StartMessageThread();
     }
 
-    private static IReadOnlyDictionary<KeyCode, uint> BuildVkByKeyCode()
+    public bool RegisterHotkey(string id, HotkeyGesture gesture, Action callback)
     {
-        var map = new Dictionary<KeyCode, uint>();
-        foreach (var keyCode in Enum.GetValues<KeyCode>())
+        if (gesture == null)
         {
-            // Build once to avoid ToString allocations on the hot path.
-            var vk = MapToWindowsVkFromName(keyCode.ToString());
-            if (vk != 0)
+            Log.Warning("Hotkey gesture is null for {Id}", id);
+            return false;
+        }
+
+        // Try to resolve gesture using resolver
+        ResolvedHotkey? resolved = null;
+        if (_resolver != null)
+        {
+            resolved = _resolver.Resolve(gesture);
+        }
+
+        // Fallback for named keys if resolver unavailable
+        if (resolved == null && gesture.KeySpec is NamedKeySpec namedSpec)
+        {
+            var keyCode = NamedKeyToVK(namedSpec.NamedKey);
+            if (keyCode != 0)
             {
-                map[keyCode] = vk;
+                resolved = new ResolvedHotkey(keyCode, gesture.Modifiers, gesture.ToDisplayString());
             }
         }
 
-        return map;
-    }
-
-    private void InitializeHook()
-    {
-        try
+        if (resolved == null)
         {
-            _hook = new EventLoopGlobalHook();
-            _hook.HookEnabled += OnHookEnabled;
-            _hook.HookDisabled += OnHookDisabled;
-            _hook.KeyPressed += OnKeyPressed;
-            _hook.KeyReleased += OnKeyReleased;
-
-            Task runTask;
-            try
-            {
-                // Start the global hook (non-blocking). The returned task completes when the hook stops/disposes.
-                runTask = _hook.RunAsync();
-                _runRequestedTcs.TrySetResult();
-            }
-            catch (Exception ex)
-            {
-                _runRequestedTcs.TrySetResult();
-                Log.Error(ex, "Error starting SharpHook global hook");
-                return;
-            }
-
-            _ = runTask.ContinueWith(t =>
-            {
-                if (t.Exception != null)
-                {
-                    Log.Error(t.Exception, "Error running SharpHook global hook");
-                }
-            }, TaskScheduler.Default);
-
-            Log.Debug("SharpHook global hook initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to initialize SharpHook global hook");
-        }
-    }
-
-    private void OnHookEnabled(object? sender, HookEventArgs e)
-    {
-        lock (_lockObject)
-        {
-            // Ensure a clean modifier state after startup/restart.
-            _currentModifiers = HotkeyModifiers.None;
+            Log.Warning("Failed to resolve hotkey gesture: {Gesture} for {Id}", gesture.ToDisplayString(), id);
+            return false;
         }
 
-        Log.Debug("SharpHook global hook enabled");
+        return RegisterResolvedHotkey(id, resolved.Modifiers, resolved.KeyCode, callback);
     }
 
-    private void OnHookDisabled(object? sender, HookEventArgs e)
-    {
-        lock (_lockObject)
-        {
-            _currentModifiers = HotkeyModifiers.None;
-        }
-
-        Log.Debug("SharpHook global hook disabled");
-    }
-
-    /// <summary>
-    /// Wait until the global hook is actually running. This prevents a startup window where hotkeys are registered
-    /// but the hook hasn't begun processing events yet.
-    /// </summary>
-    public async Task WaitUntilReadyAsync(TimeSpan timeout)
+    private bool RegisterResolvedHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback)
     {
         if (!IsSupported)
-        {
-            return;
-        }
-
-        // Ensure we at least attempted to start the hook.
-        await _runRequestedTcs.Task.ConfigureAwait(false);
-
-        var hook = _hook;
-        if (hook == null)
-        {
-            return;
-        }
-
-        var sw = Stopwatch.StartNew();
-        while (!hook.IsRunning && sw.Elapsed < timeout)
-        {
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-
-        if (!hook.IsRunning)
-        {
-            Log.Warning("SharpHook global hook not running after waiting {TimeoutMs}ms", (int)timeout.TotalMilliseconds);
-        }
-    }
-
-    private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
-    {
-        try
-        {
-            var keyCode = e.Data.KeyCode;
-
-            // Do not trigger on pure modifier keys.
-            if (ModifierByKeyCode.TryGetValue(keyCode, out var modifierFlag))
-            {
-                lock (_lockObject)
-                {
-                    _currentModifiers |= modifierFlag;
-                }
-
-                return;
-            }
-
-            if (!VkByKeyCode.TryGetValue(keyCode, out var vk) || vk == 0)
-            {
-                return;
-            }
-
-            Action? callback;
-            lock (_lockObject)
-            {
-                var modifiers = _currentModifiers;
-                _hotkeysByChord.TryGetValue((modifiers, vk), out callback);
-            }
-
-            if (callback == null)
-            {
-                return;
-            }
-
-            // Execute callback on UI thread.
-            Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                try
-                {
-                    callback();
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error executing hotkey callback");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Error in SharpHook key pressed handler");
-        }
-    }
-
-    private void OnKeyReleased(object? sender, KeyboardHookEventArgs e)
-    {
-        try
-        {
-            var keyCode = e.Data.KeyCode;
-            if (ModifierByKeyCode.TryGetValue(keyCode, out var modifierFlag))
-            {
-                lock (_lockObject)
-                {
-                    _currentModifiers &= ~modifierFlag;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Error in SharpHook key released handler");
-        }
-    }
-
-    private static uint MapToWindowsVkFromName(string keyName)
-    {
-        if (string.IsNullOrEmpty(keyName)) return 0;
-
-        // Map SharpHook KeyCode names (e.g., VcA, Vc1) to Windows virtual key codes for letters and digits
-        if (keyName.Length == 3 && keyName.StartsWith("Vc", StringComparison.Ordinal))
-        {
-            char c = keyName[2];
-            if (c >= 'A' && c <= 'Z') return (uint)c;
-            if (c >= '0' && c <= '9') return (uint)c;
-        }
-
-        // Numpad 0-9
-        if (keyName.StartsWith("VcNumPad", StringComparison.Ordinal) && keyName.Length == 9)
-        {
-            char d = keyName[8];
-            if (d >= '0' && d <= '9') return (uint)(0x60 + (d - '0'));
-        }
-
-        // Function keys F1-F24
-        if (keyName.StartsWith("VcF", StringComparison.Ordinal))
-        {
-            if (int.TryParse(keyName.AsSpan(3), out var fn) && fn >= 1 && fn <= 24)
-                return (uint)(0x70 + (fn - 1));
-        }
-
-        return keyName switch
-        {
-            // Whitespace and control
-            "VcSpace" => 0x20,
-            "VcEnter" => 0x0D,
-            "VcTab" => 0x09,
-            "VcBackspace" => 0x08,
-            "VcEscape" => 0x1B,
-
-            // Arrows
-            "VcUp" => 0x26,
-            "VcDown" => 0x28,
-            "VcLeft" => 0x25,
-            "VcRight" => 0x27,
-
-            // Home/End/Page
-            "VcHome" => 0x24,
-            "VcEnd" => 0x23,
-            "VcPageUp" => 0x21,
-            "VcPageDown" => 0x22,
-            "VcInsert" => 0x2D,
-            "VcDelete" => 0x2E,
-
-            // Symbols row
-            "VcMinus" => 0xBD,
-            "VcEquals" => 0xBB,
-            "VcBracketLeft" => 0xDB,
-            "VcBracketRight" => 0xDD,
-            "VcBackslash" => 0xDC,
-            "VcSemicolon" => 0xBA,
-            "VcQuote" => 0xDE,
-            "VcComma" => 0xBC,
-            "VcPeriod" => 0xBE,
-            "VcSlash" => 0xBF,
-            "VcGrave" => 0xC0,
-
-            // Numpad operations
-            "VcNumPadAdd" => 0x6B,
-            "VcNumPadSubtract" => 0x6D,
-            "VcNumPadMultiply" => 0x6A,
-            "VcNumPadDivide" => 0x6F,
-            "VcNumPadDecimal" => 0x6E,
-
-            // Print/Scroll/Pause
-            "VcPrintScreen" => 0x2C,
-            "VcScrollLock" => 0x91,
-            "VcPause" => 0x13,
-
-            _ => 0
-        };
-    }
-
-    public bool RegisterHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback)
-    {
-        if (!IsSupported)
-        {
-            Log.Warning("Windows hotkeys not supported on this platform");
             return false;
-        }
-
-        if (string.IsNullOrEmpty(id) || callback == null)
-        {
-            Log.Warning("Invalid hotkey registration parameters");
+        if (string.IsNullOrWhiteSpace(id) || callback == null)
             return false;
-        }
 
-        if (_hook == null)
-        {
-            Log.Error("SharpHook not initialized, cannot register hotkey");
-            return false;
-        }
+        EnsureReady();
 
-        try
+        lock (_lock)
         {
-            lock (_lockObject)
+            if (_disposed)
+                return false;
+
+            // Replace existing
+            if (_nativeIdByStringId.TryGetValue(id, out var existingNativeId))
             {
-                // Remove existing if present.
-                if (_chordById.TryGetValue(id, out var existingChord))
-                {
-                    _chordById.Remove(id);
-                    _hotkeysByChord.Remove(existingChord);
-                    Log.Debug("Removed existing hotkey: {Id}", id);
-                }
-
-                var chord = (modifiers, keyCode);
-                _chordById[id] = chord;
-                _hotkeysByChord[chord] = callback;
-
-                Log.Debug("SharpHook hotkey registered: {Id} -> {Modifiers}+{KeyCode}", id, modifiers, keyCode);
-                return true;
+                UnregisterInternal(existingNativeId);
+                _nativeIdByStringId.Remove(id);
+                _callbackByNativeId.Remove(existingNativeId);
             }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Exception registering SharpHook hotkey: {Id}", id);
-            return false;
+
+            var nativeId = _nextNativeId++;
+            var fsModifiers = ToFsModifiers(modifiers);
+
+            if (!RegisterHotKey(_windowHandle, nativeId, fsModifiers, keyCode))
+            {
+                var err = Marshal.GetLastWin32Error();
+                Log.Warning("RegisterHotKey failed: id={Id}, vk=0x{Vk:X}, modifiers=0x{Mods:X}, err={Err}", id, keyCode, fsModifiers, err);
+                return false;
+            }
+
+            _nativeIdByStringId[id] = nativeId;
+            _callbackByNativeId[nativeId] = callback;
+            return true;
         }
     }
 
     public bool UnregisterHotkey(string id)
     {
-        try
-        {
-            lock (_lockObject)
-            {
-                if (_chordById.TryGetValue(id, out var chord))
-                {
-                    _chordById.Remove(id);
-                    _hotkeysByChord.Remove(chord);
-                    Log.Debug("SharpHook hotkey unregistered: {Id}", id);
-                    return true;
-                }
-
-                return false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Exception unregistering SharpHook hotkey: {Id}", id);
+        if (!IsSupported)
             return false;
+
+        EnsureReady();
+
+        lock (_lock)
+        {
+            if (_disposed)
+                return false;
+
+            if (!_nativeIdByStringId.TryGetValue(id, out var nativeId))
+                return false;
+
+            _nativeIdByStringId.Remove(id);
+            _callbackByNativeId.Remove(nativeId);
+            return UnregisterInternal(nativeId);
         }
     }
 
     public void UnregisterAll()
     {
-        try
+        if (!IsSupported)
+            return;
+
+        EnsureReady();
+
+        lock (_lock)
         {
-            lock (_lockObject)
+            if (_disposed)
+                return;
+
+            foreach (var nativeId in _callbackByNativeId.Keys)
             {
-                var count = _chordById.Count;
-                _chordById.Clear();
-                _hotkeysByChord.Clear();
-                Log.Debug("All SharpHook hotkeys unregistered: {Count}", count);
+                UnregisterInternal(nativeId);
             }
+
+            _nativeIdByStringId.Clear();
+            _callbackByNativeId.Clear();
+            _nextNativeId = 1;
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Error unregistering all SharpHook hotkeys");
-        }
+    }
+
+    public void StartMonitoring()
+    {
+        _monitoringLayout = true;
+    }
+
+    public void StopMonitoring()
+    {
+        _monitoringLayout = false;
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
-
-        _disposed = true;
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+        }
 
         try
         {
             UnregisterAll();
-
-            if (_hook != null)
-            {
-                _hook.HookEnabled -= OnHookEnabled;
-                _hook.HookDisabled -= OnHookDisabled;
-                _hook.KeyPressed -= OnKeyPressed;
-                _hook.KeyReleased -= OnKeyReleased;
-                _hook.Dispose();
-                _hook = null;
-                Log.Debug("SharpHook disposed");
-            }
-
-            Log.Debug("WindowsHotkeyProvider disposed");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Error disposing WindowsHotkeyProvider");
+            Log.Error(ex, "Error unregistering hotkeys during dispose");
+        }
+
+        try
+        {
+            if (_windowHandle != IntPtr.Zero)
+            {
+                PostMessage(_windowHandle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error stopping hotkey message thread");
+        }
+
+        try
+        {
+            _thread?.Join(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // ignore
+        }
+
+        if (_wndProcHandle.IsAllocated)
+        {
+            _wndProcHandle.Free();
         }
     }
+
+    private void StartMessageThread()
+    {
+        _thread = new Thread(MessageThreadMain)
+        {
+            IsBackground = true,
+            Name = "WindowsHotkeyMessageLoop"
+        };
+        _thread.Start();
+    }
+
+    private void EnsureReady()
+    {
+        if (!_ready.IsSet)
+        {
+            _ready.Wait(TimeSpan.FromSeconds(2));
+        }
+    }
+
+    private void MessageThreadMain()
+    {
+        _threadId = GetCurrentThreadId();
+
+        // Create a hidden window (built-in STATIC class is sufficient for message dispatch).
+        _windowHandle = CreateWindowEx(0, "STATIC", "KapsterHotkeyWindow", WS_OVERLAPPED, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (_windowHandle == IntPtr.Zero)
+        {
+            Log.Error("Failed to create Windows hotkey message window. err={Err}", Marshal.GetLastWin32Error());
+            _ready.Set();
+            return;
+        }
+
+        _wndProc = WndProc;
+        _wndProcHandle = GCHandle.Alloc(_wndProc);
+        _oldWndProc = SetWindowLongPtr(_windowHandle, GWLP_WNDPROC, Marshal.GetFunctionPointerForDelegate(_wndProc));
+
+        _ready.Set();
+
+        // Standard message loop.
+        while (GetMessage(out var msg, IntPtr.Zero, 0, 0))
+        {
+            TranslateMessage(ref msg);
+            DispatchMessage(ref msg);
+        }
+    }
+
+    private IntPtr WndProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam)
+    {
+        if (uMsg == WM_HOTKEY)
+        {
+            var nativeId = wParam.ToInt32();
+            Action? cb = null;
+            lock (_lock)
+            {
+                _callbackByNativeId.TryGetValue(nativeId, out cb);
+            }
+
+            if (cb != null)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    try { cb(); }
+                    catch (Exception ex) { Log.Error(ex, "Error executing hotkey callback"); }
+                });
+            }
+        }
+        else if (uMsg == WM_INPUTLANGCHANGE)
+        {
+            if (_monitoringLayout)
+            {
+                LayoutChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        else if (uMsg == WM_CLOSE)
+        {
+            DestroyWindow(hWnd);
+            return IntPtr.Zero;
+        }
+        else if (uMsg == WM_DESTROY)
+        {
+            PostQuitMessage(0);
+            return IntPtr.Zero;
+        }
+
+        if (_oldWndProc != IntPtr.Zero)
+        {
+            return CallWindowProc(_oldWndProc, hWnd, uMsg, wParam, lParam);
+        }
+
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+
+    private bool UnregisterInternal(int nativeId)
+    {
+        if (_windowHandle == IntPtr.Zero)
+            return false;
+
+        if (!UnregisterHotKey(_windowHandle, nativeId))
+        {
+            var err = Marshal.GetLastWin32Error();
+            Log.Debug("UnregisterHotKey returned false for id={Id}, err={Err}", nativeId, err);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static uint ToFsModifiers(HotkeyModifiers modifiers)
+    {
+        uint m = MOD_NOREPEAT;
+        if ((modifiers & HotkeyModifiers.Alt) != 0) m |= MOD_ALT;
+        if ((modifiers & HotkeyModifiers.Control) != 0) m |= MOD_CONTROL;
+        if ((modifiers & HotkeyModifiers.Shift) != 0) m |= MOD_SHIFT;
+        if ((modifiers & HotkeyModifiers.Win) != 0) m |= MOD_WIN;
+        return m;
+    }
+
+    private static uint NamedKeyToVK(NamedKey namedKey)
+    {
+        return namedKey switch
+        {
+            NamedKey.F1 => 0x70,
+            NamedKey.F2 => 0x71,
+            NamedKey.F3 => 0x72,
+            NamedKey.F4 => 0x73,
+            NamedKey.F5 => 0x74,
+            NamedKey.F6 => 0x75,
+            NamedKey.F7 => 0x76,
+            NamedKey.F8 => 0x77,
+            NamedKey.F9 => 0x78,
+            NamedKey.F10 => 0x79,
+            NamedKey.F11 => 0x7A,
+            NamedKey.F12 => 0x7B,
+            NamedKey.Enter => 0x0D,
+            NamedKey.Tab => 0x09,
+            NamedKey.Escape => 0x1B,
+            NamedKey.Space => 0x20,
+            NamedKey.Backspace => 0x08,
+            NamedKey.Delete => 0x2E,
+            NamedKey.Insert => 0x2D,
+            NamedKey.Home => 0x24,
+            NamedKey.End => 0x23,
+            NamedKey.PageUp => 0x21,
+            NamedKey.PageDown => 0x22,
+            NamedKey.Up => 0x26,
+            NamedKey.Down => 0x28,
+            NamedKey.Left => 0x25,
+            NamedKey.Right => 0x27,
+            _ => 0
+        };
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public System.Drawing.Point pt;
+    }
+
+    private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateWindowEx(
+        uint dwExStyle,
+        string lpClassName,
+        string lpWindowName,
+        uint dwStyle,
+        int x, int y, int nWidth, int nHeight,
+        IntPtr hWndParent,
+        IntPtr hMenu,
+        IntPtr hInstance,
+        IntPtr lpParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr DefWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage(ref MSG lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr DispatchMessage(ref MSG lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern void PostQuitMessage(int nExitCode);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 }
 

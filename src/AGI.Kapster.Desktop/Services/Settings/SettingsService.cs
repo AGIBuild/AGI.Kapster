@@ -85,9 +85,27 @@ public class SettingsService : ISettingsService
 
                     if (userSettings != null)
                     {
+                        // Validate hotkey settings - if invalid, reset to defaults
+                        if (!ValidateHotkeySettings(userSettings.Hotkeys))
+                        {
+                            Log.Warning("Invalid hotkey settings detected in {FilePath}, resetting to defaults", _settingsFilePath);
+                            userSettings.Hotkeys = CreateDefaultHotkeySettings();
+                            // Persist the corrected settings
+                            var correctedSettings = PrepareSettingsForUserSave(userSettings);
+                            var correctedJson = JsonSerializer.Serialize(correctedSettings, AppJsonContext.Default.AppSettings);
+                            _fileSystemService.WriteAllText(_settingsFilePath, correctedJson);
+                        }
+
                         MergeSettings(settings, userSettings);
                         Log.Debug("Tier 3: User settings from {FilePath} merged", _settingsFilePath);
                     }
+                }
+                catch (JsonException ex)
+                {
+                    Log.Warning(ex, "Failed to deserialize user settings from {FilePath} (invalid JSON or incompatible format), resetting to defaults", _settingsFilePath);
+                    // Reset to defaults and persist
+                    settings = CreateDefaultSettings();
+                    SaveSettingsSync(settings);
                 }
                 catch (Exception ex)
                 {
@@ -142,10 +160,18 @@ public class SettingsService : ISettingsService
             baseSettings.General = userSettings.General;
         }
 
-        // Hotkey settings
+        // Hotkey settings - validate before merging
         if (userSettings.Hotkeys != null)
         {
-            baseSettings.Hotkeys = userSettings.Hotkeys;
+            if (ValidateHotkeySettings(userSettings.Hotkeys))
+            {
+                baseSettings.Hotkeys = userSettings.Hotkeys;
+            }
+            else
+            {
+                Log.Warning("Invalid hotkey settings in user settings, using defaults");
+                baseSettings.Hotkeys = CreateDefaultHotkeySettings();
+            }
         }
 
         // Default styles
@@ -300,6 +326,9 @@ public class SettingsService : ISettingsService
     {
         var defaultSettings = new AppSettings();
 
+        // Set default hotkey settings
+        defaultSettings.Hotkeys = CreateDefaultHotkeySettings();
+
         // Load AutoUpdate defaults from configuration if available
         if (_configuration != null)
         {
@@ -318,5 +347,53 @@ public class SettingsService : ISettingsService
         }
 
         return defaultSettings;
+    }
+
+    /// <summary>
+    /// Create default hotkey settings (Alt+A for capture, Alt+S for settings)
+    /// </summary>
+    private HotkeySettings CreateDefaultHotkeySettings()
+    {
+        return new HotkeySettings
+        {
+            CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'A'),
+            OpenSettings = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'S')
+        };
+    }
+
+    /// <summary>
+    /// Validate hotkey settings - ensure they are not null and have valid key specs
+    /// </summary>
+    private bool ValidateHotkeySettings(HotkeySettings? hotkeys)
+    {
+        if (hotkeys == null)
+            return false;
+
+        // Check that both hotkeys exist and have valid key specs
+        if (hotkeys.CaptureRegion?.KeySpec == null || hotkeys.OpenSettings?.KeySpec == null)
+            return false;
+
+        // Validate character keys (must be printable)
+        if (hotkeys.CaptureRegion.KeySpec is CharKeySpec charSpec1)
+        {
+            if (!char.IsLetterOrDigit(charSpec1.Character) && !IsValidSymbolChar(charSpec1.Character))
+                return false;
+        }
+
+        if (hotkeys.OpenSettings.KeySpec is CharKeySpec charSpec2)
+        {
+            if (!char.IsLetterOrDigit(charSpec2.Character) && !IsValidSymbolChar(charSpec2.Character))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Check if a character is a valid symbol for hotkey (common punctuation)
+    /// </summary>
+    private static bool IsValidSymbolChar(char c)
+    {
+        return c is '-' or '=' or '[' or ']' or ';' or '\'' or ',' or '.' or '/' or '\\' or '`' or ' ' or '+' or '*' or '&' or '%' or '$' or '#' or '@' or '!' or '?' or ':' or '"' or '<' or '>' or '{' or '}' or '|' or '~' or '^';
     }
 }
