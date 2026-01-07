@@ -28,7 +28,7 @@ env:
 
 jobs:
   build-matrix:
-    name: ðŸš€ Build ${{ matrix.platform }}
+    name: 🚀 Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,10 +49,10 @@ jobs:
       with:
         fetch-depth: 1
         
-    - name: ðŸ› ï¸ Setup Environment
+    - name: 🛠️ Setup Environment
       uses: ./.github/actions/setup-environment
         
-    - name: ðŸš€ Publish and Package
+    - name: 🚀 Publish and Package
       uses: ./.github/actions/publish-package
       with:
         runtime-id: ${{ matrix.platform }}
