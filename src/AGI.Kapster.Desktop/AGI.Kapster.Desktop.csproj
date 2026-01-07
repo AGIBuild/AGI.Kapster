@@ -16,14 +16,14 @@
     <PublishAot>False</PublishAot>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2025.12.18.54494</AssemblyVersion>
-    <FileVersion>2025.12.18.54494</FileVersion>
-    <Version>2025.12.18.54494</Version>
+    <AssemblyVersion>2026.1.7.58970</AssemblyVersion>
+    <FileVersion>2026.1.7.58970</FileVersion>
+    <Version>2026.1.7.58970</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2025.12.18.54494</InformationalVersion>
+    <InformationalVersion>2026.1.7.58970</InformationalVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -94,6 +94,5 @@
   <ItemGroup>
     <AvaloniaResource Include="logo.ico" />
   </ItemGroup>
-
   <!-- macOS global hotkeys are implemented via managed Carbon P/Invoke (no custom dylib build step). -->
 </Project>
