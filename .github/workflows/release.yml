@@ -25,6 +25,8 @@ env:
   DOTNET_VERSION: '9.0.x'
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Application Insights telemetry (from GitHub Secrets)
+  APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
   # Optional code signing / notarization placeholders
   CODE_SIGN_WINDOWS_PFX_BASE64: ''
   CODE_SIGN_WINDOWS_PFX_PASSWORD: ''
@@ -190,6 +192,44 @@ jobs:
             }
           }
           
+      - name: 🔧 Inject Obfuscated Application Insights Connection String
+        if: ${{ env.APPLICATIONINSIGHTS_CONNECTION_STRING != '' }}
+        shell: pwsh
+        run: |
+          $connectionString = $env:APPLICATIONINSIGHTS_CONNECTION_STRING
+          $configPath = "src/AGI.Kapster.Desktop/Services/Telemetry/TelemetryConfig.cs"
+          
+          if (-not (Test-Path $configPath)) {
+            Write-Host "❌ TelemetryConfig.cs not found at $configPath"
+            exit 1
+          }
+          
+          # Obfuscate the connection string (same algorithm as C# code)
+          function Get-ObfuscatedString {
+            param([string]$plainText)
+            
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($plainText)
+            # Key must match the C# implementation in TelemetryConfig.cs
+            $keySource = "AGI.Kapster.Telemetry.2024"
+            $key = [System.Text.Encoding]::UTF8.GetBytes($keySource)
+            
+            for ($i = 0; $i -lt $bytes.Length; $i++) {
+              $bytes[$i] = $bytes[$i] -bxor $key[$i % $key.Length]
+            }
+            
+            return [Convert]::ToBase64String($bytes)
+          }
+          
+          $obfuscated = Get-ObfuscatedString -plainText $connectionString
+          
+          # Replace the placeholder in TelemetryConfig.cs
+          $content = Get-Content $configPath -Raw
+          $content = $content -replace 'private const string ObfuscatedConnectionString = "";', "private const string ObfuscatedConnectionString = `"$obfuscated`";"
+          
+          Set-Content $configPath -Value $content -Encoding UTF8
+          Write-Host "✅ Obfuscated Application Insights connection string embedded in TelemetryConfig.cs"
+          Write-Host "   (Original length: $($connectionString.Length), Obfuscated length: $($obfuscated.Length))"
+
       - name: 📦 Publish & Package
         uses: ./.github/actions/publish-package
         with:

@@ -7,18 +7,17 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 using Serilog;
 
-using AGI.Kapster.Desktop.Overlays;
 using AGI.Kapster.Desktop.Services;
 using AGI.Kapster.Desktop.Services.Hotkeys;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
-using AGI.Kapster.Desktop.Services.Update;
-using AGI.Kapster.Desktop.Services.Settings;
-using AGI.Kapster.Desktop.Views;
 using AGI.Kapster.Desktop.Services.Platforms;
+using AGI.Kapster.Desktop.Services.Settings;
+using AGI.Kapster.Desktop.Services.Telemetry;
+using AGI.Kapster.Desktop.Services.Update;
+using AGI.Kapster.Desktop.Views;
 
 namespace AGI.Kapster.Desktop;
 
@@ -37,7 +36,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Setup global exception handling
+    /// Setup global exception handling with telemetry
     /// </summary>
     private void SetupGlobalExceptionHandling()
     {
@@ -46,6 +45,12 @@ public partial class App : Application
         {
             var exception = e.ExceptionObject as Exception;
             Log.Fatal(exception, "Unhandled domain exception occurred. IsTerminating: {IsTerminating}", e.IsTerminating);
+
+            // Track exception to Application Insights
+            if (exception != null)
+            {
+                TelemetryTracker.TrackUnhandledException(exception, e.IsTerminating);
+            }
 
             if (!e.IsTerminating)
             {
@@ -58,6 +63,10 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (sender, e) =>
         {
             Log.Error(e.Exception, "Unobserved task exception occurred");
+            
+            // Track exception to Application Insights
+            TelemetryTracker.TrackError(e.Exception, "UnobservedTaskException");
+
             e.SetObserved(); // Mark exception as observed to prevent application crash
         };
 
@@ -65,11 +74,13 @@ public partial class App : Application
         Log.Information("Global exception handling initialized successfully");
     }
 
-
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Initialize TelemetryTracker with service provider
+            TelemetryTracker.Initialize(Services!);
+
             // Apply platform-specific appearance customizations (e.g., hide Dock on macOS)
             try
             {
@@ -89,6 +100,12 @@ public partial class App : Application
             // Change shutdown mode to exit when MainWindow closes
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose;
 
+            // Register shutdown handler to dispose telemetry service (auto-flush)
+            desktop.ShutdownRequested += OnShutdownRequested;
+
+            // Track application startup with environment info
+            TelemetryTracker.TrackAppStarted();
+
             // Initialize services asynchronously
             Task.Run(async () =>
             {
@@ -107,6 +124,7 @@ public partial class App : Application
                 catch (Exception ex)
                 {
                     Log.Error(ex, "Failed to initialize services");
+                    TelemetryTracker.TrackError(ex, "ServiceInitialization");
                 }
             });
 
@@ -246,6 +264,24 @@ public partial class App : Application
             {
                 desktop.Shutdown();
             }
+        }
+    }
+
+    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+    {
+        // Dispose telemetry service to ensure pending data is flushed
+        try
+        {
+            Log.Debug("Application shutdown requested - disposing telemetry service");
+            var telemetryService = Services?.GetService<ITelemetryService>();
+            if (telemetryService is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Failed to dispose telemetry service during shutdown");
         }
     }
 

@@ -225,4 +225,19 @@ internal sealed class SelectionHandler
         Log.Debug("Selection confirmed: {Rect}", rect);
         ConfirmRequested?.Invoke(rect);
     }
+
+    /// <summary>
+    /// Lock or unlock selection capability
+    /// When locked, user cannot start a new selection
+    /// </summary>
+    public void SetSelectionLocked(bool locked)
+    {
+        _selector.IsSelectionLocked = locked;
+        Log.Debug("Selection locked: {Locked}", locked);
+    }
+
+    /// <summary>
+    /// Check if this handler has an active selection
+    /// </summary>
+    public bool HasSelection => _selector.SelectionRect.Width > 0 && _selector.SelectionRect.Height > 0;
 }

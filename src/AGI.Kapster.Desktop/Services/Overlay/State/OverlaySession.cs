@@ -174,15 +174,22 @@ public class OverlaySession : IOverlaySession
     
     /// <summary>
     /// Forward RegionSelected event from window to session subscribers
+    /// Also locks selection on other windows when an editable selection is created
     /// </summary>
     private void OnWindowRegionSelected(object? sender, RegionSelectedEventArgs e)
     {
+        // When a selection is completed (editable), lock all other windows to prevent new selections
+        if (e.IsEditableSelection && !_disposed)
+        {
+            LockOtherWindows(sender as Window);
+        }
+
         // Capture event handler to prevent race with Dispose()
         var handler = RegionSelected;
         if (handler != null)
         {
             handler.Invoke(e);
-            Log.Debug("[OverlaySession] RegionSelected event forwarded");
+            Log.Debug("[OverlaySession] RegionSelected event forwarded (IsEditable: {IsEditable})", e.IsEditableSelection);
         }
     }
     
@@ -197,6 +204,37 @@ public class OverlaySession : IOverlaySession
         {
             handler.Invoke(e);
             Log.Debug("[OverlaySession] Cancelled event forwarded");
+        }
+    }
+
+    /// <summary>
+    /// Lock selection capability on all windows except the specified one
+    /// This ensures only one selection exists at any time across all screens
+    /// </summary>
+    private void LockOtherWindows(Window? activeWindow)
+    {
+        Window[] allWindows;
+        lock (_lock)
+        {
+            allWindows = _windows.ToArray();
+        }
+
+        foreach (var window in allWindows)
+        {
+            if (window is IOverlayWindow overlayWindow)
+            {
+                try
+                {
+                    // Lock all windows except the one with active selection
+                    var shouldLock = window != activeWindow;
+                    overlayWindow.SetSelectionLocked(shouldLock);
+                    Log.Debug("[OverlaySession] Window selection locked: {Locked}", shouldLock);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "[OverlaySession] Failed to set selection lock on window");
+                }
+            }
         }
     }
 

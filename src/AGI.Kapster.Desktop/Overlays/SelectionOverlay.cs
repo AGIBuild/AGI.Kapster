@@ -40,6 +40,11 @@ public sealed class SelectionOverlay : Canvas
     public event Action<Rect>? ConfirmRequested;
     public event Action<Rect>? SelectionChanged;
 
+    /// <summary>
+    /// When true, prevents starting a new selection (another screen already has one)
+    /// </summary>
+    public bool IsSelectionLocked { get; set; }
+
     public SelectionOverlay()
     {
         Cursor = new Cursor(StandardCursorType.Cross);
@@ -154,6 +159,16 @@ public sealed class SelectionOverlay : Canvas
         var hasExistingSelection = SelectionRect.Width >= 2 && SelectionRect.Height >= 2;
         if (_pendingCreate && !_isDraggingCreate && !hasExistingSelection)
         {
+            // Check if selection is locked (another screen already has a selection)
+            if (IsSelectionLocked)
+            {
+                Log.Debug("SelectionOverlay: Fullscreen selection blocked - another screen already has a selection");
+                _pendingCreate = false;
+                e.Pointer.Capture(null);
+                e.Handled = true;
+                return;
+            }
+
             Log.Information("SelectionOverlay: Click detected, creating fullscreen selection");
             
             // Set selection to entire canvas (fullscreen)
@@ -259,6 +274,27 @@ public sealed class SelectionOverlay : Canvas
         // Fire events
         SelectionFinished?.Invoke(SelectionRect);
         Log.Information("SelectionOverlay: Selection set programmatically to {Rect}", rect);
+    }
+
+    /// <summary>
+    /// Clears the current selection
+    /// Used when another screen starts a new selection
+    /// </summary>
+    public void ClearSelection()
+    {
+        SelectionRect = default;
+        _isDraggingCreate = false;
+        _isDraggingMove = false;
+        _activeHandle = HandleKind.None;
+        _pendingCreate = false;
+        
+        // Hide info overlay
+        _infoOverlay.Hide();
+        
+        // Update visuals to reflect cleared selection
+        UpdateVisuals();
+        
+        Log.Debug("SelectionOverlay: Selection cleared");
     }
 
     private static Point[] HandlePoints(Rect r)
@@ -374,6 +410,14 @@ public sealed class SelectionOverlay : Canvas
     /// </summary>
     private void StartDragCreation()
     {
+        // Check if selection is locked (another screen already has a selection)
+        if (IsSelectionLocked)
+        {
+            Log.Debug("SelectionOverlay: Selection blocked - another screen already has a selection");
+            _pendingCreate = false;
+            return;
+        }
+
         _isDraggingCreate = true;
         SelectionRect = new Rect(_dragStart, _dragStart);
         Log.Information("SelectionOverlay: Started selection on window");
