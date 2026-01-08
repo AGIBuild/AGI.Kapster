@@ -174,6 +174,19 @@ We warmly welcome contributions from the community:
 
 **Your platform experience matters!** Whether you're on Windows, macOS, or Linux, we'd love to hear from you. Every issue report and suggestion helps improve the tool for the entire community.
 
+## ⚠️ Disclaimer
+
+**This project is developed with AI assistance.** The primary purpose of AGI.Kapster is to explore the feasibility of using AI tools (such as GitHub Copilot, Cursor, Claude, etc.) for real-world software development and to document practical experiences and best practices in AI-assisted programming.
+
+While this project is AI-assisted, I am committed to ensuring its **sustainability and production-readiness**. However, due to limited time and resources, it is not possible to thoroughly test all scenarios and edge cases. You may encounter various issues during use.
+
+**Please note:**
+- **Linux platform has NOT been tested** - functionality on Linux distributions is unverified
+- Some features may behave unexpectedly on certain system configurations
+- Bug reports and feedback are highly appreciated to help improve the project
+
+By using this software, you acknowledge that it is provided "as is" without warranty of any kind. Use at your own risk.
+
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
