@@ -76,6 +76,12 @@ class Program
             .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
 
+        // Add User Secrets in Development environment (for local InstrumentationKey etc.)
+        if (environment == "Development")
+        {
+            builder.Configuration.AddUserSecrets<Program>(optional: true);
+        }
+
         // Use user data directory for logs to avoid permission issues
         var userDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var appDataDir = Path.Combine(userDataDir, "AGI.Kapster");
@@ -140,7 +146,7 @@ class Program
         builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
         // Register all application services using unified extension method
-        builder.Services.AddKapsterServices();
+        builder.Services.AddKapsterServices(builder.Configuration);
 
         var host = builder.Build();
 

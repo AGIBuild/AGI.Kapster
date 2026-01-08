@@ -292,6 +292,21 @@ public partial class OverlayWindow : Window, IOverlayWindow
     /// </summary>
     public Window AsWindow() => this;
 
+    /// <summary>
+    /// Lock or unlock selection capability on this window
+    /// When locked, user cannot start a new selection
+    /// </summary>
+    public void SetSelectionLocked(bool locked)
+    {
+        _selectionHandler?.SetSelectionLocked(locked);
+        Log.Debug("OverlayWindow: Selection locked: {Locked}", locked);
+    }
+
+    /// <summary>
+    /// Check if this window has an active selection
+    /// </summary>
+    public bool HasSelection => _selectionHandler?.HasSelection ?? false;
+
     private void SetupSelectionHandlerEvents()
     {
         if (_selectionHandler == null)

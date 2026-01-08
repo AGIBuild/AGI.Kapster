@@ -174,7 +174,9 @@ class BuildTasks : NukeBuild
 
             DotNetRun(s => s
                 .SetProjectFile(MainProject)
-                .SetConfiguration(Configuration));
+                .SetConfiguration(Configuration)
+                // Set Development environment to enable User Secrets
+                .SetProcessEnvironmentVariable("DOTNET_ENVIRONMENT", "Development"));
         });
 
     Target Publish => _ => _

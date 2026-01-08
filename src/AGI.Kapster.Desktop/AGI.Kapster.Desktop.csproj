@@ -14,16 +14,18 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <!-- Disable AOT for easier packaging and deployment -->
     <PublishAot>False</PublishAot>
+    <!-- Enable User Secrets for Development -->
+    <UserSecretsId>AGI.Kapster.Desktop</UserSecretsId>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2026.1.8.34178</AssemblyVersion>
-    <FileVersion>2026.1.8.34178</FileVersion>
-    <Version>2026.1.8.34178</Version>
+    <AssemblyVersion>2026.1.8.56322</AssemblyVersion>
+    <FileVersion>2026.1.8.56322</FileVersion>
+    <Version>2026.1.8.56322</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2026.1.8.34178</InformationalVersion>
+    <InformationalVersion>2026.1.8.56322</InformationalVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -76,6 +78,10 @@
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
     <PackageReference Include="Polly" Version="8.6.5" />
+    <!-- Application Insights for telemetry -->
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
+    <!-- User Secrets support for development -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.1" />
   </ItemGroup>
   <ItemGroup>
     <Content Update="appsettings.json">

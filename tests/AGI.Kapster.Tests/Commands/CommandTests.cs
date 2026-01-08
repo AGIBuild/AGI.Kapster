@@ -7,9 +7,11 @@ using AGI.Kapster.Desktop.Rendering;
 using AGI.Kapster.Tests.TestHelpers;
 using NSubstitute;
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 namespace AGI.Kapster.Tests.Commands;
 
+[Collection("Avalonia")]
 public class CommandTests : TestBase
 {
     public CommandTests(ITestOutputHelper output) : base(output)
@@ -237,97 +239,109 @@ public class CommandTests : TestBase
     [Fact]
     public void AnnotationCommands_AddAnnotationCommand_ShouldExecuteCorrectly()
     {
-        // Arrange
-        var manager = new AnnotationManager();
-        var commandManager = new CommandManager();
-        var annotation = new RectangleAnnotation(
-            new Avalonia.Point(10, 20),
-            new Avalonia.Point(110, 70),
-            new AnnotationStyle());
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            // Arrange
+            var manager = new AnnotationManager();
+            var commandManager = new CommandManager();
+            var annotation = new RectangleAnnotation(
+                new Avalonia.Point(10, 20),
+                new Avalonia.Point(110, 70),
+                new AnnotationStyle());
 
-        // Act
-        var renderer = Substitute.For<IAnnotationRenderer>();
-        var canvas = new Canvas();
-        var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
-        commandManager.ExecuteCommand(command);
+            // Act
+            var renderer = Substitute.For<IAnnotationRenderer>();
+            var canvas = new Canvas();
+            var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
+            commandManager.ExecuteCommand(command);
 
-        // Assert
-        manager.Items.Should().HaveCount(1);
-        manager.Items.First().Should().Be(annotation);
+            // Assert
+            manager.Items.Should().HaveCount(1);
+            manager.Items.First().Should().Be(annotation);
+        });
     }
 
     [Fact]
     public void AnnotationCommands_AddAnnotationCommand_ShouldUndoCorrectly()
     {
-        // Arrange
-        var manager = new AnnotationManager();
-        var commandManager = new CommandManager();
-        var annotation = new RectangleAnnotation(
-            new Avalonia.Point(10, 20),
-            new Avalonia.Point(110, 70),
-            new AnnotationStyle());
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            // Arrange
+            var manager = new AnnotationManager();
+            var commandManager = new CommandManager();
+            var annotation = new RectangleAnnotation(
+                new Avalonia.Point(10, 20),
+                new Avalonia.Point(110, 70),
+                new AnnotationStyle());
 
-        var renderer = Substitute.For<IAnnotationRenderer>();
-        var canvas = new Canvas();
-        var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
-        commandManager.ExecuteCommand(command);
-        manager.Items.Should().HaveCount(1);
+            var renderer = Substitute.For<IAnnotationRenderer>();
+            var canvas = new Canvas();
+            var command = new AddAnnotationCommand(manager, renderer, annotation, canvas);
+            commandManager.ExecuteCommand(command);
+            manager.Items.Should().HaveCount(1);
 
-        // Act
-        commandManager.Undo();
+            // Act
+            commandManager.Undo();
 
-        // Assert
-        manager.Items.Should().BeEmpty();
+            // Assert
+            manager.Items.Should().BeEmpty();
+        });
     }
 
     [Fact]
     public void AnnotationCommands_RemoveAnnotationCommand_ShouldExecuteCorrectly()
     {
-        // Arrange
-        var manager = new AnnotationManager();
-        var commandManager = new CommandManager();
-        var annotation = new RectangleAnnotation(
-            new Avalonia.Point(10, 20),
-            new Avalonia.Point(110, 70),
-            new AnnotationStyle());
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            // Arrange
+            var manager = new AnnotationManager();
+            var commandManager = new CommandManager();
+            var annotation = new RectangleAnnotation(
+                new Avalonia.Point(10, 20),
+                new Avalonia.Point(110, 70),
+                new AnnotationStyle());
 
-        manager.AddItem(annotation);
-        manager.Items.Should().HaveCount(1);
+            manager.AddItem(annotation);
+            manager.Items.Should().HaveCount(1);
 
-        // Act
-        var renderer = Substitute.For<IAnnotationRenderer>();
-        var canvas = new Canvas();
-        var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
-        commandManager.ExecuteCommand(command);
+            // Act
+            var renderer = Substitute.For<IAnnotationRenderer>();
+            var canvas = new Canvas();
+            var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
+            commandManager.ExecuteCommand(command);
 
-        // Assert
-        manager.Items.Should().BeEmpty();
+            // Assert
+            manager.Items.Should().BeEmpty();
+        });
     }
 
     [Fact]
     public void AnnotationCommands_RemoveAnnotationCommand_ShouldUndoCorrectly()
     {
-        // Arrange
-        var manager = new AnnotationManager();
-        var commandManager = new CommandManager();
-        var annotation = new RectangleAnnotation(
-            new Avalonia.Point(10, 20),
-            new Avalonia.Point(110, 70),
-            new AnnotationStyle());
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            // Arrange
+            var manager = new AnnotationManager();
+            var commandManager = new CommandManager();
+            var annotation = new RectangleAnnotation(
+                new Avalonia.Point(10, 20),
+                new Avalonia.Point(110, 70),
+                new AnnotationStyle());
 
-        manager.AddItem(annotation);
-        var renderer = Substitute.For<IAnnotationRenderer>();
-        var canvas = new Canvas();
-        var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
-        commandManager.ExecuteCommand(command);
-        manager.Items.Should().BeEmpty();
+            manager.AddItem(annotation);
+            var renderer = Substitute.For<IAnnotationRenderer>();
+            var canvas = new Canvas();
+            var command = new RemoveAnnotationCommand(manager, renderer, annotation, canvas);
+            commandManager.ExecuteCommand(command);
+            manager.Items.Should().BeEmpty();
 
-        // Act
-        commandManager.Undo();
+            // Act
+            commandManager.Undo();
 
-        // Assert
-        manager.Items.Should().HaveCount(1);
-        manager.Items.First().Should().Be(annotation);
+            // Assert
+            manager.Items.Should().HaveCount(1);
+            manager.Items.First().Should().Be(annotation);
+        });
     }
 
     public override void Dispose()

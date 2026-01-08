@@ -81,6 +81,20 @@ public interface IOverlayWindow
     /// Raised when user cancels the overlay (Escape key)
     /// </summary>
     event EventHandler<OverlayCancelledEventArgs>? Cancelled;
+
+    // --- Selection Management ---
+
+    /// <summary>
+    /// Lock or unlock selection capability on this window
+    /// When locked, user cannot start a new selection
+    /// </summary>
+    /// <param name="locked">True to lock, false to unlock</param>
+    void SetSelectionLocked(bool locked);
+
+    /// <summary>
+    /// Check if this window has an active selection
+    /// </summary>
+    bool HasSelection { get; }
     
     // --- Window as base type (for IOverlaySession compatibility) ---
     

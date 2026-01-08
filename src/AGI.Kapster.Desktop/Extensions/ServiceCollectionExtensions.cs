@@ -24,8 +24,10 @@ using AGI.Kapster.Desktop.Services.UI;
 using AGI.Kapster.Desktop.Services.Update;
 using AGI.Kapster.Desktop.Services.Platforms;
 using AGI.Kapster.Desktop.Services.Platforms.Mac;
+using AGI.Kapster.Desktop.Services.Telemetry;
 using AGI.Kapster.Desktop.Rendering.Overlays;
 using AGI.Kapster.Desktop.Views;
+using Microsoft.Extensions.Configuration;
 
 namespace AGI.Kapster.Desktop.Extensions;
 
@@ -38,7 +40,9 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Register all AGI.Kapster services
     /// </summary>
-    public static IServiceCollection AddKapsterServices(this IServiceCollection services)
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">Optional configuration for telemetry setup</param>
+    public static IServiceCollection AddKapsterServices(this IServiceCollection services, IConfiguration? configuration = null)
     {
         return services
             .AddCoreServices()
@@ -46,7 +50,8 @@ public static class ServiceCollectionExtensions
             .AddOverlayServices()
             .AddAnnotationServices()
             .AddHotkeyServices()
-            .AddStartupServices();
+            .AddStartupServices()
+            .AddTelemetryServices(configuration);
     }
 
     #region Core Services (Settings, Tray, Lifecycle, Notifications, Error Handling)
@@ -253,6 +258,39 @@ public static class ServiceCollectionExtensions
         }
 
 #pragma warning restore CA1416
+
+        return services;
+    }
+
+    #endregion
+
+    #region Telemetry Services (Application Insights)
+
+    /// <summary>
+    /// Register telemetry services
+    /// Uses Application Insights when ConnectionString is configured, otherwise uses NullTelemetryService
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">Configuration (optional, connection string is embedded at build time)</param>
+    private static IServiceCollection AddTelemetryServices(this IServiceCollection services, IConfiguration? configuration)
+    {
+        // Priority: Environment variable > User Secrets/appsettings > Embedded obfuscated value
+        var connectionString = configuration?["ApplicationInsights:ConnectionString"];
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            // Use embedded obfuscated connection string (set at build time)
+            connectionString = TelemetryConfig.GetConnectionString();
+        }
+
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddSingleton<ITelemetryService>(new ApplicationInsightsTelemetryService(connectionString));
+        }
+        else
+        {
+            services.AddSingleton<ITelemetryService, NullTelemetryService>();
+        }
 
         return services;
     }
