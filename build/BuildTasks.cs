@@ -42,7 +42,7 @@ class BuildTasks : NukeBuild
     [Parameter("Enable code coverage collection")]
     readonly bool Coverage;
 
-    [Solution(SuppressBuildProjectCheck = true)] readonly Solution Solution;
+    [Solution] readonly Solution Solution;
     [Parameter("Manual new version (display format: yyyy.M.d.S — 4 segments where S is seconds since midnight, range 0..86399, max 5 digits. Example: 2025.9.4.3605). If omitted auto-generate.")] readonly string NewVersion; // updated
 
     AbsolutePath VersionFile => RootDirectory / "version.json"; // added

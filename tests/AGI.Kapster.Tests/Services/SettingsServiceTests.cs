@@ -40,8 +40,11 @@ public class SettingsServiceTests : TestBase
 
         // Assert
         settings.Should().NotBeNull();
-        settings.Hotkeys.CaptureRegion.Should().NotBeNullOrEmpty();
-        settings.Hotkeys.OpenSettings.Should().NotBeNullOrEmpty();
+        settings.Hotkeys.Should().NotBeNull();
+        settings.Hotkeys.CaptureRegion.Should().NotBeNull();
+        settings.Hotkeys.OpenSettings.Should().NotBeNull();
+        settings.Hotkeys.CaptureRegion.KeySpec.Should().NotBeNull();
+        settings.Hotkeys.OpenSettings.KeySpec.Should().NotBeNull();
     }
 
     [Fact]
@@ -57,7 +60,7 @@ public class SettingsServiceTests : TestBase
     {
         // Arrange
         var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
-        var newHotkey = "Ctrl+Shift+C";
+        var newHotkey = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'C');
 
         // Act
         _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
@@ -72,7 +75,7 @@ public class SettingsServiceTests : TestBase
     {
         // Arrange
         var originalHotkey = _settingsService.Settings.Hotkeys.CaptureRegion;
-        var newHotkey = "Ctrl+Alt+C";
+        var newHotkey = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Alt, 'C');
 
         // Act
         _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
@@ -83,27 +86,12 @@ public class SettingsServiceTests : TestBase
         _settingsService.Settings.Hotkeys.CaptureRegion.Should().NotBe(originalHotkey);
     }
 
-    [Theory]
-    [InlineData("Ctrl+C")]
-    [InlineData("Alt+F4")]
-    [InlineData("Shift+Tab")]
-    [InlineData("Ctrl+Alt+Delete")]
-    [InlineData("Win+R")]
-    public void Settings_ShouldAcceptValidHotkeyFormats(string hotkey)
-    {
-        // Act
-        _settingsService.Settings.Hotkeys.CaptureRegion = hotkey;
-
-        // Assert
-        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be(hotkey);
-    }
-
     [Fact]
     public void Settings_ShouldAllowMultipleHotkeyChanges()
     {
         // Arrange
-        var captureHotkey = "Ctrl+Shift+C";
-        var openSettingsHotkey = "Ctrl+Shift+S";
+        var captureHotkey = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'C');
+        var openSettingsHotkey = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'S');
 
         // Act
         _settingsService.Settings.Hotkeys.CaptureRegion = captureHotkey;
@@ -122,12 +110,12 @@ public class SettingsServiceTests : TestBase
         var settings2 = _settingsService.Settings;
 
         // Act
-        settings1.Hotkeys.CaptureRegion = "Ctrl+1";
-        settings2.Hotkeys.CaptureRegion = "Ctrl+2";
+        settings1.Hotkeys.CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Control, '1');
+        settings2.Hotkeys.CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Control, '2');
 
         // Assert - Should be the same instance (singleton pattern)
-        settings1.Hotkeys.CaptureRegion.Should().Be("Ctrl+2");
-        settings2.Hotkeys.CaptureRegion.Should().Be("Ctrl+2");
+        settings1.Hotkeys.CaptureRegion.Should().Be(HotkeyGesture.FromChar(HotkeyModifiers.Control, '2'));
+        settings2.Hotkeys.CaptureRegion.Should().Be(HotkeyGesture.FromChar(HotkeyModifiers.Control, '2'));
         settings1.Should().BeSameAs(settings2);
     }
 
@@ -154,8 +142,8 @@ public class SettingsServiceTests : TestBase
     public async Task Settings_ShouldBeSerializable()
     {
         // Arrange
-        _settingsService.Settings.Hotkeys.CaptureRegion = "Test+Hotkey";
-        _settingsService.Settings.Hotkeys.OpenSettings = "Another+Hotkey";
+        _settingsService.Settings.Hotkeys.CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Control, 'A');
+        _settingsService.Settings.Hotkeys.OpenSettings = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'S');
 
         // Act & Assert
         var action = async () => await _settingsService.SaveAsync();
@@ -166,28 +154,10 @@ public class SettingsServiceTests : TestBase
     }
 
     [Fact]
-    public void Settings_ShouldHandleNullValues()
-    {
-        // Act & Assert
-        var action = () => _settingsService.Settings.Hotkeys.CaptureRegion = null!;
-        action.Should().NotThrow();
-    }
-
-    [Fact]
-    public void Settings_ShouldHandleEmptyStrings()
-    {
-        // Act & Assert
-        var action = () => _settingsService.Settings.Hotkeys.CaptureRegion = "";
-        action.Should().NotThrow();
-
-        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be("");
-    }
-
-    [Fact]
     public async Task Settings_ShouldLoadAndSaveCorrectly()
     {
         // Arrange
-        var newHotkey = "Ctrl+Shift+S";
+        var newHotkey = HotkeyGesture.FromChar(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'S');
 
         // Act - Change setting
         _settingsService.Settings.Hotkeys.CaptureRegion = newHotkey;
@@ -210,14 +180,14 @@ public class SettingsServiceTests : TestBase
     {
         // Arrange
         var newSettings = new AppSettings();
-        newSettings.Hotkeys.CaptureRegion = "Alt+X";
+        newSettings.Hotkeys.CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'X');
         newSettings.General.StartWithWindows = false;
 
         // Act
         await _settingsService.UpdateSettingsAsync(newSettings);
 
         // Assert
-        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be("Alt+X");
+        _settingsService.Settings.Hotkeys.CaptureRegion.Should().Be(HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'X'));
         _settingsService.Settings.General.StartWithWindows.Should().BeFalse();
     }
 
@@ -225,7 +195,7 @@ public class SettingsServiceTests : TestBase
     public void ResetToDefaults_ShouldResetAllSettings()
     {
         // Arrange
-        _settingsService.Settings.Hotkeys.CaptureRegion = "Custom+Hotkey";
+        _settingsService.Settings.Hotkeys.CaptureRegion = HotkeyGesture.FromChar(HotkeyModifiers.Control, 'Z');
         var originalDefaults = new AppSettings();
 
         // Act

@@ -73,14 +73,14 @@ public class GeneralSettings
 public class HotkeySettings
 {
     /// <summary>
-    /// Capture region hotkey
+    /// Capture region hotkey gesture
     /// </summary>
-    public string CaptureRegion { get; set; } = "Alt+A";
+    public HotkeyGesture CaptureRegion { get; set; } = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'A');
 
     /// <summary>
-    /// Open settings hotkey
+    /// Open settings hotkey gesture
     /// </summary>
-    public string OpenSettings { get; set; } = "Alt+S";
+    public HotkeyGesture OpenSettings { get; set; } = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'S');
 }
 
 /// <summary>

@@ -94,13 +94,8 @@ public partial class App : Application
             {
                 try
                 {
-                    // Settings service initializes automatically
-                    Log.Debug("Settings service initialized");
-
                     // Initialize hotkey manager first so global shortcuts work immediately after startup.
-                    Log.Debug("Getting hotkey manager service...");
                     var hotkeyManager = Services!.GetRequiredService<IHotkeyManager>();
-                    Log.Debug("Hotkey manager service obtained, initializing...");
                     var hotkeyTask = hotkeyManager.InitializeAsync();
 
                     // Initialize application controller (startup settings, etc).
@@ -108,7 +103,6 @@ public partial class App : Application
                     var appControllerTask = appController.InitializeAsync();
 
                     await Task.WhenAll(hotkeyTask, appControllerTask);
-                    Log.Debug("Hotkey manager and application controller initialized");
                 }
                 catch (Exception ex)
                 {

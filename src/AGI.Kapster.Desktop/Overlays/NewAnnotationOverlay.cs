@@ -101,6 +101,11 @@ public sealed class NewAnnotationOverlay : Canvas
         set => _annotationService.CurrentStyle = value;
     }
 
+    /// <summary>
+    /// Whether text editing is currently active
+    /// </summary>
+    public bool IsTextEditing => _editingTextBox != null;
+
     public CommandManager CommandManager => _commandManager;
 
     public NewAnnotationOverlay() : this(null)

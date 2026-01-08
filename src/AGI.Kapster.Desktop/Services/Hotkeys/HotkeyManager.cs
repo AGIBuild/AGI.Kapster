@@ -1,39 +1,54 @@
 using System;
 using System.Threading.Tasks;
-
-using Serilog;
-
-using AGI.Kapster.Desktop.Services.Hotkeys;
+using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Desktop.Services.Overlay.Coordinators;
 using AGI.Kapster.Desktop.Services.Settings;
 using AGI.Kapster.Desktop.Services.Update;
 using AGI.Kapster.Desktop.Views;
+using Serilog;
 
 namespace AGI.Kapster.Desktop.Services.Hotkeys;
 
 /// <summary>
-/// Hotkey manager - uses dependency injection for platform-specific provider
+/// Hotkey manager - uses dependency injection for platform-specific provider and resolver
 /// </summary>
 public class HotkeyManager : IHotkeyManager
 {
     private readonly IHotkeyProvider _hotkeyProvider;
     private readonly ISettingsService _settingsService;
     private readonly IOverlayCoordinator _overlayCoordinator;
+    private readonly IKeyboardLayoutMonitor? _layoutMonitor;
     private bool _escHotkeyRegistered = false;
 
     public HotkeyManager(
         IHotkeyProvider hotkeyProvider,
         ISettingsService settingsService,
-        IOverlayCoordinator overlayCoordinator)
+        IOverlayCoordinator overlayCoordinator,
+        IKeyboardLayoutMonitor? layoutMonitor = null)
     {
         _hotkeyProvider = hotkeyProvider ?? throw new ArgumentNullException(nameof(hotkeyProvider));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _overlayCoordinator = overlayCoordinator ?? throw new ArgumentNullException(nameof(overlayCoordinator));
+        _layoutMonitor = layoutMonitor;
 
         // Subscribe to settings changes
         _settingsService.SettingsChanged += OnSettingsChanged;
 
-        Log.Debug("HotkeyManager constructor completed with provider: {Type}", _hotkeyProvider.GetType().Name);
+        // Subscribe to keyboard layout changes for character-stable hotkeys
+        // Note: Monitoring will only start if character-based hotkeys are registered
+        if (_layoutMonitor != null)
+        {
+            _layoutMonitor.LayoutChanged += OnLayoutChanged;
+        }
+
+        // Intentionally keep constructor logging minimal; hotkey registration logs are more actionable.
+    }
+
+    private async void OnLayoutChanged(object? sender, EventArgs e)
+    {
+        // Only re-register character-based hotkeys (layout changes don't affect named keys)
+        Log.Information("Keyboard layout changed, re-registering character-based hotkeys");
+        await ReloadCharacterHotkeysAsync();
     }
 
     private async void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
@@ -56,44 +71,22 @@ public class HotkeyManager : IHotkeyManager
             }
 
 
-            if (OperatingSystem.IsMacOS())
+            // Carbon hotkeys don't require special permissions, but check anyway
+            if (!_hotkeyProvider.HasPermissions)
             {
-                // Delay permission check (macOS accessibility).
-                await Task.Delay(500);
-
-                // Re-check permissions (macOS .app accessibility may need time).
-                if (!_hotkeyProvider.HasPermissions)
-                {
-                    Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
-                    Log.Warning("Retrying permission check in 2 seconds...");
-
-                    // Delay and retry
-                    await Task.Delay(2000);
-
-                    if (!_hotkeyProvider.HasPermissions)
-                    {
-                        Log.Error("Still no permissions after retry. Please check accessibility settings.");
-                        return;
-                    }
-
-                    Log.Information("Permissions granted after retry");
-                }
-            }
-            else
-            {
-                if (!_hotkeyProvider.HasPermissions)
-                {
-                    Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
-                    return;
-                }
-            }
-
-            if (_hotkeyProvider is WindowsHotkeyProvider windowsProvider)
-            {
-                await windowsProvider.WaitUntilReadyAsync(TimeSpan.FromSeconds(2));
+                Log.Warning("No permissions for hotkey registration - HasPermissions: {HasPermissions}", _hotkeyProvider.HasPermissions);
+                // Don't return early - Carbon provider may still work
             }
 
             await ReloadHotkeysAsync();
+            
+            // Start monitoring keyboard layout changes ONLY if character-based hotkeys exist
+            // This avoids unnecessary monitoring overhead when only named keys are used
+            if (_layoutMonitor != null && HasCharacterHotkeys())
+            {
+                _layoutMonitor.StartMonitoring();
+            }
+            
             Log.Debug("Hotkey manager initialized successfully");
         }
         catch (Exception ex)
@@ -112,12 +105,31 @@ public class HotkeyManager : IHotkeyManager
             // Use injected singleton settings service to get latest settings
             var settings = _settingsService.Settings;
 
-            // Load hotkey configurations from settings
+            // Load hotkey configurations from settings using new HotkeyGesture model
             RegisterCaptureRegionHotkey(settings.Hotkeys.CaptureRegion);
             RegisterOpenSettingsHotkey(settings.Hotkeys.OpenSettings);
 
+            // Start/stop layout monitoring based on whether character hotkeys exist
+            if (_layoutMonitor != null)
+            {
+                if (HasCharacterHotkeys())
+                {
+                    if (!_layoutMonitor.IsMonitoring)
+                    {
+                        _layoutMonitor.StartMonitoring();
+                    }
+                }
+                else
+                {
+                    if (_layoutMonitor.IsMonitoring)
+                    {
+                        _layoutMonitor.StopMonitoring();
+                    }
+                }
+            }
+
             Log.Debug("Hotkeys reloaded from settings: CaptureRegion={CaptureRegion}, OpenSettings={OpenSettings}",
-                settings.Hotkeys.CaptureRegion, settings.Hotkeys.OpenSettings);
+                settings.Hotkeys.CaptureRegion?.ToDisplayString(), settings.Hotkeys.OpenSettings?.ToDisplayString());
         }
         catch (Exception ex)
         {
@@ -127,76 +139,125 @@ public class HotkeyManager : IHotkeyManager
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Reload only character-based hotkeys (used when keyboard layout changes)
+    /// </summary>
+    private Task ReloadCharacterHotkeysAsync()
+    {
+        try
+        {
+            var settings = _settingsService.Settings;
+
+            // Only re-register character-based hotkeys
+            if (settings.Hotkeys.CaptureRegion?.KeySpec is CharKeySpec)
+            {
+                RegisterCaptureRegionHotkey(settings.Hotkeys.CaptureRegion);
+            }
+
+            if (settings.Hotkeys.OpenSettings?.KeySpec is CharKeySpec)
+            {
+                RegisterOpenSettingsHotkey(settings.Hotkeys.OpenSettings);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to reload character hotkeys");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Check if any registered hotkeys are character-based (require layout monitoring)
+    /// </summary>
+    private bool HasCharacterHotkeys()
+    {
+        var settings = _settingsService.Settings;
+        return settings.Hotkeys.CaptureRegion?.KeySpec is CharKeySpec ||
+               settings.Hotkeys.OpenSettings?.KeySpec is CharKeySpec;
+    }
+
     private async Task StartCaptureSessionAsync()
     {
         await _overlayCoordinator.StartSessionAsync();
         RegisterEscapeHotkey();
     }
-    private void RegisterCaptureRegionHotkey(string combination)
+    private void RegisterCaptureRegionHotkey(HotkeyGesture? gesture)
     {
-        if (ParseHotkeyString(combination, out var modifiers, out var keyCode))
+        if (gesture == null)
         {
-            var success = _hotkeyProvider.RegisterHotkey("capture_region", modifiers, keyCode, () =>
+            Log.Warning("Capture region hotkey gesture is null, using default");
+            gesture = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'A');
+        }
+
+        var success = _hotkeyProvider.RegisterHotkey("capture_region", gesture, () =>
+        {
+            Log.Debug("Capture region hotkey triggered");
+            // Prevent reentry if a screenshot is already active
+            if (_overlayCoordinator.HasActiveSession)
             {
-                Log.Debug("Capture region hotkey triggered");
-                // Prevent reentry if a screenshot is already active
-                if (_overlayCoordinator.HasActiveSession)
-                {
-                    Log.Debug("Capture hotkey ignored - screenshot is already active");
-                    return;
-                }
-                
+                Log.Debug("Capture hotkey ignored - screenshot is already active");
+                return;
+            }
 
                 // Ensure the capture session starts on the UI thread.
                 if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
                 {
+                    // Fire and forget - capture session starts asynchronously
                     _ = StartCaptureSessionAsync();
                 }
                 else
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => StartCaptureSessionAsync());
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        // Fire and forget - capture session starts asynchronously
+                        _ = StartCaptureSessionAsync();
+                    });
                 }
-            });
+        });
 
-            if (success)
-            {
-                Log.Debug("Successfully registered capture region hotkey: {Combination}", combination);
-            }
-            else
-            {
-                Log.Warning("Failed to register capture region hotkey: {Combination}", combination);
-            }
-        }
-    }
-
-    private void RegisterOpenSettingsHotkey(string combination)
-    {
-        if (ParseHotkeyString(combination, out var modifiers, out var keyCode))
+        if (success)
         {
-            var success = _hotkeyProvider.RegisterHotkey("open_settings", modifiers, keyCode, () =>
-            {
-                Log.Debug("Open settings hotkey triggered");
-
-                // Check if screenshot is currently in progress
-                if (_overlayCoordinator.HasActiveSession)
-                {
-                    Log.Debug("Settings hotkey ignored - screenshot is active");
-                    return;
-                }
-
-                ShowSettingsWindow();
-            });
-
-            if (success)
-            {
-                Log.Debug("Successfully registered open settings hotkey: {Combination}", combination);
-            }
-            else
-            {
-                Log.Warning("Failed to register open settings hotkey: {Combination}", combination);
-            }
+            Log.Debug("Successfully registered capture region hotkey: {Gesture}", gesture.ToDisplayString());
+        }
+        else
+        {
+            Log.Warning("Failed to register capture region hotkey: {Gesture}", gesture.ToDisplayString());
         }
     }
+
+    private void RegisterOpenSettingsHotkey(HotkeyGesture? gesture)
+    {
+        if (gesture == null)
+        {
+            Log.Warning("Open settings hotkey gesture is null, using default");
+            gesture = HotkeyGesture.FromChar(HotkeyModifiers.Alt, 'S');
+        }
+
+        var success = _hotkeyProvider.RegisterHotkey("open_settings", gesture, () =>
+        {
+            Log.Debug("Open settings hotkey triggered");
+
+            // Check if screenshot is currently in progress
+            if (_overlayCoordinator.HasActiveSession)
+            {
+                Log.Debug("Settings hotkey ignored - screenshot is active");
+                return;
+            }
+
+            ShowSettingsWindow();
+        });
+
+        if (success)
+        {
+            Log.Debug("Successfully registered open settings hotkey: {Gesture}", gesture.ToDisplayString());
+        }
+        else
+        {
+            Log.Warning("Failed to register open settings hotkey: {Gesture}", gesture.ToDisplayString());
+        }
+    }
+
 
 
     private static void ShowSettingsWindow()
@@ -212,144 +273,17 @@ public class HotkeyManager : IHotkeyManager
         }
     }
 
-    private static bool ParseHotkeyString(string combination, out HotkeyModifiers modifiers, out uint keyCode)
-    {
-        modifiers = HotkeyModifiers.None;
-        keyCode = 0;
-
-        if (string.IsNullOrEmpty(combination))
-            return false;
-
-        try
-        {
-            var parts = combination.Split('+');
-
-            foreach (var part in parts)
-            {
-                var trimmed = part.Trim();
-                var lower = trimmed.ToLowerInvariant();
-                switch (lower)
-                {
-                    case "ctrl":
-                    case "control":
-                        modifiers |= HotkeyModifiers.Control;
-                        break;
-                    case "alt":
-                        modifiers |= HotkeyModifiers.Alt;
-                        break;
-                    case "shift":
-                        modifiers |= HotkeyModifiers.Shift;
-                        break;
-                    case "win":
-                    case "cmd":
-                    case "command":
-                        modifiers |= HotkeyModifiers.Win;
-                        break;
-                    default:
-                        // Named keys
-                        keyCode = MapKeyNameToVk(lower);
-                        if (keyCode == 0 && trimmed.Length == 1)
-                        {
-                            // Single character (letter/digit)
-                            keyCode = (uint)char.ToUpperInvariant(trimmed[0]);
-                        }
-                        break;
-                }
-            }
-
-            return keyCode != 0;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to parse hotkey combination: {Combination}", combination);
-            return false;
-        }
-    }
-
-    private static uint MapKeyNameToVk(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return 0;
-
-        // Function keys F1-F24
-        if (name.Length >= 2 && name[0] == 'f' && int.TryParse(name.AsSpan(1), out var fnum) && fnum >= 1 && fnum <= 24)
-            return (uint)(0x70 + (fnum - 1));
-
-        // Arrows
-        switch (name)
-        {
-            case "space": return 0x20;
-            case "enter": return 0x0D;
-            case "esc":
-            case "escape": return 0x1B;
-            case "tab": return 0x09;
-            case "backspace":
-            case "bksp": return 0x08;
-            case "delete":
-            case "del": return 0x2E;
-            case "insert":
-            case "ins": return 0x2D;
-            case "home": return 0x24;
-            case "end": return 0x23;
-            case "pageup":
-            case "pgup": return 0x21;
-            case "pagedown":
-            case "pgdn": return 0x22;
-            case "up": return 0x26;
-            case "down": return 0x28;
-            case "left": return 0x25;
-            case "right": return 0x27;
-
-            // Numpad digits and operations
-            case "numpad0": return 0x60;
-            case "numpad1": return 0x61;
-            case "numpad2": return 0x62;
-            case "numpad3": return 0x63;
-            case "numpad4": return 0x64;
-            case "numpad5": return 0x65;
-            case "numpad6": return 0x66;
-            case "numpad7": return 0x67;
-            case "numpad8": return 0x68;
-            case "numpad9": return 0x69;
-            case "numpad+":
-            case "add": return 0x6B;
-            case "numpad-":
-            case "sub":
-            case "subtract": return 0x6D;
-            case "numpad*":
-            case "mul":
-            case "multiply": return 0x6A;
-            case "numpad/":
-            case "div":
-            case "divide": return 0x6F;
-            case "numpad.":
-            case "decimal": return 0x6E;
-
-            // OEM symbols (US layout)
-            case "-": return 0xBD; // VK_OEM_MINUS
-            case "=": return 0xBB; // VK_OEM_PLUS
-            case "[": return 0xDB; // VK_OEM_4
-            case "]": return 0xDD; // VK_OEM_6
-            case "\\": return 0xDC; // VK_OEM_5
-            case ";": return 0xBA; // VK_OEM_1
-            case "'": return 0xDE; // VK_OEM_7
-            case ",": return 0xBC; // VK_OEM_COMMA
-            case ".": return 0xBE; // VK_OEM_PERIOD
-            case "/": return 0xBF; // VK_OEM_2
-            case "`": return 0xC0; // VK_OEM_3
-        }
-
-        return 0;
-    }
 
     /// <summary>
     /// Register ESC hotkey for closing screenshot overlay
     /// </summary>
     public void RegisterEscapeHotkey()
     {
-        if (_escHotkeyRegistered || !_hotkeyProvider.IsSupported || !_hotkeyProvider.HasPermissions)
+        if (_escHotkeyRegistered || !_hotkeyProvider.IsSupported)
             return;
 
-        var success = _hotkeyProvider.RegisterHotkey("overlay_escape", HotkeyModifiers.None, 0x1B, () =>
+        var gesture = HotkeyGesture.FromNamedKey(HotkeyModifiers.None, NamedKey.Escape);
+        var success = _hotkeyProvider.RegisterHotkey("overlay_escape", gesture, () =>
         {
             Log.Debug("ESC hotkey triggered, cancelling screenshot");
             _overlayCoordinator.CloseCurrentSession();
@@ -387,6 +321,8 @@ public class HotkeyManager : IHotkeyManager
 
     public void Dispose()
     {
+        _layoutMonitor?.StopMonitoring();
+        _layoutMonitor?.Dispose();
         _hotkeyProvider?.Dispose();
         Log.Debug("HotkeyManager disposed");
     }
@@ -400,7 +336,7 @@ internal class UnsupportedHotkeyProvider : IHotkeyProvider
     public bool IsSupported => false;
     public bool HasPermissions => false;
 
-    public bool RegisterHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback)
+    public bool RegisterHotkey(string id, HotkeyGesture gesture, Action callback)
     {
         Log.Debug("Hotkey registration ignored (unsupported platform): {Id}", id);
         return false;

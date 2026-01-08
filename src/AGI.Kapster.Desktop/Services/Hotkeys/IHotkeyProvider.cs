@@ -1,4 +1,5 @@
 using System;
+using AGI.Kapster.Desktop.Models;
 
 namespace AGI.Kapster.Desktop.Services.Hotkeys;
 
@@ -18,9 +19,9 @@ public interface IHotkeyProvider : IDisposable
     bool HasPermissions { get; }
 
     /// <summary>
-    /// 注册热键
+    /// Register a hotkey using a gesture (preferred, handles character-stable resolution internally)
     /// </summary>
-    bool RegisterHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback);
+    bool RegisterHotkey(string id, HotkeyGesture gesture, Action callback);
 
     /// <summary>
     /// 注销热键
@@ -31,17 +32,4 @@ public interface IHotkeyProvider : IDisposable
     /// 注销所有热键
     /// </summary>
     void UnregisterAll();
-}
-
-/// <summary>
-/// 热键修饰符
-/// </summary>
-[Flags]
-public enum HotkeyModifiers : uint
-{
-    None = 0,
-    Alt = 1,
-    Control = 2,
-    Shift = 4,
-    Win = 8
 }

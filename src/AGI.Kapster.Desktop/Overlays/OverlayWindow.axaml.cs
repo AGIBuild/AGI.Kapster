@@ -483,7 +483,8 @@ public partial class OverlayWindow : Window, IOverlayWindow
         }
 
         // Enter key - confirm selection with capture and close
-        if (e.Key == Key.Enter)
+        // Skip if text editing is active (let TextBox handle Enter for newline)
+        if (e.Key == Key.Enter && _annotator?.IsTextEditing != true)
         {
             _selectionHandler?.HandleEnterKey();
             e.Handled = true;

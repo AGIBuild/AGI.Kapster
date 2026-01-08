@@ -33,10 +33,11 @@ public class MacClipboardStrategy : IClipboardStrategy
             }
 
             // Create DataObject with multiple formats for better compatibility
-            var dataObject = new DataObject();
+            var dataObject = new DataTransfer();
 
-            // Set as Avalonia Bitmap directly (primary format)
-            dataObject.Set("image/png", avaloniaBitmap);
+            // Create a DataTransferItem with bitmap as primary format
+            var item = new DataTransferItem();
+            item.SetBitmap(avaloniaBitmap);
 
             // Also convert to PNG byte array for additional compatibility
             using var stream = new System.IO.MemoryStream();
@@ -44,18 +45,20 @@ public class MacClipboardStrategy : IClipboardStrategy
             stream.Position = 0;
             var pngData = stream.ToArray();
 
-            // Set multiple formats for maximum compatibility
-            dataObject.Set("public.png", pngData); // macOS UTI format
-            dataObject.Set("PNG", pngData);
-            dataObject.Set("image/x-png", pngData);
-            dataObject.Set("CF_DIB", pngData); // Windows compatibility
+            // Add multiple platform-specific formats for maximum compatibility
+            item.Set(DataFormat.CreateBytesPlatformFormat("public.png"), pngData); // macOS UTI format
+            item.Set(DataFormat.CreateBytesPlatformFormat("PNG"), pngData);
+            item.Set(DataFormat.CreateBytesPlatformFormat("image/x-png"), pngData);
+            item.Set(DataFormat.CreateBytesPlatformFormat("CF_DIB"), pngData); // Windows compatibility
+
+            dataObject.Add(item);
 
             // Try to get clipboard from various sources
             var clipboardInfo = GetAvailableClipboardWithWindow();
 
             if (clipboardInfo.clipboard != null)
             {
-                await clipboardInfo.clipboard.SetDataObjectAsync(dataObject);
+                await clipboardInfo.clipboard.SetDataAsync(dataObject);
                 Log.Debug("macOS: Successfully set image to clipboard");
 
                 // If we created a temporary window, keep it alive briefly to ensure clipboard operation completes
@@ -128,7 +131,7 @@ public class MacClipboardStrategy : IClipboardStrategy
 
             if (clipboard != null)
             {
-                return await clipboard.GetTextAsync();
+                return await clipboard.TryGetTextAsync();
             }
 
             Log.Warning("macOS: No clipboard access available");

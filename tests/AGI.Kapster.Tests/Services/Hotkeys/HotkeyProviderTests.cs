@@ -4,6 +4,7 @@ using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
 using AGI.Kapster.Desktop.Services.Hotkeys;
+using AGI.Kapster.Desktop.Models;
 using AGI.Kapster.Tests.TestHelpers;
 
 namespace AGI.Kapster.Tests.Services.Hotkeys;
@@ -30,11 +31,11 @@ public class HotkeyProviderTests : TestBase
         // Arrange
         var provider = Substitute.For<IHotkeyProvider>();
         provider.IsSupported.Returns(false);
-        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<Action>())
             .Returns(false);
 
         // Act
-        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 1, () => { });
+        var result = provider.RegisterHotkey("test", HotkeyGesture.FromChar(HotkeyModifiers.None, 'A'), () => { });
 
         // Assert
         result.Should().BeFalse();
@@ -75,11 +76,11 @@ public class HotkeyProviderTests : TestBase
         var provider = Substitute.For<IHotkeyProvider>();
         provider.IsSupported.Returns(true);
         provider.HasPermissions.Returns(true);
-        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<Action>())
             .Returns(true);
 
         // Act
-        var result = provider.RegisterHotkey("test", HotkeyModifiers.None, 1, () => { });
+        var result = provider.RegisterHotkey("test", HotkeyGesture.FromChar(HotkeyModifiers.None, 'A'), () => { });
 
         // Assert
         result.Should().BeTrue();
@@ -108,16 +109,17 @@ public class HotkeyProviderTests : TestBase
         var provider = Substitute.For<IHotkeyProvider>();
         provider.IsSupported.Returns(true);
         provider.HasPermissions.Returns(true);
-        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyModifiers>(), Arg.Any<uint>(), Arg.Any<Action>())
+        provider.RegisterHotkey(Arg.Any<string>(), Arg.Any<HotkeyGesture>(), Arg.Any<Action>())
             .Returns(true);
 
         var callback = new Action(() => { });
+        var gesture = HotkeyGesture.FromChar(HotkeyModifiers.Control, 'A');
 
         // Act
-        provider.RegisterHotkey("test_hotkey", HotkeyModifiers.Control, 65, callback);
+        provider.RegisterHotkey("test_hotkey", gesture, callback);
 
         // Assert
-        provider.Received(1).RegisterHotkey("test_hotkey", HotkeyModifiers.Control, 65, callback);
+        provider.Received(1).RegisterHotkey("test_hotkey", gesture, callback);
     }
 
     [Fact]
