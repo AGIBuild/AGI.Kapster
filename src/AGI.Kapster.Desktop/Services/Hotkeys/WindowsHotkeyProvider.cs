@@ -35,19 +35,15 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private static readonly IntPtr HWND_MESSAGE = new(-3);
 
-    private readonly object _lock = new();
-    private readonly Dictionary<string, int> _nativeIdByStringId = new();
-    private readonly Dictionary<int, Action> _callbackByNativeId = new();
-    private int _nextNativeId = 1;
+    private readonly HotkeyRegistryState _state = new();
 
-    private long _opVersion;
-    private readonly Dictionary<string, long> _idVersion = new();
+    private readonly IWindowsHotkeyNativeApi _nativeApi;
+    private readonly IHotkeyThreadInvoker? _injectedInvoker;
 
     private readonly ConcurrentQueue<IInvokeRequest> _invokeQueue = new();
     private int _invokePosted;
 
     private bool _monitoringLayout;
-    private bool _disposed;
 
     private Thread? _thread;
     private uint _threadId;
@@ -66,16 +62,33 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private readonly IHotkeyResolver? _resolver;
 
-    public WindowsHotkeyProvider(IHotkeyResolver? resolver = null)
+    public WindowsHotkeyProvider(
+        IHotkeyResolver? resolver = null,
+        IWindowsHotkeyNativeApi? nativeApi = null,
+        IHotkeyThreadInvoker? invoker = null,
+        bool startMessageThread = true)
     {
         _resolver = resolver;
-        if (!IsSupported)
+
+        _nativeApi = nativeApi ?? new WindowsHotkeyNativeApi();
+        _injectedInvoker = invoker;
+
+        if (!IsSupported && _injectedInvoker is null)
         {
             Log.Warning("WindowsHotkeyProvider created on non-Windows platform");
             return;
         }
 
-        StartMessageThread();
+        if (_injectedInvoker is not null)
+        {
+            _ready.Set();
+            return;
+        }
+
+        if (startMessageThread)
+        {
+            StartMessageThread();
+        }
     }
 
     public bool RegisterHotkey(string id, HotkeyGesture gesture, Action callback)
@@ -114,47 +127,29 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private bool RegisterResolvedHotkey(string id, HotkeyModifiers modifiers, uint keyCode, Action callback)
     {
-        if (!IsSupported)
+        if (!IsSupported && _injectedInvoker is null)
             return false;
         if (string.IsNullOrWhiteSpace(id) || callback == null)
             return false;
 
         EnsureReady();
 
-        int? existingNativeId = null;
-        int nativeId;
-        uint fsModifiers;
-        long version;
+        var start = _state.BeginRegister(id);
+        if (start == default(HotkeyRegisterStart))
+            return false;
 
-        lock (_lock)
+        var nativeId = start.NativeId;
+        var fsModifiers = ToFsModifiers(modifiers);
+
+        if (start.ExistingNativeId.HasValue)
         {
-            if (_disposed)
-                return false;
-
-            version = ++_opVersion;
-            _idVersion[id] = version;
-
-            // Replace existing (unregister happens outside lock)
-            if (_nativeIdByStringId.TryGetValue(id, out var existing))
-            {
-                existingNativeId = existing;
-                _nativeIdByStringId.Remove(id);
-                _callbackByNativeId.Remove(existing);
-            }
-
-            nativeId = _nextNativeId++;
-            fsModifiers = ToFsModifiers(modifiers);
-        }
-
-        if (existingNativeId.HasValue)
-        {
-            _ = UnregisterInternal(existingNativeId.Value);
+            _ = UnregisterInternal(start.ExistingNativeId.Value);
         }
 
         var result = InvokeOnMessageThread(() =>
         {
-            var ok = RegisterHotKey(_windowHandle, nativeId, fsModifiers, keyCode);
-            var err = ok ? 0 : Marshal.GetLastWin32Error();
+            var ok = _nativeApi.RegisterHotKey(_windowHandle, nativeId, fsModifiers, keyCode);
+            var err = ok ? 0 : _nativeApi.GetLastError();
             return new Win32BoolResult(ok, err);
         }, fallback: new Win32BoolResult(false, unchecked((int)0xFFFF_FFFE)));
 
@@ -166,82 +161,35 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
             return false;
         }
 
-        // Commit only if no newer operation replaced this id.
-        bool shouldRollback = false;
-        lock (_lock)
-        {
-            if (_disposed)
-            {
-                shouldRollback = true;
-            }
-            else if (_idVersion.TryGetValue(id, out var current) && current == version)
-            {
-                _nativeIdByStringId[id] = nativeId;
-                _callbackByNativeId[nativeId] = callback;
-                return true;
-            }
-            else
-            {
-                shouldRollback = true;
-            }
-        }
+        if (_state.CommitRegister(id, start.Version, nativeId, callback))
+            return true;
 
-        if (shouldRollback)
-        {
-            _ = UnregisterInternal(nativeId);
-        }
-
+        // We were overtaken by a newer operation; roll back to avoid orphaned native ids.
+        _ = UnregisterInternal(nativeId);
         return false;
     }
 
     public bool UnregisterHotkey(string id)
     {
-        if (!IsSupported)
+        if (!IsSupported && _injectedInvoker is null)
             return false;
 
         EnsureReady();
 
-        int nativeId;
-        lock (_lock)
-        {
-            if (_disposed)
-                return false;
-
-            // New version to invalidate any in-flight register for this id.
-            _idVersion[id] = ++_opVersion;
-
-            if (!_nativeIdByStringId.TryGetValue(id, out nativeId))
-                return false;
-
-            _nativeIdByStringId.Remove(id);
-            _callbackByNativeId.Remove(nativeId);
-        }
+        if (!_state.BeginUnregister(id, out var nativeId))
+            return false;
 
         return UnregisterInternal(nativeId);
     }
 
     public void UnregisterAll()
     {
-        if (!IsSupported)
+        if (!IsSupported && _injectedInvoker is null)
             return;
 
         EnsureReady();
 
-        List<int> nativeIds;
-        lock (_lock)
-        {
-            if (_disposed)
-                return;
-
-            // Invalidate any in-flight per-id operations.
-            _opVersion++;
-            _idVersion.Clear();
-
-            nativeIds = new List<int>(_callbackByNativeId.Keys);
-            _nativeIdByStringId.Clear();
-            _callbackByNativeId.Clear();
-            _nextNativeId = 1;
-        }
+        var nativeIds = _state.SnapshotUnregisterAll();
 
         foreach (var nativeId in nativeIds)
         {
@@ -261,19 +209,10 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     public void Dispose()
     {
-        List<int>? idsToUnregister = null;
-        lock (_lock)
-        {
-            if (_disposed)
-                return;
-            _disposed = true;
+        if (_state.IsDisposed)
+            return;
 
-            // Make a best-effort attempt to unregister everything on the message thread.
-            idsToUnregister = new List<int>(_callbackByNativeId.Keys);
-            _nativeIdByStringId.Clear();
-            _callbackByNativeId.Clear();
-            _nextNativeId = 1;
-        }
+        var idsToUnregister = _state.MarkDisposedAndSnapshotAll();
 
         // Fail any pending invoke requests so callers don't hang.
         FailPendingInvokes(new ObjectDisposedException(nameof(WindowsHotkeyProvider)));
@@ -281,12 +220,9 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
         try
         {
             EnsureReady();
-            if (idsToUnregister != null)
+            foreach (var nativeId in idsToUnregister)
             {
-                foreach (var nativeId in idsToUnregister)
-                {
-                    _ = UnregisterInternal(nativeId);
-                }
+                _ = UnregisterInternal(nativeId);
             }
         }
         catch (Exception ex)
@@ -333,6 +269,9 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private void EnsureReady()
     {
+        if (_injectedInvoker is not null)
+            return;
+
         if (!_ready.IsSet)
         {
             if (!_ready.Wait(TimeSpan.FromSeconds(2)))
@@ -440,11 +379,7 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
         if (uMsg == WM_HOTKEY)
         {
             var nativeId = wParam.ToInt32();
-            Action? cb = null;
-            lock (_lock)
-            {
-                _callbackByNativeId.TryGetValue(nativeId, out cb);
-            }
+            _ = _state.TryGetCallback(nativeId, out var cb);
 
             if (cb != null)
             {
@@ -480,13 +415,13 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private bool UnregisterInternal(int nativeId)
     {
-        if (_windowHandle == IntPtr.Zero)
+        if (_injectedInvoker is null && _windowHandle == IntPtr.Zero)
             return false;
 
         var result = InvokeOnMessageThread(() =>
         {
-            var ok = UnregisterHotKey(_windowHandle, nativeId);
-            var err = ok ? 0 : Marshal.GetLastWin32Error();
+            var ok = _nativeApi.UnregisterHotKey(_windowHandle, nativeId);
+            var err = ok ? 0 : _nativeApi.GetLastError();
             return new Win32BoolResult(ok, err);
         }, fallback: new Win32BoolResult(false, unchecked((int)0xFFFF_FFFE)));
 
@@ -501,6 +436,11 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
 
     private T InvokeOnMessageThread<T>(Func<T> func, T fallback)
     {
+        if (_injectedInvoker is not null)
+        {
+            return _injectedInvoker.Invoke(func, fallback);
+        }
+
         if (_windowHandle == IntPtr.Zero)
             return fallback;
 
@@ -710,12 +650,6 @@ public sealed class WindowsHotkeyProvider : IHotkeyProvider, IKeyboardLayoutMoni
         IntPtr hMenu,
         IntPtr hInstance,
         IntPtr lpParam);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     [DllImport("user32.dll")]
     private static extern IntPtr DefWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
