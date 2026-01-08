@@ -12,7 +12,7 @@ namespace AGI.Kapster.Desktop.Services.Hotkeys;
 /// </summary>
 public class WindowsHotkeyResolver : IHotkeyResolver
 {
-    [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true)]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern short VkKeyScanEx(char ch, IntPtr hkl);
 
     [DllImport("user32.dll")]
@@ -44,11 +44,20 @@ public class WindowsHotkeyResolver : IHotkeyResolver
 
     private ResolvedHotkey? ResolveChar(char character, HotkeyModifiers userModifiers)
     {
+        // For letter characters, use the lowercase form to get the VK code
+        // This avoids adding implicit Shift modifier for uppercase letters
+        // (e.g., 'A' would otherwise require Shift+'a', but we want just the 'A' key)
+        var lookupChar = character;
+        if (character >= 'A' && character <= 'Z')
+        {
+            lookupChar = char.ToLowerInvariant(character);
+        }
+
         // Get current keyboard layout
         var hkl = GetKeyboardLayout(0);
 
         // Use VkKeyScanEx to get VK + shift state for the character
-        var scanResult = VkKeyScanEx(character, hkl);
+        var scanResult = VkKeyScanEx(lookupChar, hkl);
 
         if (scanResult == -1)
         {
