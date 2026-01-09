@@ -130,11 +130,28 @@ public static class EnvironmentInfo
                         return address.ToString();
                     }
                 }
-                catch (Exception ex)
+                catch (NetworkInformationException)
                 {
-                    Debug.WriteLine($"[EnvironmentInfo] Failed to get physical address for interface '{ni.Name}': {ex}");
+                    // Ignore network information errors for this interface and continue
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Ignore access denied for this interface and continue
                 }
             }
+        }
+        catch (NetworkInformationException)
+        {
+            // Ignore network information errors when querying network interfaces
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Ignore access denied when querying network interfaces
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // Ignore platforms that do not support NetworkInterface APIs
+        }
         }
         catch (Exception ex)
         {
