@@ -198,7 +198,7 @@ public interface IScreenCaptureStrategy
 - [Contributing Guide](../CONTRIBUTING.md)
 - [Testing Guide](../TESTING.md)
 - [Avalonia Documentation](https://docs.avaloniaui.net/)
-- [.NET Documentation](https://docs.microsoft.com/dotnet/)
+- [.NET Documentation](https://learn.microsoft.com/dotnet/)
 
 ## Avoid
 
