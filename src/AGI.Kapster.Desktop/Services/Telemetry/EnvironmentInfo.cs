@@ -94,9 +94,21 @@ public static class EnvironmentInfo
             // This is robust and works across Windows, macOS, and Linux via standard .NET API
             var interfaces = NetworkInterface.GetAllNetworkInterfaces();
             
-            // Sort to ensure consistency
-            Array.Sort(interfaces, (a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal));
+            // Sort to ensure consistency based on MAC address (more stable than interface name)
+            Array.Sort(interfaces, (a, b) =>
+            {
+                var macA = a.GetPhysicalAddress()?.ToString() ?? string.Empty;
+                var macB = b.GetPhysicalAddress()?.ToString() ?? string.Empty;
 
+                var macCompare = string.Compare(macA, macB, StringComparison.OrdinalIgnoreCase);
+                if (macCompare != 0)
+                {
+                    return macCompare;
+                }
+
+                // Fallback to name only as a tie-breaker when MACs are equal
+                return string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+            });
             foreach (var ni in interfaces)
             {
                 // Skip loopback and temporary interfaces
