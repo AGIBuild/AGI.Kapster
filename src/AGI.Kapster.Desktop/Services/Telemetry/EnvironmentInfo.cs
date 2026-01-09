@@ -6,8 +6,6 @@ using System.IO;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace AGI.Kapster.Desktop.Services.Telemetry;
 
@@ -19,7 +17,8 @@ public static class EnvironmentInfo
     private static string? _machineId;
 
     /// <summary>
-    /// Gets the unique machine identifier based on hardware fingerprint
+    /// Gets the unique machine identifier based on hardware fingerprint.
+    /// Uses the primary MAC address directly.
     /// </summary>
     public static string MachineId => GetMachineId();
 
@@ -70,19 +69,15 @@ public static class EnvironmentInfo
     {
         if (_machineId != null) return _machineId;
 
-        var sb = new StringBuilder();
+        // 1. Network Interfaces (MAC Address) as the primary ID
+        _machineId = GetPrimaryMacAddress();
 
-        // 1. Network Interfaces (MAC Address)
-        // This is a standard .NET API available on all platforms that gives us a hardware identifier.
-        sb.Append(GetPrimaryMacAddress());
+        // 2. Fallback to MachineName if MAC is unavailable
+        if (string.IsNullOrEmpty(_machineId))
+        {
+            _machineId = Environment.MachineName;
+        }
 
-        // 2. Stable environment properties as salt
-        // These might change if the user renames the machine, but together with MAC address
-        // they provide a reasonable fingerprint using only standard APIs.
-        sb.Append(Environment.MachineName);
-        sb.Append(Environment.ProcessorCount);
-
-        _machineId = ComputeSha256Hash(sb.ToString());
         return _machineId;
     }
 
@@ -130,28 +125,11 @@ public static class EnvironmentInfo
                         return address.ToString();
                     }
                 }
-                catch (NetworkInformationException)
+                catch
                 {
-                    // Ignore network information errors for this interface and continue
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    // Ignore access denied for this interface and continue
+                    // Ignore errors for individual interfaces and continue
                 }
             }
-        }
-        catch (NetworkInformationException)
-        {
-            // Ignore network information errors when querying network interfaces
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Ignore access denied when querying network interfaces
-        }
-        catch (PlatformNotSupportedException)
-        {
-            // Ignore platforms that do not support NetworkInterface APIs
-        }
         }
         catch (Exception ex)
         {
@@ -159,14 +137,6 @@ public static class EnvironmentInfo
             Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve primary MAC address: {ex}");
         }
         return string.Empty;
-    }
-
-    private static string ComputeSha256Hash(string input)
-    {
-        using var sha256 = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(input ?? string.Empty);
-        var hash = sha256.ComputeHash(bytes);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
     /// <summary>
