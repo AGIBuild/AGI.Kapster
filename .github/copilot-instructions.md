@@ -177,7 +177,8 @@ public partial class MyViewModel : ViewModelBase
 ```csharp
 public interface IScreenCaptureStrategy
 {
-    Task<Bitmap> CaptureScreenAsync();
+    // Prefer synchronous capture for precise overlay control; add async wrappers in callers if needed.
+    Bitmap CaptureScreen();
 }
 
 // Implementations in Services/Capture/Platforms/
