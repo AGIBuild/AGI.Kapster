@@ -18,14 +18,14 @@
     <UserSecretsId>AGI.Kapster.Desktop</UserSecretsId>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2026.1.9.18692</AssemblyVersion>
-    <FileVersion>2026.1.9.18692</FileVersion>
-    <Version>2026.1.9.18692</Version>
+    <AssemblyVersion>2026.1.9.48101</AssemblyVersion>
+    <FileVersion>2026.1.9.48101</FileVersion>
+    <Version>2026.1.9.48101</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2026.1.9.18692</InformationalVersion>
+    <InformationalVersion>2026.1.9.48101</InformationalVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
