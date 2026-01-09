@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -11,6 +14,14 @@ namespace AGI.Kapster.Desktop.Services.Telemetry;
 /// </summary>
 public static class EnvironmentInfo
 {
+    private static string? _machineId;
+
+    /// <summary>
+    /// Gets the unique machine identifier based on hardware fingerprint.
+    /// Uses the primary MAC address directly.
+    /// </summary>
+    public static string MachineId => GetMachineId();
+
     /// <summary>
     /// Gets environment properties for telemetry tracking
     /// </summary>
@@ -37,6 +48,7 @@ public static class EnvironmentInfo
             ["processor_count"] = Environment.ProcessorCount.ToString(),
             ["is_64bit_os"] = Environment.Is64BitOperatingSystem.ToString(),
             ["is_64bit_process"] = Environment.Is64BitProcess.ToString(),
+            ["machine_id"] = GetMachineId(),
         };
 
         // Add screen info if available
@@ -51,6 +63,80 @@ public static class EnvironmentInfo
         }
 
         return props;
+    }
+
+    private static string GetMachineId()
+    {
+        if (_machineId != null) return _machineId;
+
+        // 1. Network Interfaces (MAC Address) as the primary ID
+        _machineId = GetPrimaryMacAddress();
+
+        // 2. Fallback to MachineName if MAC is unavailable
+        if (string.IsNullOrEmpty(_machineId))
+        {
+            _machineId = Environment.MachineName;
+        }
+
+        return _machineId;
+    }
+
+    private static string GetPrimaryMacAddress()
+    {
+        try
+        {
+            // Use NetworkInterface to get hardware address
+            // This is robust and works across Windows, macOS, and Linux via standard .NET API
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            
+            // Sort to ensure consistency based on MAC address (more stable than interface name)
+            Array.Sort(interfaces, (a, b) =>
+            {
+                var macA = a.GetPhysicalAddress()?.ToString() ?? string.Empty;
+                var macB = b.GetPhysicalAddress()?.ToString() ?? string.Empty;
+
+                var macCompare = string.Compare(macA, macB, StringComparison.OrdinalIgnoreCase);
+                if (macCompare != 0)
+                {
+                    return macCompare;
+                }
+
+                // Fallback to name only as a tie-breaker when MACs are equal
+                return string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+            });
+            foreach (var ni in interfaces)
+            {
+                // Skip loopback and temporary interfaces
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                
+                // We prefer interfaces that are actually Up, but if none are Up, we take what we can get
+                // to ensure we at least get some ID.
+                // However, "Up" status might change (e.g. unplugged cable), so relying solely on Up interfaces
+                // for a permanent ID is risky if the user often disconnects.
+                // Instead, we prioritize Ethernet/WiFi and persistence.
+                
+                // Basic filtering for valid physical addresses
+                try
+                {
+                    var address = ni.GetPhysicalAddress();
+                    var bytes = address.GetAddressBytes();
+                    if (bytes.Length > 0)
+                    {
+                        return address.ToString();
+                    }
+                }
+                catch
+                {
+                    // Ignore errors for individual interfaces and continue
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Ignore access denied or other errors, but log for diagnostics
+            Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve primary MAC address: {ex}");
+        }
+        return string.Empty;
     }
 
     /// <summary>

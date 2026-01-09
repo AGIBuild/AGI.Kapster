@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;win-arm64;osx-x64;osx-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
@@ -18,14 +18,14 @@
     <UserSecretsId>AGI.Kapster.Desktop</UserSecretsId>
     <!-- Version Information -->
     <!-- Switched to 4-segment version: Year.Month.Day.SecondsSinceMidnight -->
-    <AssemblyVersion>2026.1.8.56322</AssemblyVersion>
-    <FileVersion>2026.1.8.56322</FileVersion>
-    <Version>2026.1.8.56322</Version>
+    <AssemblyVersion>2026.1.9.18692</AssemblyVersion>
+    <FileVersion>2026.1.9.18692</FileVersion>
+    <Version>2026.1.9.18692</Version>
     <Product>AGI Kapster</Product>
     <Company>AGI Build</Company>
     <Copyright>Copyright © AGI Build 2025</Copyright>
     <Description>Advanced Screenshot and Annotation Tool</Description>
-    <InformationalVersion>2026.1.8.56322</InformationalVersion>
+    <InformationalVersion>2026.1.9.18692</InformationalVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
