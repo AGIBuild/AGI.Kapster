@@ -1,10 +1,10 @@
 # Copilot Instructions for AGI.Kapster
 
-This repository contains AGI.Kapster, a modern cross-platform screen capture and annotation tool built with .NET 9 and Avalonia UI.
+This repository contains AGI.Kapster, a modern cross-platform screen capture and annotation tool built with .NET 10 and Avalonia UI.
 
 ## Tech Stack
 
-- **Framework**: .NET 9.0
+- **Framework**: .NET 10.0
 - **UI Framework**: Avalonia UI 11.3
 - **Architecture Pattern**: MVVM (Model-View-ViewModel)
 - **Dependency Injection**: Microsoft.Extensions.DependencyInjection
