@@ -2,11 +2,11 @@
 
 **Modern Cross-Platform Screen Capture and Annotation Tool**
 
-A high-performance screen capture tool built with .NET 9 and Avalonia UI, featuring intelligent overlay system, comprehensive annotation capabilities, and cross-platform support.
+A high-performance screen capture tool built with .NET 10 and Avalonia UI, featuring intelligent overlay system, comprehensive annotation capabilities, and cross-platform support.
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![Framework](https://img.shields.io/badge/.NET-9.0-purple)
-![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
+![Framework](https://img.shields.io/badge/.NET-10.0-purple)
+![UI](https://img.shields.io/badge/UI-Avalonia%2011.3-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![CI/CD](https://github.com/AGIBuild/AGI.Kapster/actions/workflows/ci.yml/badge.svg)
 
@@ -50,9 +50,9 @@ A high-performance screen capture tool built with .NET 9 and Avalonia UI, featur
 
 | Platform | Version | Architecture | Runtime |
 |----------|---------|--------------|---------|
-| **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 9.0 Desktop |
-| **macOS** | macOS 10.15+ | x64, ARM64 | .NET 9.0 Runtime |
-| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime (X11/Wayland) |
+| **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 10.0 Desktop |
+| **macOS** | macOS 10.15+ | x64, ARM64 | .NET 10.0 Runtime |
+| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 10.0 Runtime (X11/Wayland) |
 
 ### Installation
 
@@ -127,7 +127,7 @@ cd AGI.Kapster
 ## 🛠️ Development
 
 ### Requirements
-- .NET 9.0 SDK
+- .NET 10.0 SDK
 - Visual Studio 2022 / JetBrains Rider / VS Code
 
 ### Development Setup

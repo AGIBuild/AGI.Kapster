@@ -2,11 +2,11 @@
 
 **现代化跨平台截图与标注工具**
 
-基于 .NET 9 和 Avalonia UI 构建的高性能截图工具，支持智能覆盖系统、丰富的标注功能和跨平台兼容。
+基于 .NET 10 和 Avalonia UI 构建的高性能截图工具，支持智能覆盖系统、丰富的标注功能和跨平台兼容。
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![Framework](https://img.shields.io/badge/.NET-9.0-purple)
-![UI](https://img.shields.io/badge/UI-Avalonia%2011-green)
+![Framework](https://img.shields.io/badge/.NET-10.0-purple)
+![UI](https://img.shields.io/badge/UI-Avalonia%2011.3-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![CI/CD](https://github.com/AGIBuild/AGI.Kapster/actions/workflows/ci.yml/badge.svg)
 
@@ -50,9 +50,9 @@
 
 | 平台 | 版本 | 架构 | 运行时 |
 |------|------|------|--------|
-| **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 9.0 Desktop |
-| **macOS** | macOS 10.15+ | x64, ARM64 | .NET 9.0 Runtime |
-| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 9.0 Runtime（X11/Wayland） |
+| **Windows** | Windows 10 1809+ | x64, ARM64 | .NET 10.0 Desktop |
+| **macOS** | macOS 10.15+ | x64, ARM64 | .NET 10.0 Runtime |
+| **Linux** | Ubuntu 20.04+ | x64, ARM64 | .NET 10.0 Runtime（X11/Wayland） |
 
 ### 安装
 
@@ -127,7 +127,7 @@ cd AGI.Kapster
 ## 🛠️ 开发
 
 ### 开发要求
-- .NET 9.0 SDK
+- .NET 10.0 SDK
 - Visual Studio 2022 / JetBrains Rider / VS Code
 
 ### 开发环境设置
