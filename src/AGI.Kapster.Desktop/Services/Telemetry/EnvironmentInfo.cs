@@ -82,7 +82,7 @@ public static class EnvironmentInfo
         sb.Append(Environment.MachineName);
         sb.Append(Environment.ProcessorCount);
 
-        _machineId = ComputeMd5Hash(sb.ToString());
+        _machineId = ComputeSha256Hash(sb.ToString());
         return _machineId;
     }
 
@@ -126,13 +126,13 @@ public static class EnvironmentInfo
         return string.Empty;
     }
 
-    private static string ComputeMd5Hash(string input)
+    private static string ComputeSha256Hash(string input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
 
-        using var md5 = MD5.Create();
+        using var sha256 = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(input);
-        var hash = md5.ComputeHash(bytes);
+        var hash = sha256.ComputeHash(bytes);
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
