@@ -19,7 +19,9 @@ public static class EnvironmentInfo
     private static string? _machineId;
 
     /// <summary>
-    /// Gets the unique machine identifier based on hardware fingerprint
+    /// Gets the unique machine identifier based on hardware fingerprint.
+    /// The identifier is created by hashing (SHA-256) the primary MAC address
+    /// combined with machine name and processor count for anonymization.
     /// </summary>
     public static string MachineId => GetMachineId();
 
@@ -144,6 +146,10 @@ public static class EnvironmentInfo
         return string.Empty;
     }
 
+    /// <summary>
+    /// Computes SHA-256 hash of the input string for anonymization.
+    /// SHA-256 is used instead of MD5 for better security and collision resistance.
+    /// </summary>
     private static string ComputeSha256Hash(string input)
     {
         using var sha256 = SHA256.Create();
