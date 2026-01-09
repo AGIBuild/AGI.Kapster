@@ -121,19 +121,25 @@ public static class EnvironmentInfo
                 // Instead, we prioritize Ethernet/WiFi and persistence.
                 
                 // Basic filtering for valid physical addresses
-                try {
+                try
+                {
                     var address = ni.GetPhysicalAddress();
                     var bytes = address.GetAddressBytes();
                     if (bytes.Length > 0)
                     {
                         return address.ToString();
                     }
-                } catch {}
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[EnvironmentInfo] Failed to get physical address for interface '{ni.Name}': {ex}");
+                }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore access denied or other errors
+            // Ignore access denied or other errors, but log for diagnostics
+            Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve primary MAC address: {ex}");
         }
         return string.Empty;
     }
