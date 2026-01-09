@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 
 namespace AGI.Kapster.Desktop.Services.Telemetry;
 
@@ -15,12 +15,21 @@ namespace AGI.Kapster.Desktop.Services.Telemetry;
 public static class EnvironmentInfo
 {
     private static string? _machineId;
+    private static string? _userId;
 
     /// <summary>
-    /// Gets the unique machine identifier based on hardware fingerprint.
-    /// Uses the primary MAC address directly.
+    /// Gets the device identifier.
+    /// macOS uses gethostuuid(3) and returns empty string on failure (no fallback).
+    /// Other platforms use the primary MAC address with a machine name fallback.
     /// </summary>
     public static string MachineId => GetMachineId();
+    
+    /// <summary>
+    /// Gets the current OS user identifier (unique across machines).
+    /// Windows: SID. macOS: GeneratedUID (mbr_uid_to_uuid). Linux: UID.
+    /// Returns empty string on failure.
+    /// </summary>
+    public static string UserId => GetUserId();
 
     /// <summary>
     /// Gets environment properties for telemetry tracking
@@ -44,11 +53,14 @@ public static class EnvironmentInfo
             ["app_culture"] = CultureInfo.CurrentCulture.Name,
             ["app_ui_culture"] = CultureInfo.CurrentUICulture.Name,
             
-            // Machine info (anonymized)
+            // Identifiers (telemetry)
             ["processor_count"] = Environment.ProcessorCount.ToString(),
             ["is_64bit_os"] = Environment.Is64BitOperatingSystem.ToString(),
             ["is_64bit_process"] = Environment.Is64BitProcess.ToString(),
+            // Device identifier (macOS: gethostuuid(3); other platforms: primary MAC)
             ["machine_id"] = GetMachineId(),
+            // OS user identifier (Windows: SID; macOS/Linux: UID). May be empty if not resolvable.
+            ["user_id"] = GetUserId(),
         };
 
         // Add screen info if available
@@ -65,20 +77,117 @@ public static class EnvironmentInfo
         return props;
     }
 
+    private static string GetUserId()
+    {
+        if (_userId != null) return _userId;
+
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                _userId = WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
+#if DEBUG
+                Debug.WriteLine($"[EnvironmentInfo] UserId (SID): {_userId}");
+#endif
+                return _userId;
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                _userId = GetMacOSUserUuid();
+#if DEBUG
+                Debug.WriteLine($"[EnvironmentInfo] UserId (macOS GeneratedUID): {_userId}");
+#endif
+                return _userId;
+            }
+
+            // Linux: use UID
+            _userId = geteuid().ToString(CultureInfo.InvariantCulture);
+#if DEBUG
+            Debug.WriteLine($"[EnvironmentInfo] UserId (UID): {_userId}");
+#endif
+            return _userId;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve UserId: {ex}");
+            _userId = string.Empty;
+            return _userId;
+        }
+    }
+
+    /// <summary>
+    /// Gets the macOS user's GeneratedUID via mbr_uid_to_uuid().
+    /// This is a true UUID that is unique across machines.
+    /// </summary>
+    private static string GetMacOSUserUuid()
+    {
+        try
+        {
+            var uid = geteuid();
+            var uuidBytes = new byte[16];
+            var rc = mbr_uid_to_uuid(uid, uuidBytes);
+            if (rc != 0)
+            {
+                return string.Empty;
+            }
+
+            return FormatUuid(uuidBytes);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve macOS user UUID: {ex}");
+            return string.Empty;
+        }
+    }
+
     private static string GetMachineId()
     {
         if (_machineId != null) return _machineId;
 
-        // 1. Network Interfaces (MAC Address) as the primary ID
+        // macOS: Host UUID (stable across reboots/updates)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            _machineId = GetMacOSHostUuid();
+#if DEBUG
+            Debug.WriteLine($"[EnvironmentInfo] macOS MachineId (gethostuuid): {_machineId}");
+#endif
+            return _machineId;
+        }
+
         _machineId = GetPrimaryMacAddress();
 
-        // 2. Fallback to MachineName if MAC is unavailable
+        // Fallback to MachineName if MAC is unavailable
         if (string.IsNullOrEmpty(_machineId))
         {
             _machineId = Environment.MachineName;
         }
 
         return _machineId;
+    }
+
+    /// <summary>
+    /// Gets macOS Host UUID via gethostuuid(3).
+    /// </summary>
+    private static string GetMacOSHostUuid()
+    {
+        try
+        {
+            var bytes = new byte[16];
+            var timeout = new Timespec { tv_sec = 5, tv_nsec = 0 };
+            var rc = gethostuuid(bytes, ref timeout);
+            if (rc != 0)
+            {
+                return string.Empty;
+            }
+
+            return FormatUuid(bytes);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[EnvironmentInfo] Failed to retrieve macOS Host UUID: {ex}");
+            return string.Empty;
+        }
     }
 
     private static string GetPrimaryMacAddress()
@@ -120,7 +229,7 @@ public static class EnvironmentInfo
                 {
                     var address = ni.GetPhysicalAddress();
                     var bytes = address.GetAddressBytes();
-                    if (bytes.Length > 0)
+                    if (bytes.Length > 0 && IsValidMacAddress(bytes))
                     {
                         return address.ToString();
                     }
@@ -138,6 +247,58 @@ public static class EnvironmentInfo
         }
         return string.Empty;
     }
+
+    private static bool IsValidMacAddress(byte[] bytes)
+    {
+        // All zeros is not a valid hardware address.
+        var allZero = true;
+        foreach (var b in bytes)
+        {
+            if (b != 0)
+            {
+                allZero = false;
+                break;
+            }
+        }
+        if (allZero) return false;
+
+        // Known invalid pattern observed on macOS: 00:00:00:00:00:E0
+        if (bytes.Length >= 6 &&
+            bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x00 &&
+            bytes[3] == 0x00 && bytes[4] == 0x00 && bytes[5] == 0xE0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string FormatUuid(byte[] bytes)
+    {
+        if (bytes.Length < 16) return string.Empty;
+
+        return $"{bytes[0]:x2}{bytes[1]:x2}{bytes[2]:x2}{bytes[3]:x2}-" +
+               $"{bytes[4]:x2}{bytes[5]:x2}-" +
+               $"{bytes[6]:x2}{bytes[7]:x2}-" +
+               $"{bytes[8]:x2}{bytes[9]:x2}-" +
+               $"{bytes[10]:x2}{bytes[11]:x2}{bytes[12]:x2}{bytes[13]:x2}{bytes[14]:x2}{bytes[15]:x2}";
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Timespec
+    {
+        public long tv_sec;
+        public long tv_nsec;
+    }
+
+    [DllImport("libc")]
+    private static extern int gethostuuid([Out] byte[] uuid, ref Timespec wait);
+
+    [DllImport("libc")]
+    private static extern uint geteuid();
+
+    [DllImport("libc")]
+    private static extern int mbr_uid_to_uuid(uint uid, [Out] byte[] uuid);
 
     /// <summary>
     /// Gets a summary string for logging

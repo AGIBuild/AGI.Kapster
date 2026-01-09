@@ -64,11 +64,12 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService, IDi
 
             _client = new TelemetryClient(_configuration);
 
-            // Set standard user/device context properties
-            // This enables built-in "Users" and "Sessions" reporting in Azure Portal
+            // Set standard user/device context properties.
+            // Note: User.Id may be empty if the OS user identifier cannot be resolved.
             var machineId = EnvironmentInfo.MachineId;
+            var userId = EnvironmentInfo.UserId;
             _client.Context.Device.Id = machineId;
-            _client.Context.User.Id = machineId; // For non-account apps, machine ID proxies as user ID
+            _client.Context.User.Id = userId;
             _client.Context.Session.Id = _sessionId;
             
             // Set other context properties
