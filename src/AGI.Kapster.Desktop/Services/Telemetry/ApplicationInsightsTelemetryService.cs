@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.DataContracts;
@@ -18,7 +19,6 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService, IDi
     private readonly TelemetryClient? _client;
     private readonly TelemetryConfiguration? _configuration;
     private readonly string _sessionId;
-    private readonly string _installId;
     private bool _disposed;
 
     /// <inheritdoc />
@@ -31,7 +31,6 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService, IDi
     public ApplicationInsightsTelemetryService(string? connectionStringOrKey)
     {
         _sessionId = Guid.NewGuid().ToString("N")[..8];
-        _installId = GetOrCreateInstallId();
 
         if (string.IsNullOrWhiteSpace(connectionStringOrKey))
         {
@@ -65,12 +64,18 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService, IDi
 
             _client = new TelemetryClient(_configuration);
 
-            // Set common context properties
+            // Set standard user/device context properties
+            // This enables built-in "Users" and "Sessions" reporting in Azure Portal
+            var machineId = EnvironmentInfo.MachineId;
+            _client.Context.Device.Id = machineId;
+            _client.Context.User.Id = machineId; // For non-account apps, machine ID proxies as user ID
             _client.Context.Session.Id = _sessionId;
+            
+            // Set other context properties
             _client.Context.Device.OperatingSystem = Environment.OSVersion.ToString();
             _client.Context.Component.Version = GetAppVersion();
-            _client.Context.GlobalProperties["install_id"] = _installId;
             _client.Context.GlobalProperties["platform"] = GetPlatform();
+            _client.Context.GlobalProperties["process_arch"] = RuntimeInformation.ProcessArchitecture.ToString();
 
             Log.Information("Application Insights telemetry initialized (session: {SessionId}, endpoint: {Endpoint})", 
                 _sessionId, 
@@ -202,35 +207,5 @@ public sealed class ApplicationInsightsTelemetryService : ITelemetryService, IDi
         if (OperatingSystem.IsMacOS()) return "macos";
         if (OperatingSystem.IsLinux()) return "linux";
         return "unknown";
-    }
-
-    private static string GetOrCreateInstallId()
-    {
-        try
-        {
-            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var kapsterDir = System.IO.Path.Combine(appDataPath, "AGI.Kapster");
-            var installIdPath = System.IO.Path.Combine(kapsterDir, ".install_id");
-
-            if (System.IO.File.Exists(installIdPath))
-            {
-                var existingId = System.IO.File.ReadAllText(installIdPath).Trim();
-                if (!string.IsNullOrEmpty(existingId))
-                {
-                    return existingId;
-                }
-            }
-
-            // Generate new install ID
-            var newId = Guid.NewGuid().ToString("N");
-            System.IO.Directory.CreateDirectory(kapsterDir);
-            System.IO.File.WriteAllText(installIdPath, newId);
-            return newId;
-        }
-        catch
-        {
-            // Fallback to session-based ID if we can't persist
-            return Guid.NewGuid().ToString("N");
-        }
     }
 }
